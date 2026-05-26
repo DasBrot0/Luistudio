@@ -1,65 +1,76 @@
-# Base de Datos – Luistudio
+# Base de Datos - Luistudio
 
-## Motor
+## Motor y acceso
 
-**PostgreSQL** hospedado en Supabase / Neon, accedido vía **Prisma ORM** desde el backend NestJS en el puerto `5432`.
+- Motor: `PostgreSQL` (local o cloud: Supabase/Neon).
+- Puerto por defecto: `5432`.
+- Backend consumidor: `Spring Boot`.
+- ORM equivalente en stack Java: `Spring Data JPA` con `Hibernate` como proveedor JPA.
 
 ![Diagrama de base de datos](image/database/diagrama_bd.png)
 
 ## Entidades principales
 
-### Módulo: Usuarios y Acceso
+### Modulo: Usuarios y Acceso
 
-| Entidad               | Descripción |
+| Entidad               | Descripcion |
 |-----------------------|-------------|
-| `Usuario`             | Datos del usuario (estudiante o administrador): nombre, apellido, código, correo institucional, contraseña (hash bcrypt), estado (habilitado / deshabilitado). |
-| `Rol`                 | Define el tipo de usuario: Administrador o Estudiante. |
-| `Permiso`             | Permisos granulares asociados a cada rol. |
-| `IntentoLogin`        | Registro de intentos de inicio de sesión fallidos para bloqueo automático. |
-| `DobleFactor`         | Configuración de autenticación de dos factores (2FA) por usuario. |
-| `RecuperacionContra`  | Tokens temporales para el flujo de restablecimiento de contraseña. |
+| `usuario`             | Datos del usuario (estudiante o administrador): nombre, apellido, codigo, correo institucional, contrasena (hash bcrypt), estado (habilitado/deshabilitado). |
+| `rol`                 | Define el tipo de usuario: Administrador o Estudiante. |
+| `permiso`             | Permisos granulares asociados a cada rol. |
+| `rol_permiso`         | Tabla puente para relacion muchos-a-muchos entre `rol` y `permiso`. |
+| `intento_login`       | Registro de intentos de inicio de sesion fallidos para bloqueo automatico. |
+| `doble_factor`        | Configuracion de autenticacion de dos factores (2FA) por usuario. |
+| `recuperacion_contra` | Tokens temporales para el flujo de restablecimiento de contrasena. |
 
-### Módulo: Reservas y Salas
+### Modulo: Reservas y Salas
 
-| Entidad      | Descripción |
-|--------------|-------------|
-| `Sala`       | Información de la sala: nombre, capacidad, ubicación, estado (disponible / en mantenimiento). |
-| `Pabellón`   | Agrupación de salas por edificio o ubicación física dentro del campus. |
-| `Reserva`    | Registro de reservas: sala, usuario, fecha, hora inicio, hora fin, estado (activa / cancelada). |
-| `Mantenimiento` | Periodos de mantenimiento programados para una sala, que bloquean su disponibilidad. |
+| Entidad         | Descripcion |
+|-----------------|-------------|
+| `pabellon`      | Agrupacion de salas por edificio o ubicacion fisica dentro del campus. |
+| `sala`          | Informacion de la sala: nombre, capacidad, ubicacion, estado (disponible/en_mantenimiento). |
+| `reserva`       | Registro de reservas: sala, usuario, fecha, hora inicio, hora fin, estado (activa/cancelada/completada). |
+| `mantenimiento` | Periodos de mantenimiento programados para una sala, que bloquean su disponibilidad. |
 
-### Módulo: Notificaciones
+### Modulo: Notificaciones
 
-| Entidad                   | Descripción |
-|---------------------------|-------------|
-| `RegistroNotificacion`    | Historial de todas las notificaciones enviadas (tipo, destinatario, fecha, contenido). |
-| `PreferenciaNotificacion` | Configuración personal de qué notificaciones desea recibir cada usuario. |
-| `email_outbox`            | Cola de correos pendientes de envío (confirmaciones, recordatorios, alertas). |
+| Entidad                     | Descripcion |
+|----------------------------|-------------|
+| `registro_notificacion`    | Historial de todas las notificaciones enviadas (tipo, destinatario, fecha, contenido). |
+| `preferencia_notificacion` | Configuracion personal de que notificaciones desea recibir cada usuario. |
+| `email_outbox`             | Cola de correos pendientes de envio (confirmaciones, recordatorios, alertas). |
 
-### Módulo: Auditoría
+### Modulo: Auditoria
 
-| Entidad      | Descripción |
-|--------------|-------------|
-| `audit_log`  | Registro de acciones relevantes en el sistema: actor, acción, entidad afectada, fecha. Usado principalmente en modificaciones de reservas y cambios de seguridad. |
+| Entidad     | Descripcion |
+|-------------|-------------|
+| `audit_log` | Registro de acciones relevantes: actor, accion, entidad afectada y fecha. |
 
 ## Relaciones clave
 
-```
-Usuario ──< Reserva >── Sala
-Usuario ──< IntentoLogin
-Usuario ── DobleFactor
-Usuario ── RecuperacionContra
-Usuario ── PreferenciaNotificacion
-Usuario ──< RegistroNotificacion
-Sala ── Pabellón
-Sala ──< Mantenimiento
-Rol ──< Permiso
-Usuario >── Rol
+```text
+usuario 1 --- n reserva n --- 1 sala
+usuario 1 --- n intento_login
+usuario 1 --- 1 doble_factor
+usuario 1 --- n recuperacion_contra
+usuario 1 --- 1 preferencia_notificacion
+usuario 1 --- n registro_notificacion
+sala n --- 1 pabellon
+sala 1 --- n mantenimiento
+rol 1 --- n usuario
+rol n --- n permiso (via rol_permiso)
 ```
 
-## Índices recomendados
+## Indices recomendados
 
-- `Sala.ubicacion` → para filtros rápidos por campus/pabellón.
-- `Reserva.usuario_id + Reserva.fecha` → para validar límite de reservas simultáneas.
-- `IntentoLogin.usuario_id + IntentoLogin.fecha` → para detección de accesos fallidos.
-- `audit_log.entidad + audit_log.entidad_id` → para trazabilidad por recurso.
+- `sala(ubicacion)` para filtros rapidos por campus/pabellon.
+- `reserva(usuario_id, fecha)` para validar limite de reservas por usuario.
+- `reserva(sala_id, fecha, hora_inicio, hora_fin)` para buscar solapamientos.
+- `intento_login(usuario_id, fecha_intento)` para deteccion de accesos fallidos.
+- `audit_log(entidad, entidad_id)` para trazabilidad por recurso.
+
+## Script SQL inicial
+
+El esquema inicial propuesto para desarrollo local esta en:
+
+- `database/001_init.sql`
