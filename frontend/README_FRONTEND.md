@@ -1,40 +1,42 @@
-### Frontend — React + TypeScript + Tailwind
+# Frontend - Luistudio (Release 01)
 
+## Stack
+
+- React + TypeScript + Vite
+- Tailwind CSS
+
+## Ejecucion local
+
+1. Instala dependencias:
+
+```bash
+npm install
 ```
-src/
-├── assets/          # Logos, íconos SVG, imágenes estáticas
-│
-├── components/      # Componentes reutilizables sin lógica de negocio
-│   ├── ui/          # Botones, inputs, modals, badges, tablas genéricas
-│   ├── layout/      # Sidebar, Topbar, NotificationBell, PageWrapper
-│   └── charts/      # Wrappers de Recharts (ej. ReservasChart)
-│
-├── pages/           # Vista principal del router
-│   ├── auth/        # Login, ForgotPassword
-│   ├── reservas/    # Reservar, MisReservas, Calendario
-│   ├── salas/       # ListaSalas, DetalleSala
-│   ├── admin/
-│   │   ├── usuarios/      # GestionUsuarios, Perfiles
-│   │   ├── mantenimiento/ # BloquearSala
-│   │   ├── seguridad/     # RegistroSeguridad, ConfigSeguridad
-│   │   └── auditoria/     # Auditoria
-│   └── perfil/      # MiPerfil, Notificaciones, Preferencias2FA
-│
-├── router/          # Definición de rutas, guards por rol
-│
-├── hooks/           # useAuth, useReservas, useNotificaciones, etc.
-│
-├── services/        # Llamadas a la API agrupadas por dominio
-│   ├── auth.service.ts
-│   ├── reservas.service.ts
-│   ├── salas.service.ts
-│   └── usuarios.service.ts
-│
-├── store/           # Estado global (Context o Zustand)
-│   ├── auth/        # Usuario actual, rol, token
-│   └── notificaciones/
-│
-├── types/           # Interfaces y tipos TypeScript compartidos
-│
-└── utils/           # Helpers: formatFecha, exportICS, calcularDuracion
+
+2. Configura variable de entorno (opcional):
+
+```bash
+VITE_API_BASE_URL=http://localhost:8080/api
 ```
+
+3. Ejecuta:
+
+```bash
+npm run dev
+```
+
+## Funcionalidades conectadas a backend
+
+- Login con roles (admin/estudiante) y flujo 2FA.
+- Solicitud y confirmacion de restablecimiento de contrasena.
+- Reserva, edicion y cancelacion de reservas.
+- CRUD de salas (admin).
+- Filtro y cambio de estado de perfiles (admin).
+- Configuracion de limites de reservas (admin).
+- Navegacion por rol y centro de notificaciones en UI.
+- Modo oscuro con persistencia (`localStorage`).
+
+## Capa API
+
+- Archivo principal: `src/services/api.ts`
+- Token JWT en `localStorage` con clave `luistudio_token`.
