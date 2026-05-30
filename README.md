@@ -63,3 +63,14 @@ Un sistema web que permita:
 ---
 
 > Documentación completa en la carpeta [`/docs`](./docs/)
+
+## Arranque local con `.env` en raiz
+
+1. Copia `.env.example` a `.env` y ajusta valores.
+2. Base de datos:
+   - Crear `luistudio_db`.
+   - Ejecutar `database/001_init.sql`.
+3. Levantar backend:
+   - `powershell -ExecutionPolicy Bypass -File scripts/start-backend.ps1`
+4. Levantar frontend:
+   - `powershell -ExecutionPolicy Bypass -File scripts/start-frontend.ps1`

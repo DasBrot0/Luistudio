@@ -28,13 +28,16 @@ npm run dev
 ## Funcionalidades conectadas a backend
 
 - Login con roles (admin/estudiante) y flujo 2FA.
+- Verificacion 2FA mediante modal propio (sin depender de `window.prompt`).
 - Solicitud y confirmacion de restablecimiento de contrasena.
 - Reserva, edicion y cancelacion de reservas.
 - CRUD de salas (admin).
 - Filtro y cambio de estado de perfiles (admin).
 - Configuracion de limites de reservas (admin).
 - Navegacion por rol y centro de notificaciones en UI.
-- Modo oscuro con persistencia (`localStorage`).
+- Modo oscuro con persistencia (`localStorage`) y paleta tonal completa para cards, modales, tablas, botones, textos y selectores.
+- Configuracion de accesibilidad visual en cliente: escala de texto global persistente (`luistudio_font_scale` en `localStorage`).
+- Sincronizacion de tema y escala de texto con backend en `GET/PUT /api/me/preferences` para usuarios autenticados.
 
 ## Capa API
 

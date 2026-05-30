@@ -19,11 +19,18 @@
    - `DB_DRIVER` (por defecto H2)
    - `JWT_SECRET`
    - `CORS_ORIGINS`
+   - `EMAIL_PROVIDER` (`log` por defecto, `resend` para envio real por API HTTP)
+   - `EMAIL_FROM` (ej. `Luistudio <no-reply@tu-dominio.com>`)
+   - `RESEND_API_KEY` (requerida si `EMAIL_PROVIDER=resend`)
 4. Ejecuta:
 
 ```bash
 ./mvnw spring-boot:run
 ```
+
+Si usas el script `scripts/start-backend.ps1`, este carga variables automaticamente desde:
+- `/.env` (raiz del proyecto), o
+- `/backend/reservas/.env` (si no existe el de raiz).
 
 ## Endpoints principales (Release 01)
 
@@ -70,10 +77,14 @@
 
 - `GET /api/me/preferences`
 - `PUT /api/me/preferences`
+  - Incluye preferencias de notificaciones + UI (`themeMode`, `fontScale`).
 
 ## Notas de implementacion
 
 - Se implementa bloqueo temporal tras intentos fallidos de login.
 - Se implementa 2FA por codigo temporal.
 - `email_outbox` se procesa por scheduler (reintentos automaticos).
+- En local, sin `RESEND_API_KEY`, el envio de correos cae en modo log (no SMTP).
+- Para despliegue en Render, usar `EMAIL_PROVIDER=resend` + `RESEND_API_KEY` (salida por HTTPS/443).
 - Se generan enlaces Google Calendar y descarga `.ics` por reserva.
+- El esquema SQL base (`database/001_init.sql` y `database/002_seed_release01.sql`) define tablas y columnas en ingles para instalaciones desde cero.
