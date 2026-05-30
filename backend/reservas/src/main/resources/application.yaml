@@ -1,0 +1,37 @@
+spring:
+  application:
+    name: reservas
+  datasource:
+    url: ${DB_URL:jdbc:h2:mem:luistudio;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH}
+    username: ${DB_USER:sa}
+    password: ${DB_PASSWORD:}
+    driver-class-name: ${DB_DRIVER:org.h2.Driver}
+  jpa:
+    hibernate:
+      ddl-auto: update
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: true
+  jackson:
+    time-zone: America/Lima
+    serialization:
+      write-dates-as-timestamps: false
+
+server:
+  port: ${PORT:8080}
+
+security:
+  jwt:
+    secret: ${JWT_SECRET:luistudio-dev-secret-change-me}
+    expiration-minutes: ${JWT_EXP_MINUTES:180}
+    provisional-expiration-minutes: ${JWT_PROVISIONAL_EXP_MINUTES:10}
+
+app:
+  cors:
+    origins: ${CORS_ORIGINS:http://localhost:5173}
+  email:
+    provider: ${EMAIL_PROVIDER:log}
+    from: ${EMAIL_FROM:Luistudio <onboarding@resend.dev>}
+    resend:
+      api-key: ${RESEND_API_KEY:}
