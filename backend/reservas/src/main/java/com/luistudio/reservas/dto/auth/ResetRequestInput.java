@@ -1,0 +1,7 @@
+package com.luistudio.reservas.dto.auth;
+
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
+
+public record ResetRequestInput(@NotBlank @Email String email) {
+}
