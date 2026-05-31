@@ -88,3 +88,16 @@ Si usas el script `scripts/start-backend.ps1`, este carga variables automaticame
 - Para despliegue en Render, usar `EMAIL_PROVIDER=resend` + `RESEND_API_KEY` (salida por HTTPS/443).
 - Se generan enlaces Google Calendar y descarga `.ics` por reserva.
 - El esquema SQL base (`database/001_init.sql` y `database/002_seed_release01.sql`) define tablas y columnas en ingles para instalaciones desde cero.
+
+## Patrones aplicados
+
+- `Strategy`:
+  - Reglas de validacion de reservas (`service/booking/rule/*`).
+  - Flujo de respuesta de login (`service/auth/strategy/*`).
+- `Command`:
+  - Recordatorios de reservas (`service/booking/command/*`).
+- `Factory Method`:
+  - Creacion de entidades de reservas/salas/mantenimiento/seguridad (`service/factory/*`).
+  - Seleccion de proveedor de envio de correo (`service/email/gateway/EmailGatewayFactory`).
+- `Adapter`:
+  - Adaptacion de proveedor de correo (`service/email/gateway/*Gateway`).

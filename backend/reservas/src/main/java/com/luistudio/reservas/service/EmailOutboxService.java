@@ -6,44 +6,29 @@ import com.luistudio.reservas.model.NotificationPreferenceEntity;
 import com.luistudio.reservas.model.UserEntity;
 import com.luistudio.reservas.repository.EmailOutboxRepository;
 import com.luistudio.reservas.repository.NotificationPreferenceRepository;
+import com.luistudio.reservas.service.email.gateway.EmailGateway;
+import com.luistudio.reservas.service.email.gateway.EmailGatewayFactory;
 import java.time.OffsetDateTime;
 import java.util.List;
-import java.util.Map;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.util.StringUtils;
-import org.springframework.web.client.RestClient;
 
-@Slf4j
 @Service
 public class EmailOutboxService {
 
     private final EmailOutboxRepository emailOutboxRepository;
     private final NotificationPreferenceRepository notificationPreferenceRepository;
-    private final RestClient restClient;
-    private final String emailProvider;
-    private final String emailFrom;
-    private final String resendApiKey;
+    private final EmailGateway emailGateway;
 
     public EmailOutboxService(
         EmailOutboxRepository emailOutboxRepository,
         NotificationPreferenceRepository notificationPreferenceRepository,
-        RestClient.Builder restClientBuilder,
-        @Value("${app.email.provider:log}") String emailProvider,
-        @Value("${app.email.from:Luistudio <onboarding@resend.dev>}") String emailFrom,
-        @Value("${app.email.resend.api-key:}") String resendApiKey
+        EmailGatewayFactory emailGatewayFactory
     ) {
         this.emailOutboxRepository = emailOutboxRepository;
         this.notificationPreferenceRepository = notificationPreferenceRepository;
-        this.restClient = restClientBuilder.baseUrl("https://api.resend.com").build();
-        this.emailProvider = emailProvider;
-        this.emailFrom = emailFrom;
-        this.resendApiKey = resendApiKey;
+        this.emailGateway = emailGatewayFactory.createGateway();
     }
 
     @Transactional
@@ -91,36 +76,6 @@ public class EmailOutboxService {
     }
 
     private void sendEmail(EmailOutboxEntity email) {
-        if (shouldUseResend()) {
-            sendWithResend(email);
-            return;
-        }
-        if ("resend".equalsIgnoreCase(emailProvider) && !StringUtils.hasText(resendApiKey)) {
-            log.warn("[OUTBOX] EMAIL_PROVIDER=resend pero RESEND_API_KEY no esta configurada. Usando fallback a log.");
-        }
-        log.info("[OUTBOX] To: {} | Subject: {}", email.getDestinatario(), email.getAsunto());
-    }
-
-    private boolean shouldUseResend() {
-        return "resend".equalsIgnoreCase(emailProvider) && StringUtils.hasText(resendApiKey);
-    }
-
-    private void sendWithResend(EmailOutboxEntity email) {
-        Map<String, Object> payload = Map.of(
-            "from", emailFrom,
-            "to", List.of(email.getDestinatario()),
-            "subject", email.getAsunto(),
-            "text", email.getCuerpo()
-        );
-
-        String response = restClient.post()
-            .uri("/emails")
-            .header(HttpHeaders.AUTHORIZATION, "Bearer " + resendApiKey)
-            .contentType(MediaType.APPLICATION_JSON)
-            .body(payload)
-            .retrieve()
-            .body(String.class);
-
-        log.info("[RESEND] Email enviado a {} | Subject: {} | Response: {}", email.getDestinatario(), email.getAsunto(), response);
+        emailGateway.send(email);
     }
 }

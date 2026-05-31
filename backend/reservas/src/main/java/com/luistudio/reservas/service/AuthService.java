@@ -19,9 +19,10 @@ import com.luistudio.reservas.repository.PasswordResetRepository;
 import com.luistudio.reservas.repository.TwoFactorCodeRepository;
 import com.luistudio.reservas.repository.UserRepository;
 import com.luistudio.reservas.security.JwtService;
-import java.security.SecureRandom;
+import com.luistudio.reservas.service.auth.strategy.LoginStrategy;
+import com.luistudio.reservas.service.factory.SecurityEntityFactory;
 import java.time.OffsetDateTime;
-import java.util.UUID;
+import java.util.List;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -38,6 +39,8 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final DtoMapper dtoMapper;
     private final EmailOutboxService emailOutboxService;
+    private final SecurityEntityFactory securityEntityFactory;
+    private final List<LoginStrategy> loginStrategies;
 
     public AuthService(
         UserRepository userRepository,
@@ -47,7 +50,9 @@ public class AuthService {
         JwtService jwtService,
         PasswordEncoder passwordEncoder,
         DtoMapper dtoMapper,
-        EmailOutboxService emailOutboxService
+        EmailOutboxService emailOutboxService,
+        SecurityEntityFactory securityEntityFactory,
+        List<LoginStrategy> loginStrategies
     ) {
         this.userRepository = userRepository;
         this.loginAttemptRepository = loginAttemptRepository;
@@ -57,6 +62,8 @@ public class AuthService {
         this.passwordEncoder = passwordEncoder;
         this.dtoMapper = dtoMapper;
         this.emailOutboxService = emailOutboxService;
+        this.securityEntityFactory = securityEntityFactory;
+        this.loginStrategies = loginStrategies;
     }
 
     @Transactional
@@ -98,28 +105,7 @@ public class AuthService {
         user.setLockedUntil(null);
         userRepository.save(user);
 
-        if (Boolean.TRUE.equals(user.getHas2fa())) {
-            String code = generateSixDigits();
-            TwoFactorCodeEntity twoFactor = new TwoFactorCodeEntity();
-            twoFactor.setUsuario(user);
-            twoFactor.setCode(code);
-            twoFactor.setExpiraAt(OffsetDateTime.now().plusMinutes(10));
-            twoFactor.setUsado(false);
-            twoFactorCodeRepository.save(twoFactor);
-
-            emailOutboxService.enqueue(user, "Codigo de verificacion 2FA", "Tu codigo es: " + code, null);
-
-            String provisionalToken = jwtService.generateProvisionalToken(
-                user.getId(),
-                user.getCorreo(),
-                user.getRol().getNombre()
-            );
-
-            return new LoginResponse(null, provisionalToken, true, dtoMapper.toAuthUser(user), "Codigo 2FA enviado");
-        }
-
-        String token = jwtService.generateToken(user.getId(), user.getCorreo(), user.getRol().getNombre());
-        return new LoginResponse(token, null, false, dtoMapper.toAuthUser(user), "Login correcto");
+        return resolveLoginStrategy(user).buildResponse(user);
     }
 
     @Transactional
@@ -160,11 +146,7 @@ public class AuthService {
     @Transactional
     public void requestReset(ResetRequestInput request) {
         userRepository.findByCorreoIgnoreCase(request.email()).ifPresent(user -> {
-            PasswordResetEntity reset = new PasswordResetEntity();
-            reset.setUsuario(user);
-            reset.setToken(UUID.randomUUID().toString().replace("-", ""));
-            reset.setExpiraEn(OffsetDateTime.now().plusMinutes(30));
-            reset.setUsado(false);
+            PasswordResetEntity reset = securityEntityFactory.newPasswordReset(user, 30);
             passwordResetRepository.save(reset);
 
             emailOutboxService.enqueue(
@@ -199,16 +181,10 @@ public class AuthService {
     @Transactional
     public void enroll2fa(Long userId) {
         UserEntity user = userRepository.findById(userId).orElseThrow(() -> new NotFoundException("Usuario no encontrado"));
-        String code = generateSixDigits();
-
-        TwoFactorCodeEntity twoFactor = new TwoFactorCodeEntity();
-        twoFactor.setUsuario(user);
-        twoFactor.setCode(code);
-        twoFactor.setExpiraAt(OffsetDateTime.now().plusMinutes(10));
-        twoFactor.setUsado(false);
+        TwoFactorCodeEntity twoFactor = securityEntityFactory.newTwoFactorCode(user, 10);
         twoFactorCodeRepository.save(twoFactor);
 
-        emailOutboxService.enqueue(user, "Activacion de 2FA", "Codigo para activar 2FA: " + code, null);
+        emailOutboxService.enqueue(user, "Activacion de 2FA", "Codigo para activar 2FA: " + twoFactor.getCode(), null);
     }
 
     @Transactional
@@ -235,15 +211,14 @@ public class AuthService {
     }
 
     private void registerAttempt(UserEntity user, boolean success, String ipAddress) {
-        LoginAttemptEntity attempt = new LoginAttemptEntity();
-        attempt.setUsuario(user);
-        attempt.setExito(success);
-        attempt.setIpOrigen(ipAddress);
+        LoginAttemptEntity attempt = securityEntityFactory.newLoginAttempt(user, success, ipAddress);
         loginAttemptRepository.save(attempt);
     }
 
-    private String generateSixDigits() {
-        int value = new SecureRandom().nextInt(900000) + 100000;
-        return String.valueOf(value);
+    private LoginStrategy resolveLoginStrategy(UserEntity user) {
+        return loginStrategies.stream()
+            .filter(strategy -> strategy.supports(user))
+            .findFirst()
+            .orElseThrow(() -> new IllegalStateException("No existe estrategia de login para el usuario"));
     }
 }

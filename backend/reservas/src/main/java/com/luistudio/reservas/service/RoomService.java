@@ -7,15 +7,15 @@ import com.luistudio.reservas.dto.room.RoomUpsertRequest;
 import com.luistudio.reservas.exception.BusinessException;
 import com.luistudio.reservas.exception.NotFoundException;
 import com.luistudio.reservas.model.MaintenanceEntity;
-import com.luistudio.reservas.model.MaintenanceStatus;
 import com.luistudio.reservas.model.PabellonEntity;
-import com.luistudio.reservas.model.ReservationStatus;
 import com.luistudio.reservas.model.RoomEntity;
 import com.luistudio.reservas.model.RoomState;
 import com.luistudio.reservas.repository.MaintenanceRepository;
 import com.luistudio.reservas.repository.PabellonRepository;
 import com.luistudio.reservas.repository.ReservationRepository;
 import com.luistudio.reservas.repository.RoomRepository;
+import com.luistudio.reservas.service.factory.MaintenanceFactory;
+import com.luistudio.reservas.service.factory.RoomFactory;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.OffsetDateTime;
@@ -32,19 +32,25 @@ public class RoomService {
     private final ReservationRepository reservationRepository;
     private final MaintenanceRepository maintenanceRepository;
     private final DtoMapper dtoMapper;
+    private final RoomFactory roomFactory;
+    private final MaintenanceFactory maintenanceFactory;
 
     public RoomService(
         RoomRepository roomRepository,
         PabellonRepository pabellonRepository,
         ReservationRepository reservationRepository,
         MaintenanceRepository maintenanceRepository,
-        DtoMapper dtoMapper
+        DtoMapper dtoMapper,
+        RoomFactory roomFactory,
+        MaintenanceFactory maintenanceFactory
     ) {
         this.roomRepository = roomRepository;
         this.pabellonRepository = pabellonRepository;
         this.reservationRepository = reservationRepository;
         this.maintenanceRepository = maintenanceRepository;
         this.dtoMapper = dtoMapper;
+        this.roomFactory = roomFactory;
+        this.maintenanceFactory = maintenanceFactory;
     }
 
     @Transactional(readOnly = true)
@@ -68,14 +74,13 @@ public class RoomService {
         }
 
         PabellonEntity pabellon = resolvePabellon(request.pabellonCode(), request.location());
-
-        RoomEntity room = new RoomEntity();
-        room.setNombre(request.name().trim());
-        room.setCapacidad(request.capacity());
-        room.setUbicacion(request.location().trim());
-        room.setEstado(RoomState.DISPONIBLE);
-        room.setPabellon(pabellon);
-        room.setCodigo(generateRoomCode(request.location()));
+        RoomEntity room = roomFactory.createAvailableRoom(
+            request.name(),
+            request.capacity(),
+            request.location(),
+            pabellon,
+            generateRoomCode(request.location())
+        );
         return dtoMapper.toRoom(roomRepository.save(room));
     }
 
@@ -112,12 +117,7 @@ public class RoomService {
             throw new BusinessException(HttpStatus.BAD_REQUEST, "La fecha fin debe ser mayor que inicio");
         }
 
-        MaintenanceEntity maintenance = new MaintenanceEntity();
-        maintenance.setSala(room);
-        maintenance.setInicio(request.start());
-        maintenance.setFin(request.end());
-        maintenance.setMotivo(request.reason());
-        maintenance.setEstado(MaintenanceStatus.PROGRAMADO);
+        MaintenanceEntity maintenance = maintenanceFactory.createScheduled(room, request);
         room.setEstado(RoomState.EN_MANTENIMIENTO);
         roomRepository.save(room);
 
