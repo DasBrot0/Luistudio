@@ -37,3 +37,12 @@ app:
     from: ${EMAIL_FROM:Luistudio <onboarding@resend.dev>}
     resend:
       api-key: ${RESEND_API_KEY:}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: never

@@ -32,6 +32,28 @@ Si usas el script `scripts/start-backend.ps1`, este carga variables automaticame
 - `/.env` (raiz del proyecto), o
 - `/backend/reservas/.env` (si no existe el de raiz).
 
+## Despliegue en Render (Docker)
+
+En este proyecto puedes desplegar el backend usando:
+- `backend/reservas/Dockerfile`
+- `backend/reservas/.dockerignore`
+
+Sugerencias de configuracion en Render:
+- `Root Directory`: `backend/reservas`
+- Runtime: `Docker`
+- Variables de entorno minimas:
+  - `DB_URL`
+  - `DB_USER`
+  - `DB_PASSWORD`
+  - `DB_DRIVER=org.postgresql.Driver`
+  - `JWT_SECRET`
+  - `CORS_ORIGINS`
+
+Memoria (500 MB):
+- El Dockerfile ya incluye ajustes JVM para memoria limitada (`MaxRAMPercentage=70`, `SerialGC`).
+- Con trafico bajo/moderado suele funcionar bien en 500 MB.
+- Si sube la concurrencia, exportaciones pesadas o procesos simultaneos, puede haber reinicios por OOM; en ese caso conviene subir a 1 GB.
+
 ## Endpoints principales (Release 01)
 
 ### Auth y seguridad
@@ -108,6 +130,27 @@ Si usas el script `scripts/start-backend.ps1`, este carga variables automaticame
 - Se agrega preferencia por usuario `login_landing_view` para definir la vista inicial al iniciar sesion (validada por rol).
 - Para bases ya existentes, aplicar `database/004_add_login_landing_view.sql`.
 - Para convertir data previa de salas (ingles -> espanol en `code/name/campus/venue/location`), aplicar `database/005_rooms_data_to_spanish.sql`.
+
+## Keep-alive en Render con UptimeRobot
+
+Si despliegas en Render y quieres evitar que el backend entre en reposo por inactividad, puedes usar UptimeRobot para hacer ping cada 5 minutos.
+
+1. Verifica endpoint de salud publico:
+   - URL recomendada: `GET /actuator/health`
+   - En este proyecto:
+     - Actuator esta habilitado.
+     - Solo se expone `health`.
+     - `GET /actuator/health` esta permitido sin autenticacion.
+2. Crea cuenta gratuita en UptimeRobot (hasta 50 monitores, intervalo minimo 5 min).
+3. Crea monitor:
+   - `Monitor Type`: `HTTP(s)`
+   - `Friendly Name`: `Luistudio Backend`
+   - `URL`: `https://<tu-servicio-render>.onrender.com/actuator/health`
+   - `Monitoring Interval`: `5 minutes`
+4. Guarda el monitor y valida que reciba `200 OK`.
+
+Nota:
+- No uses `GET /api/rooms` para keep-alive si no mandas token, porque ese endpoint requiere autenticacion.
 
 ## Patrones aplicados
 
