@@ -15,8 +15,8 @@
 | Exportación de calendario | `.ics`             |
 | Control de versiones      | Git + GitHub       |
 | Despliegue Frontend       | Vercel             |
-| Despliegue Backend        | Render / Railway   |
-| Hosting Base de Datos     | Supabase / Neon    |
+| Despliegue Backend        | Render             |
+| Hosting Base de Datos     | Supabase           |
 
 ---
 
@@ -38,11 +38,11 @@ Navegador (PC / Móvil)
         ↓  HTTPS
 Frontend React (Vercel)
         ↓  REST API
-Backend Spring Boot + Java (Render / Railway)
+Backend Spring Boot + Java (Render)
         ↓  TCP/IP :5432
-PostgreSQL (Supabase / Neon)
+PostgreSQL (Supabase)
         +
-Servidor SMTP externo (Brevo / Resend)
+Servidor SMTP externo (Resend)
 ```
 
 ---

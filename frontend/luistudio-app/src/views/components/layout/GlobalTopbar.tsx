@@ -64,7 +64,7 @@ export function GlobalTopbar({
 
   return (
     <>
-      <aside className={`hidden border-r border-primary-light bg-bg-sidebar text-text-on-primary md:fixed md:inset-y-0 md:left-0 md:z-40 md:flex md:flex-col md:transition-all ${isSidebarCollapsed ? 'md:w-24' : 'md:w-64'}`}>
+      <aside className={`sidebar-shell hidden border-r border-primary-light bg-bg-sidebar text-text-on-primary md:fixed md:inset-y-0 md:left-0 md:z-40 md:flex md:flex-col md:transition-all ${isSidebarCollapsed ? 'md:w-24' : 'md:w-64'}`}>
         <button
           type="button"
           onClick={onToggleSidebar}
@@ -86,7 +86,7 @@ export function GlobalTopbar({
           </div>
         </div>
 
-        <nav className="flex flex-1 flex-col gap-2 px-3">
+        <nav className="flex min-h-0 flex-1 flex-col gap-2 px-3">
           {navItems.map((item) => {
             const isActive = activeRoute === item.route
             return (

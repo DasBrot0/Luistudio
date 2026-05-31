@@ -36,6 +36,9 @@
   --error-ink: #ef4444;
   --card-shadow: 0 8px 24px rgba(17, 24, 39, 0.08);
   --badge-ink: #84b6ef;
+  --scrollbar-track: #e8edf5;
+  --scrollbar-thumb: #9eb0c6;
+  --scrollbar-thumb-hover: #7f93ad;
 
   --title-font: 'Metropolis', 'Segoe UI', sans-serif;
   --text-font: 'Metropolis', 'Segoe UI', sans-serif;
@@ -90,10 +93,35 @@
   --on-brand: #ffffff;
   --card-shadow: 0 14px 34px rgba(0, 0, 0, 0.48);
   --badge-ink: #89bdf8;
+  --scrollbar-track: #1b2a3d;
+  --scrollbar-thumb: #516a8a;
+  --scrollbar-thumb-hover: #6d89ad;
 }
 
 * {
   box-sizing: border-box;
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+}
+
+*::-webkit-scrollbar {
+  width: 0.75rem;
+  height: 0.75rem;
+}
+
+*::-webkit-scrollbar-track {
+  background: var(--scrollbar-track);
+  border-radius: 999px;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: 999px;
+  border: 2px solid var(--scrollbar-track);
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-thumb-hover);
 }
 
 .page {
@@ -171,11 +199,11 @@
 }
 
 .sidebar-edge-toggle {
+  --sidebar-toggle-width: 1.9rem;
   position: absolute;
   top: 1.2rem;
-  right: 0;
-  transform: translateX(25%);
-  width: 1.9rem;
+  right: calc(var(--sidebar-toggle-width) * -0.25);
+  width: var(--sidebar-toggle-width);
   height: 2.3rem;
   border-radius: 0 0.65rem 0.65rem 0;
   border: 1px solid color-mix(in srgb, var(--line-300) 60%, transparent);
@@ -195,7 +223,13 @@
 
 .sidebar-edge-toggle.collapsed {
   border-radius: 0.65rem 0 0 0.65rem;
-  transform: translateX(25%);
+}
+
+.sidebar-shell {
+  overflow-y: auto;
+  overflow-x: visible;
+  max-height: 100dvh;
+  scrollbar-gutter: stable;
 }
 
 .role-chip {
@@ -1957,6 +1991,64 @@ th {
   }
 }
 
+@media (max-height: 52rem) {
+  .modal-layer {
+    place-items: center;
+    overflow-y: auto;
+    padding: 0.7rem;
+  }
+
+  .modal-card {
+    max-height: calc(100dvh - 1.4rem);
+    overflow-y: auto;
+  }
+}
+
+@media (max-height: 48rem) and (min-width: 48rem) {
+  .dashboard-page {
+    padding: var(--space-2);
+  }
+
+  .app-header {
+    margin-bottom: var(--space-2);
+  }
+
+  .card {
+    padding: 0.82rem;
+  }
+
+  .booking-block {
+    padding: 0.72rem 0.74rem;
+    gap: 0.46rem;
+  }
+
+  .reservation-week-nav {
+    gap: 0.35rem;
+  }
+
+  .calendar-grid th,
+  .calendar-grid td {
+    padding: 0.1rem;
+  }
+
+  .calendar-cell-btn {
+    min-height: 1.46rem;
+  }
+
+  .modal-card:not(.settings-dialog) .modal-actions {
+    position: sticky;
+    bottom: 0;
+    background: var(--surface-000);
+    padding-top: 0.55rem;
+  }
+
+  .settings-dialog .modal-actions {
+    position: static;
+    background: transparent;
+    padding-top: 0;
+  }
+}
+
 @media (max-width: 72rem) and (min-width: 48rem) {
   .dashboard-page {
     padding: var(--space-2);
@@ -2049,7 +2141,7 @@ th {
 
 @media (max-width: 47.99rem) {
   .modal-layer {
-    place-items: start center;
+    place-items: center;
     overflow-y: auto;
     padding: 0.7rem;
   }
