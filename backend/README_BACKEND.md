@@ -140,7 +140,7 @@ Si despliegas en Render y quieres evitar que el backend entre en reposo por inac
    - En este proyecto:
      - Actuator esta habilitado.
      - Solo se expone `health`.
-     - `GET /actuator/health` esta permitido sin autenticacion.
+     - `GET /actuator/health` y `HEAD /actuator/health` estan permitidos sin autenticacion.
 2. Crea cuenta gratuita en UptimeRobot (hasta 50 monitores, intervalo minimo 5 min).
 3. Crea monitor:
    - `Monitor Type`: `HTTP(s)`
