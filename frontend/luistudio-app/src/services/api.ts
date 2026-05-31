@@ -1,4 +1,6 @@
-const API_BASE = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080/api'
+const rawApiBase = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080/api'
+const normalizedApiBase = rawApiBase.replace(/\/+$/, '')
+const API_BASE = normalizedApiBase.endsWith('/api') ? normalizedApiBase : `${normalizedApiBase}/api`
 
 export interface ApiAuthUser {
   id: number

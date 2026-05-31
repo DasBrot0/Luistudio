@@ -19,6 +19,8 @@ npm install
 VITE_API_BASE_URL=http://localhost:8080/api
 ```
 
+Nota: si defines `VITE_API_BASE_URL` sin sufijo `/api`, la app lo agrega automÃ¡ticamente.
+
 3. Ejecuta:
 
 ```bash
@@ -58,3 +60,8 @@ npm run dev
 
 - Archivo principal: `src/services/api.ts`
 - Token JWT en `localStorage` con clave `luistudio_token`.
+
+## Deploy en Vercel (SPA)
+
+- Este frontend usa React Router, por lo que rutas como `/reservas` o `/salas` deben reescribirse a `index.html` en produccion.
+- El archivo `frontend/luistudio-app/vercel.json` ya incluye el rewrite global para evitar `404 NOT_FOUND` al recargar con `F5`.
