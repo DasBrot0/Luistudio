@@ -68,7 +68,7 @@ export function GlobalTopbar({
         <button
           type="button"
           onClick={onToggleSidebar}
-          className="sidebar-edge-toggle"
+          className={`sidebar-edge-toggle ${isSidebarCollapsed ? 'collapsed' : ''}`}
           title={isSidebarCollapsed ? 'Expandir barra lateral' : 'Colapsar barra lateral'}
         >
           <div className={isSidebarCollapsed ? 'rotate-180' : ''}>

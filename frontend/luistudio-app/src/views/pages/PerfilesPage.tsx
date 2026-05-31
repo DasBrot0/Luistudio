@@ -38,7 +38,7 @@ export function PerfilesPage({
             />
           </div>
 
-          <div className="table-wrap">
+          <div className="table-wrap desktop-table-only">
             <table>
               <thead>
                 <tr>
@@ -71,6 +71,30 @@ export function PerfilesPage({
                 ))}
               </tbody>
             </table>
+          </div>
+
+          <div className="mobile-list-only">
+            {paginatedProfiles.map((profile) => (
+              <article key={`profile-mobile-${profile.id}`} className="mobile-record-card">
+                <div className="mobile-record-grid">
+                  <p><strong>ID:</strong> {profile.id}</p>
+                  <p><strong>Código:</strong> {profile.code}</p>
+                  <p><strong>Correo:</strong> {profile.email}</p>
+                  <p><strong>Nombre:</strong> {profile.firstName}</p>
+                  <p><strong>Apellidos:</strong> {profile.lastName}</p>
+                  <p className="mobile-record-state">
+                    <strong>Estado:</strong>{' '}
+                    <button
+                      type="button"
+                      className={`status-pill clickable ${profile.status === 'Habilitado' ? 'ok' : 'cancelled'}`}
+                      onClick={() => onToggleProfileStatus(profile.id)}
+                    >
+                      {profile.status}
+                    </button>
+                  </p>
+                </div>
+              </article>
+            ))}
           </div>
 
           <div className="pagination pagination-center">

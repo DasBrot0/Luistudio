@@ -42,6 +42,9 @@ public class NotificationPreferenceEntity {
     @Column(name = "font_scale", nullable = false)
     private Double fontScale = 1.0;
 
+    @Column(name = "login_landing_view", nullable = false, length = 30)
+    private String loginLandingView = "STUDENT_MY_BOOKINGS";
+
     @Column(name = "updated_at", nullable = false)
     private OffsetDateTime actualizadoEn = OffsetDateTime.now();
 }

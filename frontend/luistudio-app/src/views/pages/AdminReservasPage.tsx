@@ -60,6 +60,14 @@ export function AdminReservasPage({
     return endDateTime.getTime() > Date.now()
   }
 
+  const bookingRows = bookings.map((booking) => {
+    const owner = users.find((user) => user.id === booking.userId)
+    return {
+      booking,
+      ownerEmail: booking.userEmail ?? owner?.email ?? 'No registrado',
+    }
+  })
+
   return (
     <main className="page dashboard-page">
       <AppHeader title="Reservas registradas" roleLabel="Administrador" />
@@ -79,7 +87,7 @@ export function AdminReservasPage({
             </div>
           </div>
 
-          <div className="table-wrap">
+          <div className="table-wrap desktop-table-only">
             <table>
               <thead>
                 <tr>
@@ -93,28 +101,48 @@ export function AdminReservasPage({
                 </tr>
               </thead>
               <tbody>
-                {bookings.map((booking) => {
-                  const owner = users.find((user) => user.id === booking.userId)
-
-                  return (
-                    <tr key={booking.id}>
-                      <td data-label="ID">{booking.id}</td>
-                      <td data-label="Estudiante">{booking.userEmail ?? owner?.email ?? 'No registrado'}</td>
-                      <td data-label="Sala">{booking.roomId}</td>
-                      <td data-label="Fecha">{formatDate(booking.date)}</td>
-                      <td data-label="Horario">{booking.start}-{booking.end}</td>
-                      <td data-label="Estado">
-                        <span className={`status-pill ${booking.status === 'Confirmado' ? 'ok' : 'cancelled'}`}>{booking.status}</span>
-                      </td>
-                      <td data-label="Acciones" className="actions-cell">
+                {bookingRows.map(({ booking, ownerEmail }) => (
+                  <tr key={booking.id}>
+                    <td data-label="ID">{booking.id}</td>
+                    <td data-label="Estudiante">{ownerEmail}</td>
+                    <td data-label="Sala">{booking.roomId}</td>
+                    <td data-label="Fecha">{formatDate(booking.date)}</td>
+                    <td data-label="Horario">{booking.start}-{booking.end}</td>
+                    <td data-label="Estado">
+                      <span className={`status-pill ${booking.status === 'Confirmado' ? 'ok' : 'cancelled'}`}>{booking.status}</span>
+                    </td>
+                    <td data-label="Acciones" className="actions-cell">
+                      <div className="actions-inline">
                         <button type="button" className="inline-flex min-h-8 items-center justify-center rounded-md bg-slate-200 px-3 text-xs font-semibold text-slate-700 transition hover:-translate-y-px hover:bg-slate-300 disabled:cursor-not-allowed disabled:opacity-60" onClick={() => onEditBooking(booking)}>Editar</button>
                         <button type="button" className="inline-flex min-h-8 items-center justify-center rounded-md bg-red-100 px-3 text-xs font-semibold text-red-700 transition hover:-translate-y-px hover:bg-red-200 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500 disabled:opacity-60" disabled={!canCancelBooking(booking)} onClick={() => onCancelBooking(booking.id)}>Cancelar</button>
-                      </td>
-                    </tr>
-                  )
-                })}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
+          </div>
+
+          <div className="mobile-list-only">
+            {bookingRows.map(({ booking, ownerEmail }) => (
+              <article key={`admin-mobile-${booking.id}`} className="mobile-record-card">
+                <div className="mobile-record-grid">
+                  <p><strong>ID:</strong> {booking.id}</p>
+                  <p><strong>Estudiante:</strong> {ownerEmail}</p>
+                  <p><strong>Sala:</strong> {booking.roomId}</p>
+                  <p><strong>Fecha:</strong> {formatDate(booking.date)}</p>
+                  <p><strong>Horario:</strong> {booking.start}-{booking.end}</p>
+                  <p className="mobile-record-state">
+                    <strong>Estado:</strong>{' '}
+                    <span className={`status-pill ${booking.status === 'Confirmado' ? 'ok' : 'cancelled'}`}>{booking.status}</span>
+                  </p>
+                </div>
+                <div className="actions-inline mt-2">
+                  <button type="button" className="inline-flex min-h-8 items-center justify-center rounded-md bg-slate-200 px-3 text-xs font-semibold text-slate-700 transition hover:-translate-y-px hover:bg-slate-300 disabled:cursor-not-allowed disabled:opacity-60" onClick={() => onEditBooking(booking)}>Editar</button>
+                  <button type="button" className="inline-flex min-h-8 items-center justify-center rounded-md bg-red-100 px-3 text-xs font-semibold text-red-700 transition hover:-translate-y-px hover:bg-red-200 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500 disabled:opacity-60" disabled={!canCancelBooking(booking)} onClick={() => onCancelBooking(booking.id)}>Cancelar</button>
+                </div>
+              </article>
+            ))}
           </div>
 
           <div className="pagination">

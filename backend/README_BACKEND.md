@@ -83,6 +83,12 @@ Si usas el script `scripts/start-backend.ps1`, este carga variables automaticame
 - `PUT /api/me/preferences`
   - Incluye preferencias de notificaciones + UI (`themeMode`, `fontScale`).
 
+### Usuarios (consulta para reservas)
+
+- `GET /api/users/lookup?code=...`
+  - Requiere usuario autenticado.
+  - Devuelve codigo y nombre completo para validar participantes de una reserva.
+
 ## Notas de implementacion
 
 - Se implementa bloqueo temporal tras intentos fallidos de login.
@@ -91,14 +97,17 @@ Si usas el script `scripts/start-backend.ps1`, este carga variables automaticame
 - En local, sin `RESEND_API_KEY`, el envio de correos cae en modo log (no SMTP).
 - Para despliegue en Render, usar `EMAIL_PROVIDER=resend` + `RESEND_API_KEY` (salida por HTTPS/443).
 - Se generan enlaces Google Calendar y descarga `.ics` por reserva.
-- El esquema SQL base (`database/001_init.sql` y `database/002_seed_release01.sql`) define tablas y columnas en ingles para instalaciones desde cero.
-- Para bases existentes del release anterior, aplicar tambien `database/004_rooms_catalog_and_schedules.sql`.
-- Las salas ahora almacenan catalogo en ingles (`campus`, `venue`, `name`) y el backend devuelve equivalencias en espanol (`campusLabel`, `venueLabel`, `resourceLabel`).
+- El esquema SQL base (`database/001_init.sql` y `database/002_seed_release01.sql`) define tablas y columnas para instalaciones desde cero.
+- Para bases existentes, aplicar los scripts incrementales disponibles en `/database` antes de levantar el backend.
+- Las salas almacenan data de catalogo en espanol (`code`, `name`, `campus`, `venue`, `location`).
 - Se agregan horarios por campus (`campus_schedules`) y override por sala (`room_schedules`) para validar reservas por dia/hora.
 - Se agregan reglas por sala de personas: `minPeople`, `minPeopleRequired`, `maxPeople`.
 - Se agrega configuracion de duracion por bloque de reserva por campus (Monterrico 60 min, Mayorazgo 45 min por defecto).
 - Las reservas solo aceptan fechas/horas dentro de la ventana permitida (semana actual; fin de semana habilita tambien la siguiente semana) y siempre en horas futuras del dia actual.
 - No se permite cancelar reservas que ya finalizaron (validacion en backend).
+- Se agrega preferencia por usuario `login_landing_view` para definir la vista inicial al iniciar sesion (validada por rol).
+- Para bases ya existentes, aplicar `database/004_add_login_landing_view.sql`.
+- Para convertir data previa de salas (ingles -> espanol en `code/name/campus/venue/location`), aplicar `database/005_rooms_data_to_spanish.sql`.
 
 ## Patrones aplicados
 

@@ -13,6 +13,7 @@ public interface UserRepository extends JpaRepository<UserEntity, Long> {
     Optional<UserEntity> findByCorreoIgnoreCase(String correo);
 
     Optional<UserEntity> findByCodigo(String codigo);
+    Optional<UserEntity> findByCodigoIgnoreCase(String codigo);
 
     long countByEstado(UserStatus estado);
 

@@ -8,6 +8,7 @@ import type {
   BookingStatus,
   CampusSchedule,
   Profile,
+  ReservationCompanion,
   ReservationForm,
   Role,
   ScheduleDay,
@@ -41,7 +42,31 @@ interface NotificationItem {
   createdAt: string
 }
 
+type LoginLandingViewCode =
+  | 'STUDENT_MY_BOOKINGS'
+  | 'STUDENT_RESERVE'
+  | 'ADMIN_ROOMS'
+  | 'ADMIN_BOOKINGS'
+
+const LOCAL_STORAGE_THEME_KEY = 'luistudio_dark_mode'
+const LOCAL_STORAGE_FONT_SCALE_KEY = 'luistudio_font_scale'
+const LOCAL_STORAGE_LANDING_KEY = 'luistudio_login_landing_route'
+
 const clampFontScale = (value: number) => Math.min(1.3, Math.max(0.85, Number.isFinite(value) ? value : 1))
+
+const getInitialDarkMode = () => {
+  const saved = localStorage.getItem(LOCAL_STORAGE_THEME_KEY)
+  if (saved !== null) return saved === '1'
+  return window.matchMedia('(prefers-color-scheme: dark)').matches
+}
+
+const getInitialFontScale = () => {
+  const savedFontScale = Number(localStorage.getItem(LOCAL_STORAGE_FONT_SCALE_KEY) ?? '1')
+  if (!Number.isNaN(savedFontScale) && savedFontScale >= 0.85 && savedFontScale <= 1.3) {
+    return clampFontScale(savedFontScale)
+  }
+  return 1
+}
 
 const toUiRole = (role: 'ADMIN' | 'ESTUDIANTE'): Role => (role === 'ADMIN' ? 'admin' : 'student')
 
@@ -88,7 +113,7 @@ const toUiRoom = (room: {
   venue: room.venue,
   venueLabel: room.venueLabel,
   capacity: room.capacity,
-  location: room.venueLabel,
+  location: room.location,
   minPeople: room.minPeople,
   minPeopleRequired: room.minPeopleRequired,
   maxPeople: room.maxPeople,
@@ -119,6 +144,7 @@ const toUiBooking = (booking: {
   start: string
   end: string
   status: 'ACTIVA' | 'CANCELADA' | 'COMPLETADA'
+  observation?: string
 }): Booking => ({
   id: `RES-${booking.id}`,
   backendId: booking.id,
@@ -132,7 +158,28 @@ const toUiBooking = (booking: {
   start: toHourMinute(booking.start),
   end: toHourMinute(booking.end),
   status: booking.status === 'CANCELADA' ? 'Cancelado' : 'Confirmado',
+  observation: booking.observation,
 })
+
+const parseParticipantsFromObservation = (observation?: string): ReservationCompanion[] => {
+  if (!observation) return []
+  const parts = observation.split('Participantes:')[1]?.trim()
+  if (!parts) return []
+  return parts
+    .split('|')
+    .map((segment) => segment.trim())
+    .filter(Boolean)
+    .map((segment) => {
+      const [rawCode, ...rest] = segment.split('-')
+      const code = rawCode?.trim() ?? ''
+      const fullName = rest.join('-').trim()
+      return { code, fullName }
+    })
+    .filter((item) => item.code && item.fullName)
+}
+
+const buildParticipantsObservation = (participants: Array<{ code: string; fullName: string }>) =>
+  `Participantes: ${participants.map((item) => `${item.code} - ${item.fullName}`).join(' | ')}`.slice(0, 255)
 
 const toProfile = (user: {
   id: number
@@ -149,6 +196,22 @@ const toProfile = (user: {
   lastName: user.lastName,
   status: user.status === 'HABILITADO' ? 'Habilitado' : 'Deshabilitado',
 })
+
+const defaultLandingRoute = (role: Role): RouteKey => (role === 'admin' ? 'salas' : 'misreservas')
+
+const routeToLandingViewCode = (role: Role, route: RouteKey): LoginLandingViewCode => {
+  if (role === 'admin') {
+    return route === 'admin-reservas' ? 'ADMIN_BOOKINGS' : 'ADMIN_ROOMS'
+  }
+  return route === 'reservas' ? 'STUDENT_RESERVE' : 'STUDENT_MY_BOOKINGS'
+}
+
+const landingViewCodeToRoute = (role: Role, code: LoginLandingViewCode): RouteKey => {
+  if (role === 'admin') {
+    return code === 'ADMIN_BOOKINGS' ? 'admin-reservas' : 'salas'
+  }
+  return code === 'STUDENT_RESERVE' ? 'reservas' : 'misreservas'
+}
 
 export function MainPage() {
   const location = useLocation()
@@ -200,6 +263,8 @@ export function MainPage() {
     end: '',
   })
   const [reservationError, setReservationError] = useState('')
+  const [reservationCompanions, setReservationCompanions] = useState<ReservationCompanion[]>([])
+  const [reservationCompanionCodeInput, setReservationCompanionCodeInput] = useState('')
   const [reservationWeekOffset, setReservationWeekOffset] = useState(0)
   const [roomBookingsWindow, setRoomBookingsWindow] = useState<Booking[]>([])
   const [confirmationBookingId, setConfirmationBookingId] = useState('')
@@ -214,6 +279,8 @@ export function MainPage() {
     start: '16:30',
     end: '17:30',
   })
+  const [editBookingCompanions, setEditBookingCompanions] = useState<ReservationCompanion[]>([])
+  const [editCompanionCodeInput, setEditCompanionCodeInput] = useState('')
 
   const [roomFilterLocation, setRoomFilterLocation] = useState('Todas')
   const [roomModalMode, setRoomModalMode] = useState<'none' | 'add' | 'edit'>('none')
@@ -245,19 +312,20 @@ export function MainPage() {
   const [isNotificationsModalOpen, setIsNotificationsModalOpen] = useState(false)
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false)
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
-  const [isDarkMode, setIsDarkMode] = useState(false)
-  const [fontScale, setFontScale] = useState(1)
+  const [isDarkMode, setIsDarkMode] = useState<boolean>(getInitialDarkMode)
+  const [fontScale, setFontScale] = useState<number>(getInitialFontScale)
   const [preferencesLoaded, setPreferencesLoaded] = useState(false)
   const [notificationPrefs, setNotificationPrefs] = useState<Pick<ApiPreferences, 'emailEnabled' | 'reminderEnabled' | 'bookingChangesEnabled'>>({
     emailEnabled: true,
     reminderEnabled: true,
     bookingChangesEnabled: true,
   })
+  const [loginLandingRoute, setLoginLandingRoute] = useState<RouteKey | null>(null)
   const [campusSchedules, setCampusSchedules] = useState<CampusSchedule[]>([])
 
   const effectiveRoute = useMemo(
-    () => resolveRouteByAuth(route, authenticatedUser),
-    [route, authenticatedUser],
+    () => resolveRouteByAuth(route, authenticatedUser, loginLandingRoute),
+    [route, authenticatedUser, loginLandingRoute],
   )
   const activeRooms = useMemo(() => rooms.filter((room) => room.active), [rooms])
   const campusValueOptions = useMemo(() => [...new Set(activeRooms.map((room) => room.campus))], [activeRooms])
@@ -339,6 +407,71 @@ export function MainPage() {
     setRoute(nextRoute)
   }
 
+  const handleReservationChange = (next: ReservationForm) => {
+    setReservationForm(next)
+    const selectionChanged =
+      next.campus !== reservationForm.campus ||
+      next.location !== reservationForm.location ||
+      next.roomId !== reservationForm.roomId
+    if (selectionChanged) {
+      setReservationCompanions([])
+      setReservationCompanionCodeInput('')
+    }
+  }
+
+  const handleAddReservationCompanion = async () => {
+    if (!token || !authenticatedUser || !selectedReservationRoom) return
+    const code = reservationCompanionCodeInput.trim()
+    if (!code) {
+      setModalMessage({
+        title: 'Código faltante',
+        message: 'Ingresa un código antes de agregar a la persona.',
+        variant: 'error',
+      })
+      return
+    }
+    const currentPeople = 1 + reservationCompanions.length
+    if (currentPeople >= selectedReservationRoom.maxPeople) {
+      setModalMessage({
+        title: 'Límite alcanzado',
+        message: `Esta sala permite como máximo ${selectedReservationRoom.maxPeople} personas.`,
+        variant: 'error',
+      })
+      return
+    }
+    try {
+      const found = await api.lookupUserByCode(token, code)
+      if (found.code.toLowerCase() === authenticatedUser.code.toLowerCase()) {
+        setModalMessage({
+          title: 'Código duplicado',
+          message: 'Tu código ya cuenta como la persona 1 de la reserva.',
+          variant: 'error',
+        })
+        return
+      }
+      const duplicate = reservationCompanions.some(
+        (item) => item.code.trim().toLowerCase() === found.code.toLowerCase(),
+      )
+      if (duplicate) {
+        setModalMessage({
+          title: 'Código repetido',
+          message: 'Esa persona ya está agregada en la reserva.',
+          variant: 'error',
+        })
+        return
+      }
+      setReservationCompanions((current) => [...current, { code: found.code, fullName: found.fullName }])
+      setReservationCompanionCodeInput('')
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'No se pudo validar el código'
+      setModalMessage({ title: 'Código inválido', message, variant: 'error' })
+    }
+  }
+
+  const handleRemoveReservationCompanion = (index: number) => {
+    setReservationCompanions((current) => current.filter((_, itemIndex) => itemIndex !== index))
+  }
+
   const loadRooms = async (authToken: string) => {
     const result = await api.getRooms(authToken)
     const mapped = result.map(toUiRoom)
@@ -396,7 +529,7 @@ export function MainPage() {
 
   const bootstrap = async (authToken: string, user: AuthUser) => {
     await loadRooms(authToken)
-    await loadUserPreferences(authToken)
+    const landingRoute = await loadUserPreferences(authToken, user)
     if (user.role === 'admin') {
       await Promise.all([
         loadAdminBookings(authToken),
@@ -407,9 +540,10 @@ export function MainPage() {
     } else {
       await loadMyBookings(authToken)
     }
+    return landingRoute
   }
 
-  const loadUserPreferences = async (authToken: string) => {
+  const loadUserPreferences = async (authToken: string, user: AuthUser) => {
     try {
       const result = await api.getPreferences(authToken)
       setNotificationPrefs({
@@ -417,11 +551,30 @@ export function MainPage() {
         reminderEnabled: result.reminderEnabled,
         bookingChangesEnabled: result.bookingChangesEnabled,
       })
-      setIsDarkMode(result.themeMode === 'DARK')
-      setFontScale(clampFontScale(result.fontScale))
+      const nextDarkMode = result.themeMode === 'DARK'
+      const nextFontScale = clampFontScale(result.fontScale)
+      setIsDarkMode(nextDarkMode)
+      setFontScale(nextFontScale)
+      const landing = landingViewCodeToRoute(user.role, result.loginLandingView)
+      setLoginLandingRoute(landing)
+      localStorage.setItem(LOCAL_STORAGE_THEME_KEY, nextDarkMode ? '1' : '0')
+      localStorage.setItem(LOCAL_STORAGE_FONT_SCALE_KEY, String(nextFontScale))
+      localStorage.setItem(LOCAL_STORAGE_LANDING_KEY, landing)
       setPreferencesLoaded(true)
+      return landing
     } catch {
+      const cachedLanding = localStorage.getItem(LOCAL_STORAGE_LANDING_KEY) as RouteKey | null
+      const allowedRoutes =
+        user.role === 'admin'
+          ? (['salas', 'admin-reservas'] as RouteKey[])
+          : (['misreservas', 'reservas'] as RouteKey[])
+      const fallbackLanding =
+        cachedLanding && allowedRoutes.includes(cachedLanding)
+          ? cachedLanding
+          : defaultLandingRoute(user.role)
+      setLoginLandingRoute(fallbackLanding)
       setPreferencesLoaded(true)
+      return fallbackLanding
     }
   }
 
@@ -443,9 +596,10 @@ export function MainPage() {
 
   useEffect(() => {
     const expectedPath = routePaths[effectiveRoute]
+    if (route === 'login' && authenticatedUser && !preferencesLoaded) return
     if (!authHydrated && route !== 'login' && route !== 'reset-password') return
     if (location.pathname !== expectedPath) navigate(expectedPath, { replace: true })
-  }, [authHydrated, effectiveRoute, route, location.pathname, navigate])
+  }, [authHydrated, effectiveRoute, route, authenticatedUser, preferencesLoaded, location.pathname, navigate])
 
   useEffect(() => {
     if (!toastMessage) return
@@ -459,25 +613,19 @@ export function MainPage() {
   }, [effectiveRoute])
 
   useEffect(() => {
-    const saved = localStorage.getItem('luistudio_dark_mode')
-    const initial = saved === null ? window.matchMedia('(prefers-color-scheme: dark)').matches : saved === '1'
-    setIsDarkMode(initial)
-
-    const savedFontScale = Number(localStorage.getItem('luistudio_font_scale') ?? '1')
-    if (!Number.isNaN(savedFontScale) && savedFontScale >= 0.85 && savedFontScale <= 1.3) {
-      setFontScale(clampFontScale(savedFontScale))
-    }
-  }, [])
-
-  useEffect(() => {
     document.documentElement.classList.toggle('dark', isDarkMode)
-    localStorage.setItem('luistudio_dark_mode', isDarkMode ? '1' : '0')
+    localStorage.setItem(LOCAL_STORAGE_THEME_KEY, isDarkMode ? '1' : '0')
   }, [isDarkMode])
 
   useEffect(() => {
     document.documentElement.style.fontSize = `${fontScale * 100}%`
-    localStorage.setItem('luistudio_font_scale', String(fontScale))
+    localStorage.setItem(LOCAL_STORAGE_FONT_SCALE_KEY, String(fontScale))
   }, [fontScale])
+
+  useEffect(() => {
+    if (!loginLandingRoute) return
+    localStorage.setItem(LOCAL_STORAGE_LANDING_KEY, loginLandingRoute)
+  }, [loginLandingRoute])
 
   useEffect(() => {
     if (!token || !authenticatedUser || !preferencesLoaded) return
@@ -486,11 +634,15 @@ export function MainPage() {
         ...notificationPrefs,
         themeMode: isDarkMode ? 'DARK' : 'LIGHT',
         fontScale: clampFontScale(fontScale),
+        loginLandingView: routeToLandingViewCode(
+          authenticatedUser.role,
+          loginLandingRoute ?? defaultLandingRoute(authenticatedUser.role),
+        ),
       }
       api.updatePreferences(token, payload).catch(() => undefined)
     }, 300)
     return () => window.clearTimeout(timeout)
-  }, [token, authenticatedUser, preferencesLoaded, notificationPrefs, isDarkMode, fontScale])
+  }, [token, authenticatedUser, preferencesLoaded, notificationPrefs, isDarkMode, fontScale, loginLandingRoute])
 
   useEffect(() => {
     const stored = localStorage.getItem('luistudio_token')
@@ -564,6 +716,7 @@ export function MainPage() {
     setShowTwoFactorModal(false)
     setTwoFactorCode('')
     setProvisionalToken('')
+    setLoginLandingRoute(null)
     localStorage.removeItem('luistudio_token')
     setAuthHydrated(true)
     navigateToRoute('login')
@@ -586,8 +739,8 @@ export function MainPage() {
       setAuthenticatedUser(user)
       setToken(response.token)
       localStorage.setItem('luistudio_token', response.token)
-      await bootstrap(response.token, user)
-      navigateToRoute(user.role === 'admin' ? 'salas' : 'misreservas')
+      const landingRoute = await bootstrap(response.token, user)
+      navigateToRoute(landingRoute)
     } catch (error) {
       setLoginError(error instanceof Error ? error.message : 'Error al iniciar sesión')
     }
@@ -621,8 +774,8 @@ export function MainPage() {
       setShowTwoFactorModal(false)
       setTwoFactorCode('')
       setProvisionalToken('')
-      await bootstrap(verification.token, user)
-      navigateToRoute(user.role === 'admin' ? 'salas' : 'misreservas')
+      const landingRoute = await bootstrap(verification.token, user)
+      navigateToRoute(landingRoute)
     } catch (error) {
       setTwoFactorError(error instanceof Error ? error.message : 'No se pudo verificar el código 2FA.')
     }
@@ -675,8 +828,29 @@ export function MainPage() {
       })
       return
     }
+    if (!authenticatedUser) return
     const selectedRoom = getRoomById(reservationForm.roomId)
     if (!selectedRoom) return
+    const derivedPeople = 1 + reservationCompanions.length
+    const requiredMinPeople = selectedRoom.minPeopleRequired ? selectedRoom.minPeople : 1
+    const allowedMaxPeople = selectedRoom.maxPeople
+    if (derivedPeople < requiredMinPeople || derivedPeople > allowedMaxPeople) {
+      setModalMessage({
+        title: 'Cantidad de personas inválida',
+        message: `Esta sala permite entre ${requiredMinPeople} y ${allowedMaxPeople} personas para reservar.`,
+        variant: 'error',
+      })
+      return
+    }
+    const allCodes = [authenticatedUser.code, ...reservationCompanions.map((item) => item.code.trim())].map((code) => code.toLowerCase())
+    if (new Set(allCodes).size !== allCodes.length) {
+      setModalMessage({
+        title: 'Códigos repetidos',
+        message: 'No se permiten códigos duplicados en la misma reserva.',
+        variant: 'error',
+      })
+      return
+    }
     if (minutesBetween(reservationForm.start, reservationForm.end) <= 0) {
       setModalMessage({
         title: 'Horario inválido',
@@ -686,17 +860,28 @@ export function MainPage() {
       return
     }
     try {
+      const participants = [
+        {
+          code: authenticatedUser.code,
+          fullName: `${authenticatedUser.firstName} ${authenticatedUser.lastName}`.trim(),
+        },
+        ...reservationCompanions,
+      ]
+      const observation = buildParticipantsObservation(participants)
       const created = await api.createBooking(token, {
         roomId: selectedRoom.backendId,
         location: reservationForm.location,
-        people: reservationForm.people,
+        people: derivedPeople,
         date: reservationForm.date,
         start: reservationForm.start,
         end: reservationForm.end,
+        observation,
       })
       const newBooking = toUiBooking(created)
       setBookings((current) => [newBooking, ...current])
       setConfirmationBookingId(newBooking.id)
+      setReservationCompanions([])
+      setReservationCompanionCodeInput('')
       pushNotification('Reserva confirmada y correo encolado correctamente.')
     } catch (error) {
       const message = error instanceof Error ? error.message : 'No se pudo crear la reserva'
@@ -707,7 +892,12 @@ export function MainPage() {
 
   const openEditBooking = (booking: Booking) => {
     const room = activeRooms.find((item) => item.id === booking.roomId)
+    const participants = parseParticipantsFromObservation(booking.observation)
+    const companions = participants.filter(
+      (item) => item.code.toLowerCase() !== authenticatedUser?.code.toLowerCase(),
+    )
     setEditingBookingId(booking.id)
+    setReservationError('')
     setEditBookingForm({
       campus: room?.campusLabel ?? '',
       location: room?.venueLabel ?? booking.location,
@@ -717,6 +907,63 @@ export function MainPage() {
       start: booking.start,
       end: booking.end,
     })
+    setEditBookingCompanions(companions)
+    setEditCompanionCodeInput('')
+  }
+
+  const handleAddEditCompanion = async () => {
+    if (!token || !authenticatedUser) return
+    const selectedRoom = getRoomById(editBookingForm.roomId)
+    if (!selectedRoom) return
+    const code = editCompanionCodeInput.trim()
+    if (!code) {
+      setModalMessage({
+        title: 'Código faltante',
+        message: 'Ingresa un código antes de agregar a la persona.',
+        variant: 'error',
+      })
+      return
+    }
+    const currentPeople = 1 + editBookingCompanions.length
+    if (currentPeople >= selectedRoom.maxPeople) {
+      setModalMessage({
+        title: 'Límite alcanzado',
+        message: `Esta sala permite como máximo ${selectedRoom.maxPeople} personas.`,
+        variant: 'error',
+      })
+      return
+    }
+    try {
+      const found = await api.lookupUserByCode(token, code)
+      if (found.code.toLowerCase() === authenticatedUser.code.toLowerCase()) {
+        setModalMessage({
+          title: 'Código duplicado',
+          message: 'Tu código ya cuenta como la persona 1 de la reserva.',
+          variant: 'error',
+        })
+        return
+      }
+      const duplicate = editBookingCompanions.some(
+        (item) => item.code.trim().toLowerCase() === found.code.toLowerCase(),
+      )
+      if (duplicate) {
+        setModalMessage({
+          title: 'Código repetido',
+          message: 'Esa persona ya está agregada en la reserva.',
+          variant: 'error',
+        })
+        return
+      }
+      setEditBookingCompanions((current) => [...current, { code: found.code, fullName: found.fullName }])
+      setEditCompanionCodeInput('')
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'No se pudo validar el código'
+      setModalMessage({ title: 'Código inválido', message, variant: 'error' })
+    }
+  }
+
+  const handleRemoveEditCompanion = (index: number) => {
+    setEditBookingCompanions((current) => current.filter((_, itemIndex) => itemIndex !== index))
   }
 
   const handleSaveEditedBooking = async (event: FormEvent<HTMLFormElement>) => {
@@ -725,18 +972,75 @@ export function MainPage() {
     const selectedRoom = getRoomById(editBookingForm.roomId)
     const target = bookings.find((booking) => booking.id === editingBookingId)
     if (!selectedRoom || !target) return
+    if (
+      !editBookingForm.campus ||
+      !editBookingForm.location ||
+      !editBookingForm.roomId ||
+      !editBookingForm.date ||
+      !editBookingForm.start ||
+      !editBookingForm.end
+    ) {
+      setModalMessage({
+        title: 'Datos incompletos',
+        message: 'Completa campus, ubicación, recurso, fecha y horario para editar.',
+        variant: 'error',
+      })
+      return
+    }
+    const derivedPeople = 1 + editBookingCompanions.length
+    const requiredMinPeople = selectedRoom.minPeopleRequired ? selectedRoom.minPeople : 1
+    const allowedMaxPeople = selectedRoom.maxPeople
+    if (derivedPeople < requiredMinPeople || derivedPeople > allowedMaxPeople) {
+      setModalMessage({
+        title: 'Cantidad de personas inválida',
+        message: `Esta sala permite entre ${requiredMinPeople} y ${allowedMaxPeople} personas para reservar.`,
+        variant: 'error',
+      })
+      return
+    }
+    const allCodes = [authenticatedUser?.code ?? '', ...editBookingCompanions.map((item) => item.code.trim())]
+      .map((code) => code.toLowerCase())
+      .filter(Boolean)
+    if (new Set(allCodes).size !== allCodes.length) {
+      setModalMessage({
+        title: 'Códigos repetidos',
+        message: 'No se permiten códigos duplicados en la misma reserva.',
+        variant: 'error',
+      })
+      return
+    }
+    if (minutesBetween(editBookingForm.start, editBookingForm.end) <= 0) {
+      setModalMessage({
+        title: 'Horario inválido',
+        message: 'La hora de fin debe ser posterior a la hora de inicio.',
+        variant: 'error',
+      })
+      return
+    }
     try {
+      const ownerName = authenticatedUser
+        ? `${authenticatedUser.firstName} ${authenticatedUser.lastName}`.trim()
+        : target.userEmail ?? 'Usuario'
+      const ownerCode = authenticatedUser?.code ?? 'SIN-CODIGO'
+      const participants = [
+        { code: ownerCode, fullName: ownerName },
+        ...editBookingCompanions,
+      ]
+      const observation = buildParticipantsObservation(participants)
       const updated = await api.updateBooking(token, target.backendId, {
         roomId: selectedRoom.backendId,
         location: editBookingForm.location,
-        people: editBookingForm.people,
+        people: derivedPeople,
         date: editBookingForm.date,
         start: editBookingForm.start,
         end: editBookingForm.end,
+        observation,
       })
       const next = toUiBooking(updated)
       setBookings((current) => current.map((booking) => (booking.id === editingBookingId ? next : booking)))
       setEditingBookingId(null)
+      setEditBookingCompanions([])
+      setEditCompanionCodeInput('')
     } catch (error) {
       const message = error instanceof Error ? error.message : 'No se pudo actualizar la reserva'
       setReservationError(message)
@@ -868,7 +1172,7 @@ export function MainPage() {
         maxActiveBookings: updated.maxActiveBookings,
         maxDurationMinutes: updated.maxDurationMinutes,
       })
-      setConfigNotice('Configuracion actualizada correctamente.')
+      setConfigNotice('Configuración actualizada correctamente.')
     } catch (error) {
       const message = error instanceof Error ? error.message : 'No se pudo actualizar la configuración'
       setModalMessage({ title: 'Error de configuración', message, variant: 'error' })
@@ -983,15 +1287,26 @@ export function MainPage() {
             selectedRoomCapacity={selectedReservationRoom?.capacity ?? null}
             roomBookings={roomBookingsForSelectedRoom}
             weekOffset={reservationWeekOffset}
-            onReservationChange={setReservationForm}
+            onReservationChange={handleReservationChange}
+            onAddCompanion={handleAddReservationCompanion}
+            currentUser={authenticatedUser}
+            companions={reservationCompanions}
+            companionCodeInput={reservationCompanionCodeInput}
+            onCompanionCodeInputChange={setReservationCompanionCodeInput}
+            onRemoveCompanion={handleRemoveReservationCompanion}
             onWeekOffsetChange={setReservationWeekOffset}
-            onClearReservationForm={() => setReservationForm(getDefaultReservationForm(activeRooms))}
+            onClearReservationForm={() => {
+              setReservationForm(getDefaultReservationForm(activeRooms))
+              setReservationCompanions([])
+              setReservationCompanionCodeInput('')
+            }}
             onSubmitReservation={handleCreateReservation}
           />
         )}
         {effectiveRoute === 'misreservas' && (
           <MisReservasPage
             myBookings={myBookings}
+            activeRooms={activeRooms}
             onEditBooking={openEditBooking}
             onCancelBooking={(bookingId) => cancelBooking(bookingId, 'student')}
             onCreateFirstReservation={() => navigateToRoute('reservas')}
@@ -1067,11 +1382,22 @@ export function MainPage() {
       {editingBookingId && (
         <EditBookingModal
           form={editBookingForm}
-          locationOptions={locationOptions}
+          campusOptions={campusOptions}
+          locationOptionsByCampus={locationOptionsByCampus}
           activeRooms={activeRooms}
+          currentUser={authenticatedUser}
+          companions={editBookingCompanions}
+          companionCodeInput={editCompanionCodeInput}
           errorMessage={reservationError}
           onChange={setEditBookingForm}
-          onCancel={() => setEditingBookingId(null)}
+          onCompanionCodeInputChange={setEditCompanionCodeInput}
+          onAddCompanion={handleAddEditCompanion}
+          onRemoveCompanion={handleRemoveEditCompanion}
+          onCancel={() => {
+            setEditingBookingId(null)
+            setEditBookingCompanions([])
+            setEditCompanionCodeInput('')
+          }}
           onSubmit={handleSaveEditedBooking}
         />
       )}
@@ -1217,6 +1543,26 @@ export function MainPage() {
 
             <div className="settings-section">
               <p className="settings-badge-ink">Sesión</p>
+              <p className="settings-field-title">Vista inicial al iniciar sesión</p>
+              <select
+                className="settings-select"
+                value={loginLandingRoute ?? (authenticatedUser ? defaultLandingRoute(authenticatedUser.role) : 'misreservas')}
+                onChange={(event) => setLoginLandingRoute(event.target.value as RouteKey)}
+                disabled={!authenticatedUser}
+              >
+                {authenticatedUser?.role === 'admin' ? (
+                  <>
+                    <option value="salas">Salas</option>
+                    <option value="admin-reservas">Reservas</option>
+                  </>
+                ) : (
+                  <>
+                    <option value="misreservas">Mis reservas</option>
+                    <option value="reservas">Reservar</option>
+                  </>
+                )}
+              </select>
+              <p className="settings-note">Esta vista se abrirá automáticamente cuando inicies sesión.</p>
               <button type="button" className="settings-logout-btn" onClick={logout}>
                 Cerrar sesión
               </button>

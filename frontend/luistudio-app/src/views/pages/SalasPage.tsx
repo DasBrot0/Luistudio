@@ -51,7 +51,7 @@ export function SalasPage({
             </div>
           </div>
 
-          <div className="table-wrap">
+          <div className="table-wrap desktop-table-only">
             <table>
               <thead>
                 <tr>
@@ -76,13 +76,37 @@ export function SalasPage({
                       {room.minPeopleRequired ? `${room.minPeople} (min obligatorio)` : `${room.minPeople} (min opcional)`} / {room.maxPeople} max
                     </td>
                     <td data-label="Acciones" className="actions-cell">
-                      <button type="button" className="inline-flex min-h-8 items-center justify-center rounded-md bg-slate-200 px-3 text-xs font-semibold text-slate-700 transition hover:-translate-y-px hover:bg-slate-300 disabled:cursor-not-allowed disabled:opacity-60" onClick={() => onOpenEditRoom(room)}>Editar</button>
-                      <button type="button" className="danger-btn inline-flex min-h-8 items-center justify-center rounded-md px-3 text-xs font-semibold transition hover:-translate-y-px disabled:cursor-not-allowed disabled:opacity-60" onClick={() => onAskDeleteRoom(room.id)}>Eliminar</button>
+                      <div className="actions-inline">
+                        <button type="button" className="inline-flex min-h-8 items-center justify-center rounded-md bg-slate-200 px-3 text-xs font-semibold text-slate-700 transition hover:-translate-y-px hover:bg-slate-300 disabled:cursor-not-allowed disabled:opacity-60" onClick={() => onOpenEditRoom(room)}>Editar</button>
+                        <button type="button" className="danger-btn inline-flex min-h-8 items-center justify-center rounded-md px-3 text-xs font-semibold transition hover:-translate-y-px disabled:cursor-not-allowed disabled:opacity-60" onClick={() => onAskDeleteRoom(room.id)}>Eliminar</button>
+                      </div>
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
+          </div>
+
+          <div className="mobile-list-only">
+            {filteredRooms.map((room) => (
+              <article key={`room-mobile-${room.id}`} className="mobile-record-card">
+                <div className="mobile-record-grid">
+                  <p><strong>ID:</strong> {room.id}</p>
+                  <p><strong>Campus:</strong> {room.campusLabel}</p>
+                  <p><strong>Ubicación:</strong> {room.venueLabel}</p>
+                  <p><strong>Recurso:</strong> {room.resourceLabel}</p>
+                  <p><strong>Nombre:</strong> {room.name}</p>
+                  <p>
+                    <strong>Personas:</strong>{' '}
+                    {room.minPeopleRequired ? `${room.minPeople} (min obligatorio)` : `${room.minPeople} (min opcional)`} / {room.maxPeople} max
+                  </p>
+                </div>
+                <div className="actions-inline mt-2">
+                  <button type="button" className="inline-flex min-h-8 items-center justify-center rounded-md bg-slate-200 px-3 text-xs font-semibold text-slate-700 transition hover:-translate-y-px hover:bg-slate-300 disabled:cursor-not-allowed disabled:opacity-60" onClick={() => onOpenEditRoom(room)}>Editar</button>
+                  <button type="button" className="danger-btn inline-flex min-h-8 items-center justify-center rounded-md px-3 text-xs font-semibold transition hover:-translate-y-px disabled:cursor-not-allowed disabled:opacity-60" onClick={() => onAskDeleteRoom(room.id)}>Eliminar</button>
+                </div>
+              </article>
+            ))}
           </div>
 
           {roomNotice && <p className="error-text">{roomNotice}</p>}

@@ -5,6 +5,7 @@ public record NotificationPreferencesUpdateRequest(
     Boolean reminderEnabled,
     Boolean bookingChangesEnabled,
     String themeMode,
-    Double fontScale
+    Double fontScale,
+    String loginLandingView
 ) {
 }

@@ -5,7 +5,7 @@
 - React + TypeScript + Vite
 - Tailwind CSS
 
-## Ejecucion local
+## Ejecución local
 
 1. Instala dependencias:
 
@@ -28,23 +28,30 @@ npm run dev
 ## Funcionalidades conectadas a backend
 
 - Login con roles (admin/estudiante) y flujo 2FA.
-- Verificacion 2FA mediante modal propio (sin depender de `window.prompt`).
+- Verificación 2FA mediante modal propio (sin depender de `window.prompt`).
 - Solicitud y confirmación de restablecimiento de contraseña.
-- Reserva, edicion y cancelacion de reservas.
+- Reserva, edición y cancelación de reservas.
 - En listados de reservas, el horario se muestra sin segundos (`HH:mm-HH:mm`) y no se permite cancelar reservas ya finalizadas.
 - Reserva con cuadrícula semanal interactiva (semana anterior, actual y siguiente) y selección visual por bloque horario.
-- En reserva, los campos inician vacios y `Inicio/Fin` se sincronizan con la grilla y reglas de sala/campus (sin seleccionar horas invalidas manualmente).
-- Fuera de la ventana permitida (semana actual y solo horas futuras; el fin de semana habilita tambien la semana siguiente) los espacios quedan en blanco y no clickeables.
+- En reserva, los campos inician vacíos y `Inicio/Fin` se sincronizan con la grilla y reglas de sala/campus (sin seleccionar horas inválidas manualmente).
+- Fuera de la ventana permitida (semana actual y solo horas futuras; el fin de semana habilita también la semana siguiente) los espacios quedan en blanco y no clickeables.
+- En `Personas de la reserva`, se autoincluye el usuario autenticado como persona 1 fija y se gestionan acompañantes agregando por código con validación inmediata contra backend.
+- `Editar reserva` usa el mismo esquema moderno de `Reservar` (Recurso, Fecha y hora, Personas de la reserva), sin campo legacy de número de personas.
+- `Nueva reserva` usa un layout por bloques (`Recurso`, `Fecha y hora`, `Personas de la reserva`) con proporciones desktop (campus más angosto que ubicación/recurso) y adaptación responsive para móvil.
+- `Mis reservas` incluye alternancia de vista compacta/detallada (con campus, recinto y ubicación) sin scroll horizontal en desktop ni móvil.
+- Vistas separadas por componente para desktop/móvil en listados principales (Mis reservas, Reservas registradas, Salas y Perfiles), evitando mezcla de estilos al redimensionar.
 - CRUD de salas (admin).
-- Edicion completa de sala (campus, ubicacion, recurso, capacidad, min/max personas y horario semanal por sala).
+- Edición completa de sala (campus, ubicación, recurso, capacidad, min/max personas y horario semanal por sala).
 - Filtro y cambio de estado de perfiles (admin).
-- Configuracion de limites de reservas (admin).
-- Configuracion de horario general por campus (admin), con advertencias si entra en conflicto con overrides de salas.
-- Configuracion de duracion por bloque de reserva por campus (30/45/60/120 min).
+- Configuración de límites de reservas (admin).
+- Configuración de horario general por campus (admin), con advertencias si entra en conflicto con overrides de salas.
+- Configuración de duración por bloque de reserva por campus (30/45/60/120 min).
 - Navegación por rol y centro de notificaciones en UI.
 - Modo oscuro con persistencia (`localStorage`) y paleta tonal completa para cards, modales, tablas, botones, textos y selectores.
-- Configuracion de accesibilidad visual en cliente: escala de texto global persistente (`luistudio_font_scale` en `localStorage`).
-- Sincronizacion de tema y escala de texto con backend en `GET/PUT /api/me/preferences` para usuarios autenticados.
+- Tema inicial automático según modo del sistema (si no existe preferencia guardada), con persistencia en `localStorage` y sincronización en backend por usuario autenticado.
+- Configuración de accesibilidad visual en cliente: escala de texto global persistente (`luistudio_font_scale` en `localStorage`).
+- Sincronización de tema y escala de texto con backend en `GET/PUT /api/me/preferences` para usuarios autenticados.
+- Configuración de vista inicial de sesión por rol desde el modal de Configuración (estudiante: Mis reservas/Reservar; admin: Salas/Reservas).
 - Mensajes de error/confirmación en modales integrados con la UI (sin `alert`/mensajes legacy).
 
 ## Capa API

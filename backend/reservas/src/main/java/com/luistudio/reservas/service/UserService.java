@@ -1,6 +1,7 @@
 package com.luistudio.reservas.service;
 
 import com.luistudio.reservas.dto.common.PageResponse;
+import com.luistudio.reservas.dto.user.UserLookupResponse;
 import com.luistudio.reservas.dto.user.UserResponse;
 import com.luistudio.reservas.dto.user.UserStatusUpdateRequest;
 import com.luistudio.reservas.exception.BusinessException;
@@ -46,6 +47,28 @@ public class UserService {
     }
 
     @Transactional(readOnly = true)
+    public UserLookupResponse findForReservationByCode(String code) {
+        String normalized = code == null ? "" : code.trim();
+        if (normalized.isBlank()) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST, "El código de usuario es obligatorio");
+        }
+
+        UserEntity user = userRepository.findByCodigoIgnoreCase(normalized)
+            .orElseThrow(() -> new NotFoundException("No se encontró un usuario con ese código"));
+
+        if (user.getEstado() != UserStatus.HABILITADO) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST, "El usuario está deshabilitado");
+        }
+
+        return new UserLookupResponse(
+            user.getCodigo(),
+            user.getNombres(),
+            user.getApellidos(),
+            user.getNombres() + " " + user.getApellidos()
+        );
+    }
+
+    @Transactional(readOnly = true)
     public PageResponse<UserResponse> listUsers(int page, int size, String query) {
         Page<UserEntity> users = userRepository.searchUsers(query, PageRequest.of(page, size));
         return new PageResponse<>(
@@ -82,6 +105,9 @@ public class UserService {
             pref.setCambiosReservaHabilitado(true);
             pref.setThemeMode("LIGHT");
             pref.setFontScale(1.0);
+            pref.setLoginLandingView(
+                "ADMIN".equalsIgnoreCase(user.getRol().getNombre()) ? "ADMIN_ROOMS" : "STUDENT_MY_BOOKINGS"
+            );
             return notificationPreferenceRepository.save(pref);
         });
     }

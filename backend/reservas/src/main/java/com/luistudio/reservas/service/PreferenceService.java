@@ -13,6 +13,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class PreferenceService {
+    private static final String STUDENT_MY_BOOKINGS = "STUDENT_MY_BOOKINGS";
+    private static final String STUDENT_RESERVE = "STUDENT_RESERVE";
+    private static final String ADMIN_ROOMS = "ADMIN_ROOMS";
+    private static final String ADMIN_BOOKINGS = "ADMIN_BOOKINGS";
 
     private final UserService userService;
     private final NotificationPreferenceRepository notificationPreferenceRepository;
@@ -41,6 +45,9 @@ public class PreferenceService {
         if (request.bookingChangesEnabled() != null) pref.setCambiosReservaHabilitado(request.bookingChangesEnabled());
         if (request.themeMode() != null) pref.setThemeMode(parseThemeMode(request.themeMode()));
         if (request.fontScale() != null) pref.setFontScale(clampFontScale(request.fontScale()));
+        if (request.loginLandingView() != null) {
+            pref.setLoginLandingView(parseLandingView(request.loginLandingView(), user.getRol().getNombre()));
+        }
         pref.setActualizadoEn(OffsetDateTime.now());
         notificationPreferenceRepository.save(pref);
         return toResponse(pref);
@@ -52,7 +59,8 @@ public class PreferenceService {
             Boolean.TRUE.equals(pref.getRecordatorioHabilitado()),
             Boolean.TRUE.equals(pref.getCambiosReservaHabilitado()),
             pref.getThemeMode() == null ? "LIGHT" : pref.getThemeMode(),
-            pref.getFontScale() == null ? 1.0 : pref.getFontScale()
+            pref.getFontScale() == null ? 1.0 : pref.getFontScale(),
+            resolveLandingView(pref.getLoginLandingView(), pref.getUsuario().getRol().getNombre())
         );
     }
 
@@ -69,5 +77,28 @@ public class PreferenceService {
             throw new BusinessException(HttpStatus.BAD_REQUEST, "Escala de texto invalida. Rango permitido: 0.85 - 1.30.");
         }
         return Math.round(value * 100.0) / 100.0;
+    }
+
+    private String parseLandingView(String value, String roleName) {
+        String normalized = value.trim().toUpperCase();
+        String role = roleName == null ? "" : roleName.trim().toUpperCase();
+
+        if ("ADMIN".equals(role)) {
+            if (ADMIN_ROOMS.equals(normalized) || ADMIN_BOOKINGS.equals(normalized)) return normalized;
+            throw new BusinessException(HttpStatus.BAD_REQUEST, "Vista inicial invalida para ADMIN.");
+        }
+
+        if (STUDENT_MY_BOOKINGS.equals(normalized) || STUDENT_RESERVE.equals(normalized)) return normalized;
+        throw new BusinessException(HttpStatus.BAD_REQUEST, "Vista inicial invalida para ESTUDIANTE.");
+    }
+
+    private String resolveLandingView(String value, String roleName) {
+        String role = roleName == null ? "" : roleName.trim().toUpperCase();
+        if ("ADMIN".equals(role)) {
+            if (ADMIN_BOOKINGS.equals(value) || ADMIN_ROOMS.equals(value)) return value;
+            return ADMIN_ROOMS;
+        }
+        if (STUDENT_RESERVE.equals(value) || STUDENT_MY_BOOKINGS.equals(value)) return value;
+        return STUDENT_MY_BOOKINGS;
     }
 }

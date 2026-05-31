@@ -23,13 +23,19 @@ export function getRouteFromPath(pathname: string): RouteKey {
   return 'login'
 }
 
-export function resolveRouteByAuth(route: RouteKey, user: AuthUser | null): RouteKey {
+export function resolveRouteByAuth(route: RouteKey, user: AuthUser | null, preferredLanding: RouteKey | null = null): RouteKey {
+  const studentLanding = (preferred: RouteKey | null) =>
+    preferred === 'reservas' || preferred === 'misreservas' ? preferred : 'misreservas'
+
+  const adminLanding = (preferred: RouteKey | null) =>
+    preferred === 'admin-reservas' || preferred === 'salas' ? preferred : 'salas'
+
   if (route === 'reset-password') {
     return route
   }
 
   if (route === 'login' && user) {
-    return user.role === 'student' ? 'misreservas' : 'salas'
+    return user.role === 'student' ? studentLanding(preferredLanding) : adminLanding(preferredLanding)
   }
 
   if (route === 'login') {
@@ -44,12 +50,12 @@ export function resolveRouteByAuth(route: RouteKey, user: AuthUser | null): Rout
     if (route === 'reservas' || route === 'misreservas') {
       return route
     }
-    return 'reservas'
+    return studentLanding(preferredLanding)
   }
 
   if (route === 'salas' || route === 'perfiles' || route === 'admin-reservas') {
     return route
   }
 
-  return 'salas'
+  return adminLanding(preferredLanding)
 }

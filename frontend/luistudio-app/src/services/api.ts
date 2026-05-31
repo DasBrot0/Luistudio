@@ -59,6 +59,7 @@ interface ApiBooking {
   start: string
   end: string
   status: 'ACTIVA' | 'CANCELADA' | 'COMPLETADA'
+  observation?: string
   googleCalendarUrl: string
   icsUrl: string
 }
@@ -98,12 +99,20 @@ interface ApiUser {
   role: 'ADMIN' | 'ESTUDIANTE'
 }
 
+export interface ApiUserLookup {
+  code: string
+  firstName: string
+  lastName: string
+  fullName: string
+}
+
 export interface ApiPreferences {
   emailEnabled: boolean
   reminderEnabled: boolean
   bookingChangesEnabled: boolean
   themeMode: 'LIGHT' | 'DARK'
   fontScale: number
+  loginLandingView: 'STUDENT_MY_BOOKINGS' | 'STUDENT_RESERVE' | 'ADMIN_ROOMS' | 'ADMIN_BOOKINGS'
 }
 
 async function http<T>(path: string, options: RequestInit = {}, token?: string): Promise<T> {
@@ -263,6 +272,7 @@ export const api = {
       end: string
       people: number
       location: string
+      observation?: string
     },
   ) {
     return http<ApiBooking>('/bookings', { method: 'POST', body: JSON.stringify(payload) }, token)
@@ -278,6 +288,7 @@ export const api = {
       end: string
       people: number
       location: string
+      observation?: string
     },
   ) {
     return http<ApiBooking>(
@@ -349,5 +360,10 @@ export const api = {
 
   getCampusMap(token: string) {
     return http('/campus/map', {}, token)
+  },
+
+  lookupUserByCode(token: string, code: string) {
+    const query = `?code=${encodeURIComponent(code)}`
+    return http<ApiUserLookup>(`/users/lookup${query}`, {}, token)
   },
 }

@@ -16,6 +16,7 @@ public record BookingResponse(
     LocalTime start,
     LocalTime end,
     String status,
+    String observation,
     String googleCalendarUrl,
     String icsUrl
 ) {

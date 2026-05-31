@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import type { FormEvent } from 'react'
 import { AppHeader } from '../components/layout/AppHeader'
-import type { Booking, ReservationForm, Room } from '../../models/types'
+import type { AuthUser, Booking, ReservationCompanion, ReservationForm, Room } from '../../models/types'
 
 interface ReservasPageProps {
   reservationForm: ReservationForm
@@ -12,7 +12,13 @@ interface ReservasPageProps {
   selectedRoomCapacity: number | null
   roomBookings: Booking[]
   weekOffset: number
+  currentUser: AuthUser | null
+  companions: ReservationCompanion[]
+  companionCodeInput: string
   onReservationChange: (next: ReservationForm) => void
+  onAddCompanion: () => void
+  onCompanionCodeInputChange: (value: string) => void
+  onRemoveCompanion: (index: number) => void
   onWeekOffsetChange: (value: number) => void
   onClearReservationForm: () => void
   onSubmitReservation: (event: FormEvent<HTMLFormElement>) => void
@@ -20,8 +26,64 @@ interface ReservasPageProps {
 
 interface CalendarDay {
   isoDate: string
-  label: string
+  weekdayLabel: string
+  dateLabel: string
   weekday: number
+}
+
+function SweepIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="m4 18 6.2-6.2 2.4 2.4L6.4 20.4H4z" />
+      <path d="m11.4 10.6 1.9-1.9 2.4 2.4-1.9 1.9z" />
+      <path d="m14.6 7.4 2-2a2 2 0 0 1 2.8 2.8l-2 2z" />
+    </svg>
+  )
+}
+
+function MinusUserIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <circle cx="9" cy="8" r="3.2" />
+      <path d="M3.6 17.5c1-2.5 3-3.8 5.4-3.8s4.4 1.3 5.4 3.8" />
+      <path d="M15.5 10.5H21" />
+    </svg>
+  )
+}
+
+function ArrowLeftIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M20 12H6.5" />
+      <path d="m11.2 17-5-5 5-5" />
+    </svg>
+  )
+}
+
+function ArrowRightIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M4 12h13.5" />
+      <path d="m12.8 7 5 5-5 5" />
+    </svg>
+  )
+}
+
+function CheckIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="m4.5 12.5 4.6 4.6L19.5 6.8" />
+    </svg>
+  )
+}
+
+function UserIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <circle cx="12" cy="8.2" r="3.2" />
+      <path d="M5.2 18.2c1.4-2.7 3.8-4.1 6.8-4.1s5.4 1.4 6.8 4.1" />
+    </svg>
+  )
 }
 
 function toMinutes(time: string) {
@@ -50,9 +112,13 @@ function getWeekDays(weekOffset: number): CalendarDay[] {
     const current = new Date(monday)
     current.setDate(monday.getDate() + index)
     const isoDate = toIsoDate(current)
-    const label = current.toLocaleDateString('es-PE', { weekday: 'short', day: '2-digit', month: '2-digit' })
+    const weekdayLabel = current
+      .toLocaleDateString('es-PE', { weekday: 'short' })
+      .replace('.', '')
+      .toLowerCase()
+    const dateLabel = current.toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit' })
     const weekday = ((current.getDay() + 6) % 7) + 1
-    return { isoDate, label, weekday }
+    return { isoDate, weekdayLabel, dateLabel, weekday }
   })
 }
 
@@ -65,7 +131,13 @@ export function ReservasPage({
   selectedRoomCapacity,
   roomBookings,
   weekOffset,
+  currentUser,
+  companions,
+  companionCodeInput,
   onReservationChange,
+  onAddCompanion,
+  onCompanionCodeInputChange,
+  onRemoveCompanion,
   onWeekOffsetChange,
   onClearReservationForm,
   onSubmitReservation,
@@ -164,6 +236,17 @@ export function ReservasPage({
     })
   }, [reservationForm.date, selectedRoom, weekDays, timeSlots, slotMinutes, roomBookings])
 
+  const maxPeople = selectedRoom?.maxPeople ?? selectedRoomCapacity ?? 12
+  const totalPeople = (currentUser ? 1 : 0) + companions.length
+  const peopleLabel = `${selectedRoom ? totalPeople : 0} ${(selectedRoom ? totalPeople : 0) === 1 ? 'persona' : 'personas'}`
+  const canAddCompanion = Boolean(
+    selectedRoom && currentUser && companionCodeInput.trim() && totalPeople < maxPeople,
+  )
+  const canShowReservationDetails =
+    Boolean(reservationForm.campus) &&
+    Boolean(reservationForm.location) &&
+    Boolean(reservationForm.roomId)
+
   return (
     <main className="page dashboard-page">
       <AppHeader title="Reservar" roleLabel="Estudiante" />
@@ -171,167 +254,231 @@ export function ReservasPage({
       <section className="dashboard-grid single-grid">
         <article className="card booking-card">
           <form onSubmit={onSubmitReservation} className="booking-form">
-            <div className="card-head slim-head">
+            <div className="card-head slim-head booking-form-head">
               <h2>Nueva reserva</h2>
               <div className="inline-filters quick-links">
                 <button
                   type="button"
-                  className="inline-flex min-h-8 items-center justify-center rounded-md border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 transition hover:-translate-y-px hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="inline-flex min-h-8 items-center justify-center gap-2 rounded-md border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 transition hover:-translate-y-px hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
                   onClick={onClearReservationForm}
                 >
+                  <span className="btn-icon" aria-hidden="true">
+                    <SweepIcon />
+                  </span>
                   Limpiar
                 </button>
               </div>
             </div>
 
-            <div className="form-grid top-grid">
-              <div>
-                <label htmlFor="campus">Campus</label>
-                <select
-                  id="campus"
-                  value={reservationForm.campus}
-                  onChange={(event) => {
-                    const nextCampus = event.target.value
-                    onReservationChange({
-                      ...reservationForm,
-                      campus: nextCampus,
-                      location: '',
-                      roomId: '',
-                      people: 0,
-                      date: '',
-                      start: '',
-                      end: '',
-                    })
-                  }}
-                >
-                  <option value="">Seleccionar campus</option>
-                  {campusOptions.map((campus) => (
-                    <option key={campus} value={campus}>
-                      {campus}
-                    </option>
-                  ))}
-                </select>
-              </div>
+            <section className="booking-block">
+              <p className="booking-block-kicker">Recurso</p>
+              <div className="booking-resource-grid">
+                <div className="booking-field booking-field-campus">
+                  <label htmlFor="campus">Campus</label>
+                  <select
+                    id="campus"
+                    value={reservationForm.campus}
+                    onChange={(event) => {
+                      const nextCampus = event.target.value
+                      onReservationChange({
+                        ...reservationForm,
+                        campus: nextCampus,
+                        location: '',
+                        roomId: '',
+                        people: 0,
+                        date: '',
+                        start: '',
+                        end: '',
+                      })
+                    }}
+                  >
+                    <option value="">--</option>
+                    {campusOptions.map((campus) => (
+                      <option key={campus} value={campus}>
+                        {campus}
+                      </option>
+                    ))}
+                  </select>
+                </div>
 
-              <div>
-                <label htmlFor="location">Ubicación</label>
-                <select
-                  id="location"
-                  value={reservationForm.location}
-                  onChange={(event) => {
-                    const nextLocation = event.target.value
-                    onReservationChange({
-                      ...reservationForm,
-                      location: nextLocation,
-                      roomId: '',
-                      people: 0,
-                      date: '',
-                      start: '',
-                      end: '',
-                    })
-                  }}
-                  disabled={!reservationForm.campus}
-                >
-                  <option value="">Seleccionar ubicación</option>
-                  {locationsForCampus.map((location) => (
-                    <option key={location} value={location}>
-                      {location}
-                    </option>
-                  ))}
-                </select>
-              </div>
+                <div className="booking-field">
+                  <label htmlFor="location">Ubicación</label>
+                  <select
+                    id="location"
+                    value={reservationForm.location}
+                    onChange={(event) => {
+                      const nextLocation = event.target.value
+                      onReservationChange({
+                        ...reservationForm,
+                        location: nextLocation,
+                        roomId: '',
+                        people: 0,
+                        date: '',
+                        start: '',
+                        end: '',
+                      })
+                    }}
+                    disabled={!reservationForm.campus}
+                  >
+                    <option value="">--</option>
+                    {locationsForCampus.map((location) => (
+                      <option key={location} value={location}>
+                        {location}
+                      </option>
+                    ))}
+                  </select>
+                </div>
 
-              <div>
-                <label htmlFor="room">Recurso</label>
-                <select
-                  id="room"
-                  value={reservationForm.roomId}
-                  onChange={(event) => {
-                    const nextRoom = roomsByLocation.find((room) => room.id === event.target.value)
-                    onReservationChange({
-                      ...reservationForm,
-                      roomId: event.target.value,
-                      people: nextRoom?.minPeople ?? 0,
-                      date: '',
-                      start: '',
-                      end: '',
-                    })
-                  }}
-                  disabled={!reservationForm.location}
-                >
-                  <option value="">Seleccionar recurso</option>
-                  {roomsByLocation.map((room) => (
-                    <option key={room.id} value={room.id}>
-                      {room.resourceLabel}
-                    </option>
-                  ))}
-                </select>
-                {selectedRoom && (
-                  <p className="mt-1 text-xs font-medium text-slate-600">
-                    Capacidad: {selectedRoom.capacity} | Min: {selectedRoom.minPeople}
-                    {selectedRoom.minPeopleRequired ? ' (obligatorio)' : ' (opcional)'} | Max: {selectedRoom.maxPeople} | Bloque: {slotMinutes} min
-                  </p>
-                )}
+                <div className="booking-field">
+                  <label htmlFor="room">Recurso</label>
+                  <select
+                    id="room"
+                    value={reservationForm.roomId}
+                    onChange={(event) => {
+                      onReservationChange({
+                        ...reservationForm,
+                        roomId: event.target.value,
+                        people: 0,
+                        date: '',
+                        start: '',
+                        end: '',
+                      })
+                    }}
+                    disabled={!reservationForm.location}
+                  >
+                    <option value="">--</option>
+                    {roomsByLocation.map((room) => (
+                      <option key={room.id} value={room.id}>
+                        {room.resourceLabel}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
-            </div>
+              {selectedRoom && (
+                <p className="booking-resource-meta">
+                  Cap. {selectedRoom.capacity} · Min. {selectedRoom.minPeople}
+                  {selectedRoom.minPeopleRequired ? ' obligatorio' : ' opcional'} · Max. {selectedRoom.maxPeople} · Bloques de {slotMinutes} min
+                </p>
+              )}
+            </section>
 
-            <div className="form-grid bottom-grid">
-              <div>
-                <label htmlFor="people">Personas</label>
-                <input
-                  id="people"
-                  type="number"
-                  min={selectedRoom?.minPeopleRequired ? selectedRoom.minPeople : 1}
-                  max={selectedRoom?.maxPeople ?? selectedRoomCapacity ?? 12}
-                  value={reservationForm.people > 0 ? reservationForm.people : ''}
-                  onChange={(event) =>
-                    onReservationChange({
-                      ...reservationForm,
-                      people: Number(event.target.value),
-                    })
-                  }
-                  disabled={!selectedRoom}
-                />
-              </div>
-              <div>
-                <label htmlFor="date">Fecha</label>
-                <input id="date" type="date" value={reservationForm.date} readOnly />
-              </div>
-              <div>
-                <label htmlFor="start">Inicio</label>
-                <select
-                  id="start"
-                  value={reservationForm.start}
-                  disabled={!reservationForm.date}
-                  onChange={(event) =>
-                    onReservationChange({
-                      ...reservationForm,
-                      start: event.target.value,
-                      end: event.target.value ? toTime(toMinutes(event.target.value) + slotMinutes) : '',
-                    })
-                  }
-                >
-                  <option value="">Seleccionar inicio</option>
-                  {availableStartSlotsForSelectedDate.map((start) => (
-                    <option key={start} value={start}>
-                      {start}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label htmlFor="end">Fin</label>
-                <input id="end" type="time" value={reservationForm.end} readOnly />
-              </div>
-            </div>
+            {canShowReservationDetails && (
+              <>
+                <section className="booking-block">
+                  <div className="participants-panel participants-panel-modern">
+                    <div className="participants-modern-head">
+                      <p className="booking-block-kicker">Personas de la reserva</p>
+                      <p className="people-total-compact" aria-live="polite">
+                        {peopleLabel}
+                      </p>
+                    </div>
+
+                    {currentUser && selectedRoom && (
+                      <>
+                        <div className="participant-modern-row participant-modern-row-owner">
+                          <span className="participant-modern-check" aria-hidden="true">
+                            <CheckIcon />
+                          </span>
+                          <div className="participant-modern-copy">
+                            <strong>{`${currentUser.firstName} ${currentUser.lastName}`.trim()}</strong>
+                            <span>{currentUser.code}</span>
+                          </div>
+                        </div>
+
+                        {companions.map((companion, index) => (
+                          <div key={`companion-${index}`} className="participant-modern-row">
+                            <span className="participant-modern-avatar" aria-hidden="true">
+                              <UserIcon />
+                            </span>
+                            <div className="participant-modern-copy">
+                              <strong>{companion.fullName}</strong>
+                              <span>{companion.code}</span>
+                            </div>
+                            <button
+                              type="button"
+                              className="person-action-btn person-action-btn-danger inline-flex min-h-8 items-center justify-center gap-2 rounded-md border bg-white px-3 text-xs font-semibold transition hover:-translate-y-px disabled:cursor-not-allowed disabled:opacity-60"
+                              onClick={() => onRemoveCompanion(index)}
+                            >
+                              <span className="btn-icon" aria-hidden="true">
+                                <MinusUserIcon />
+                              </span>
+                              Quitar
+                            </button>
+                          </div>
+                        ))}
+
+                        <div className="participant-modern-row participant-modern-row-add">
+                          <span className="participant-modern-avatar participant-modern-avatar-muted" aria-hidden="true">
+                            <UserIcon />
+                          </span>
+                          <input
+                            type="text"
+                            value={companionCodeInput}
+                            onChange={(event) => onCompanionCodeInputChange(event.target.value)}
+                            placeholder="Código"
+                            aria-label="Código de persona a agregar"
+                          />
+                          <button
+                            type="button"
+                            className="person-action-btn inline-flex min-h-8 items-center justify-center rounded-md border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 transition hover:-translate-y-px hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                            onClick={onAddCompanion}
+                            disabled={!canAddCompanion}
+                          >
+                            + Agregar
+                          </button>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </section>
+
+                <section className="booking-block">
+                  <p className="booking-block-kicker">Fecha y hora</p>
+                  <div className="reservation-time-row booking-time-grid">
+                    <div className="compact-field">
+                      <label htmlFor="date">Fecha</label>
+                      <input id="date" type="date" value={reservationForm.date} readOnly />
+                    </div>
+                    <div className="compact-field">
+                      <label htmlFor="start">Inicio</label>
+                      <select
+                        id="start"
+                        value={reservationForm.start}
+                        disabled={!reservationForm.date}
+                        onChange={(event) =>
+                          onReservationChange({
+                            ...reservationForm,
+                            start: event.target.value,
+                            end: event.target.value ? toTime(toMinutes(event.target.value) + slotMinutes) : '',
+                          })
+                        }
+                      >
+                        <option value="">--</option>
+                        {availableStartSlotsForSelectedDate.map((start) => (
+                          <option key={start} value={start}>
+                            {start}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="compact-field">
+                      <label htmlFor="end">Fin</label>
+                      <input id="end" type="time" value={reservationForm.end} readOnly />
+                    </div>
+                  </div>
+                </section>
 
             <div className="reservation-week-nav">
               <button
                 type="button"
-                className="inline-flex min-h-8 items-center justify-center rounded-md border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 transition hover:-translate-y-px hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                className="inline-flex min-h-8 items-center justify-center gap-2 rounded-md border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 transition hover:-translate-y-px hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
                 onClick={() => onWeekOffsetChange(Math.max(0, weekOffset - 1))}
                 disabled={weekOffset <= 0}
               >
+                <span className="btn-icon" aria-hidden="true">
+                  <ArrowLeftIcon />
+                </span>
                 Semana anterior
               </button>
               <p className="m-0 text-xs font-semibold text-slate-600">
@@ -339,11 +486,14 @@ export function ReservasPage({
               </p>
               <button
                 type="button"
-                className="inline-flex min-h-8 items-center justify-center rounded-md border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 transition hover:-translate-y-px hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                className="inline-flex min-h-8 items-center justify-center gap-2 rounded-md border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 transition hover:-translate-y-px hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
                 onClick={() => onWeekOffsetChange(Math.min(maxWeekOffset, weekOffset + 1))}
                 disabled={weekOffset >= maxWeekOffset}
               >
                 Semana siguiente
+                <span className="btn-icon" aria-hidden="true">
+                  <ArrowRightIcon />
+                </span>
               </button>
             </div>
 
@@ -353,7 +503,12 @@ export function ReservasPage({
                   <tr>
                     <th>Hora</th>
                     {weekDays.map((day) => (
-                      <th key={day.isoDate}>{day.label}</th>
+                      <th key={day.isoDate}>
+                        <span className="calendar-day-header">
+                          <span>{day.weekdayLabel}</span>
+                          <span>{day.dateLabel}</span>
+                        </span>
+                      </th>
                     ))}
                   </tr>
                 </thead>
@@ -380,7 +535,7 @@ export function ReservasPage({
                                 type="button"
                                 className={`calendar-cell-btn ${selected ? 'selected' : ''} ${disabled ? 'blocked' : 'available'}`}
                                 disabled={disabled}
-                                aria-label={`${day.label} ${slot} ${slotEnd}`}
+                                aria-label={`${day.weekdayLabel} ${day.dateLabel} ${slot} ${slotEnd}`}
                                 onClick={() =>
                                   onReservationChange({
                                     ...reservationForm,
@@ -400,14 +555,19 @@ export function ReservasPage({
               </table>
             </div>
 
-            <div className="action-row items-center">
+            <div className="action-row items-center justify-end">
               <button
                 type="submit"
-                className="inline-flex min-h-10 items-center justify-center rounded-full bg-primary px-4 text-sm font-semibold text-white transition hover:-translate-y-px hover:bg-primary-dark disabled:cursor-not-allowed disabled:opacity-60"
+                className="inline-flex min-h-10 items-center justify-center gap-2 rounded-full bg-primary px-4 text-sm font-semibold text-white transition hover:-translate-y-px hover:bg-primary-dark disabled:cursor-not-allowed disabled:opacity-60"
               >
+                <span className="btn-icon" aria-hidden="true">
+                  <CheckIcon />
+                </span>
                 Confirmar reserva
               </button>
             </div>
+              </>
+            )}
 
             {reservationError && <p className="error-text">{reservationError}</p>}
           </form>
@@ -416,3 +576,5 @@ export function ReservasPage({
     </main>
   )
 }
+
+

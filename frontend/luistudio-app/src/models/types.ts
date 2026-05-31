@@ -58,6 +58,11 @@ export interface ReservationForm {
   end: string
 }
 
+export interface ReservationCompanion {
+  code: string
+  fullName: string
+}
+
 export interface Booking {
   id: string
   backendId: number
@@ -71,6 +76,7 @@ export interface Booking {
   start: string
   end: string
   status: BookingStatus
+  observation?: string
 }
 
 export interface Profile {

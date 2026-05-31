@@ -74,6 +74,7 @@ public class DtoMapper {
             reservation.getHoraInicio(),
             reservation.getHoraFin(),
             reservation.getEstado().name(),
+            reservation.getObservacion(),
             CalendarUtils.googleCalendarLink(
                 title,
                 description,
