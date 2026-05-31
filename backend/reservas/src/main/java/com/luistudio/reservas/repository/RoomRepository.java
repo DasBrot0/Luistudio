@@ -1,5 +1,6 @@
 package com.luistudio.reservas.repository;
 
+import com.luistudio.reservas.model.PabellonEntity;
 import com.luistudio.reservas.model.RoomEntity;
 import com.luistudio.reservas.model.RoomState;
 import java.util.List;
@@ -12,4 +13,8 @@ public interface RoomRepository extends JpaRepository<RoomEntity, Long> {
     List<RoomEntity> findByEstadoNot(RoomState estado);
 
     List<RoomEntity> findByUbicacionIgnoreCaseAndEstadoNot(String ubicacion, RoomState estado);
+
+    List<RoomEntity> findByCampusIgnoreCaseAndEstadoNot(String campus, RoomState estado);
+
+    List<RoomEntity> findByPabellonAndEstadoNot(PabellonEntity pabellon, RoomState estado);
 }

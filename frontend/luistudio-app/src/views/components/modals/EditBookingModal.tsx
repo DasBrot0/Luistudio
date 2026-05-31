@@ -105,9 +105,9 @@ export function EditBookingModal({
 
           <div className="modal-actions">
             <button type="button" className="inline-flex min-h-10 items-center justify-center rounded-full border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:-translate-y-px hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60" onClick={onCancel}>
-              Cancel
+              Cancelar
             </button>
-            <button type="submit" className="inline-flex min-h-10 items-center justify-center rounded-full border border-amber-300 bg-amber-200 px-4 text-sm font-semibold text-amber-900 transition hover:-translate-y-px hover:bg-amber-300">
+            <button type="submit" className="inline-flex min-h-10 items-center justify-center rounded-full bg-primary px-4 text-sm font-semibold text-white transition hover:-translate-y-px hover:bg-primary-dark disabled:cursor-not-allowed disabled:opacity-60">
               Guardar cambios
             </button>
           </div>

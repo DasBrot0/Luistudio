@@ -25,12 +25,31 @@ export interface Room {
   backendId: number
   id: string
   name: string
+  resourceLabel: string
+  campus: string
+  campusLabel: string
+  venue: string
+  venueLabel: string
   capacity: number
   location: string
+  minPeople: number
+  minPeopleRequired: boolean
+  maxPeople: number
+  slotMinutes: number
+  schedule: ScheduleDay[]
   active: boolean
 }
 
+export interface ScheduleDay {
+  dayOfWeek: number
+  openTime: string | null
+  closeTime: string | null
+  closed: boolean
+  override?: boolean
+}
+
 export interface ReservationForm {
+  campus: string
   location: string
   roomId: string
   people: number
@@ -70,6 +89,20 @@ export interface SystemConfig {
 
 export interface RoomDraft {
   name: string
+  campus: string
   location: string
   capacity: number
+  minPeople: number
+  minPeopleRequired: boolean
+  maxPeople: number
+  schedule: ScheduleDay[]
+  pabellonCode: string
+}
+
+export interface CampusSchedule {
+  campus: string
+  campusLabel: string
+  slotMinutes: number
+  days: ScheduleDay[]
+  warnings: string[]
 }

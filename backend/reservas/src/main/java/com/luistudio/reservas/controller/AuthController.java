@@ -52,13 +52,13 @@ public class AuthController {
     @PostMapping("/reset-request")
     public ResponseEntity<MessageResponse> requestReset(@Valid @RequestBody ResetRequestInput request) {
         authService.requestReset(request);
-        return ResponseEntity.ok(new MessageResponse("Si el correo existe, se envio un token de recuperacion"));
+        return ResponseEntity.ok(new MessageResponse("Si el correo existe, se envió un enlace de recuperación"));
     }
 
     @PostMapping("/reset-confirm")
     public ResponseEntity<MessageResponse> confirmReset(@Valid @RequestBody ResetConfirmInput request) {
         authService.confirmReset(request);
-        return ResponseEntity.ok(new MessageResponse("Contrasena actualizada"));
+        return ResponseEntity.ok(new MessageResponse("Contraseña actualizada"));
     }
 
     @PostMapping("/2fa/enroll")
@@ -66,7 +66,7 @@ public class AuthController {
         AuthPrincipal principal = currentUserProvider.requireCurrentUser();
         currentUserProvider.requireNotProvisionalToken();
         authService.enroll2fa(principal.userId());
-        return ResponseEntity.ok(new MessageResponse("Codigo 2FA enviado"));
+        return ResponseEntity.ok(new MessageResponse("Código 2FA enviado"));
     }
 
     @PostMapping("/2fa/confirm")

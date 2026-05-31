@@ -11,8 +11,17 @@ public class CapacityRule implements BookingValidationRule {
 
     @Override
     public void validate(BookingRuleContext context) {
-        if (context.request().people() > context.room().getCapacidad()) {
-            throw new BusinessException(HttpStatus.BAD_REQUEST, "La cantidad de personas supera la capacidad de la sala");
+        int people = context.request().people();
+        int roomCapacity = context.room().getCapacidad();
+        int roomMax = context.room().getMaximoPersonas() == null ? roomCapacity : context.room().getMaximoPersonas();
+        int roomMin = context.room().getMinimoPersonas() == null ? 1 : context.room().getMinimoPersonas();
+        boolean minRequired = Boolean.TRUE.equals(context.room().getMinimoPersonasObligatorio());
+
+        if (people > roomCapacity || people > roomMax) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST, "La cantidad de personas supera el maximo permitido para la sala");
+        }
+        if (minRequired && people < roomMin) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST, "La reserva requiere al menos " + roomMin + " personas para esta sala");
         }
     }
 }

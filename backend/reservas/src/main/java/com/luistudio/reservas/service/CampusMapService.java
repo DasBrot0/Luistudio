@@ -47,8 +47,8 @@ public class CampusMapService {
         List<PabellonEntity> pabellones = pabellonRepository.findAll();
 
         List<CampusMapResponse.PabellonMapItem> mapped = pabellones.stream().map(p -> {
-            List<CampusMapResponse.RoomMapItem> rooms = roomRepository.findByUbicacionIgnoreCaseAndEstadoNot(
-                p.getCodigo(),
+            List<CampusMapResponse.RoomMapItem> rooms = roomRepository.findByPabellonAndEstadoNot(
+                p,
                 com.luistudio.reservas.model.RoomState.INACTIVA
             ).stream().map(room -> {
                 String status = resolveStatus(room, activeNow, activeMaintenances);

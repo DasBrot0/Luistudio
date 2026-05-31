@@ -844,6 +844,110 @@ th {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.three-cols {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.reservation-week-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.calendar-grid-wrap {
+  width: 100%;
+  overflow-x: auto;
+  border: 1px solid var(--line-200);
+  border-radius: var(--radius-md);
+}
+
+.calendar-grid {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 46rem;
+}
+
+.calendar-grid th,
+.calendar-grid td {
+  border-bottom: 1px solid var(--table-row-border);
+  border-right: 1px solid var(--table-row-border);
+  padding: 0.35rem;
+  text-align: center;
+}
+
+.calendar-grid th:first-child,
+.calendar-grid td:first-child {
+  min-width: 4.2rem;
+  font-weight: 700;
+  background: var(--surface-075);
+}
+
+.calendar-grid th:last-child,
+.calendar-grid td:last-child {
+  border-right: 0;
+}
+
+.calendar-cell-btn {
+  width: 100%;
+  border: 0;
+  border-radius: 8px;
+  min-height: 2rem;
+  padding: 0;
+}
+
+.calendar-cell-btn.available {
+  background: color-mix(in srgb, var(--ok-bg) 35%, transparent);
+}
+
+.calendar-cell-btn.blocked {
+  background: color-mix(in srgb, var(--danger-bg) 36%, transparent);
+}
+
+.calendar-cell-btn.selected {
+  background: color-mix(in srgb, var(--brand-500) 82%, var(--surface-000));
+}
+
+.calendar-cell-btn:disabled {
+  opacity: 0.88;
+  cursor: not-allowed;
+}
+
+.calendar-empty-slot {
+  background: transparent;
+}
+
+.room-form-modal-card {
+  width: min(100%, 46rem);
+}
+
+.room-schedule-grid {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.room-schedule-row {
+  display: grid;
+  grid-template-columns: 2.4rem 6.8rem minmax(0, 1fr) minmax(0, 1fr);
+  gap: 0.4rem;
+  align-items: center;
+}
+
+.campus-schedule-card {
+  display: grid;
+  gap: 0.65rem;
+  border: 1px solid var(--line-200);
+  border-radius: var(--radius-sm);
+  padding: 0.8rem;
+}
+
+.campus-schedule-card h3 {
+  margin: 0;
+  font-size: var(--fs-sm);
+  font-family: var(--title-font);
+}
+
 .modal-layer {
   position: fixed;
   inset: 0;
@@ -1212,6 +1316,14 @@ th {
   .two-cols {
     grid-template-columns: 1fr;
   }
+
+  .three-cols {
+    grid-template-columns: 1fr;
+  }
+
+  .room-schedule-row {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 40rem) {
@@ -1241,19 +1353,19 @@ th {
     overflow-x: visible;
   }
 
-  table,
-  tbody,
-  tr,
-  td {
+  table:not(.calendar-grid),
+  table:not(.calendar-grid) tbody,
+  table:not(.calendar-grid) tr,
+  table:not(.calendar-grid) td {
     display: block;
     width: 100%;
   }
 
-  thead {
+  table:not(.calendar-grid) thead {
     display: none;
   }
 
-  tr {
+  table:not(.calendar-grid) tr {
     border: 1px solid var(--line-100);
     border-radius: 10px;
     margin-bottom: 10px;
@@ -1261,7 +1373,7 @@ th {
     background: var(--surface-000);
   }
 
-  td {
+  table:not(.calendar-grid) td {
     border-bottom: 1px dashed var(--line-100);
     padding: 8px 0;
     font-size: var(--fs-xs);
@@ -1271,11 +1383,11 @@ th {
     text-align: right;
   }
 
-  td:last-child {
+  table:not(.calendar-grid) td:last-child {
     border-bottom: 0;
   }
 
-  td::before {
+  table:not(.calendar-grid) td::before {
     content: attr(data-label);
     color: var(--muted-600);
     font-weight: 600;

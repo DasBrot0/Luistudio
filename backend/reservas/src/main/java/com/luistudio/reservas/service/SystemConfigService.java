@@ -13,6 +13,7 @@ public class SystemConfigService {
 
     public static final String KEY_MAX_ACTIVE_BOOKINGS = "max_reservas_simultaneas";
     public static final String KEY_MAX_DURATION_MINUTES = "duracion_maxima_minutos";
+    private static final String KEY_CAMPUS_SLOT_MINUTES_PREFIX = "campus_slot_minutos_";
 
     private final SystemConfigRepository systemConfigRepository;
 
@@ -24,6 +25,8 @@ public class SystemConfigService {
     public void ensureDefaults() {
         upsert(KEY_MAX_ACTIVE_BOOKINGS, "1");
         upsert(KEY_MAX_DURATION_MINUTES, "120");
+        upsert(campusSlotKey("Monterrico"), "60");
+        upsert(campusSlotKey("Mayorazgo"), "45");
     }
 
     @Transactional(readOnly = true)
@@ -50,6 +53,26 @@ public class SystemConfigService {
         return Integer.parseInt(getValue(KEY_MAX_DURATION_MINUTES, "120"));
     }
 
+    @Transactional(readOnly = true)
+    public int getCampusSlotMinutes(String campus) {
+        return Integer.parseInt(getValue(campusSlotKey(campus), String.valueOf(getDefaultCampusSlotMinutes(campus))));
+    }
+
+    @Transactional
+    public void setCampusSlotMinutes(String campus, int slotMinutes) {
+        validateCampusSlotMinutes(slotMinutes);
+        upsert(campusSlotKey(campus), String.valueOf(slotMinutes));
+    }
+
+    public void validateCampusSlotMinutes(int slotMinutes) {
+        if (slotMinutes != 30 && slotMinutes != 45 && slotMinutes != 60 && slotMinutes != 120) {
+            throw new com.luistudio.reservas.exception.BusinessException(
+                org.springframework.http.HttpStatus.BAD_REQUEST,
+                "El intervalo por campus debe ser 30, 45, 60 o 120 minutos"
+            );
+        }
+    }
+
     private String getValue(String key, String defaultValue) {
         return systemConfigRepository.findByClave(key)
             .map(SystemConfigEntity::getValor)
@@ -62,5 +85,18 @@ public class SystemConfigService {
         entity.setValor(value);
         entity.setUpdatedAt(OffsetDateTime.now());
         systemConfigRepository.save(entity);
+    }
+
+    private String campusSlotKey(String campus) {
+        String normalized = campus == null ? "default" : campus.trim().toLowerCase();
+        normalized = normalized.replaceAll("[^a-z0-9]+", "_");
+        return KEY_CAMPUS_SLOT_MINUTES_PREFIX + normalized;
+    }
+
+    private int getDefaultCampusSlotMinutes(String campus) {
+        if ("Mayorazgo".equalsIgnoreCase(campus)) {
+            return 45;
+        }
+        return 60;
     }
 }

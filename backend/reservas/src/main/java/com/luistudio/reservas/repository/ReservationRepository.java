@@ -18,6 +18,19 @@ public interface ReservationRepository extends JpaRepository<ReservationEntity, 
 
     List<ReservationEntity> findByUsuarioOrderByFechaDescHoraInicioDesc(UserEntity usuario);
 
+    @Query("""
+        SELECT r FROM ReservationEntity r
+        WHERE r.sala = :room
+          AND r.estado = com.luistudio.reservas.model.ReservationStatus.ACTIVA
+          AND r.fecha BETWEEN :fromDate AND :toDate
+        ORDER BY r.fecha ASC, r.horaInicio ASC
+    """)
+    List<ReservationEntity> findActiveByRoomAndDateRange(
+        @Param("room") RoomEntity room,
+        @Param("fromDate") LocalDate fromDate,
+        @Param("toDate") LocalDate toDate
+    );
+
     long countByUsuarioAndEstado(UserEntity usuario, ReservationStatus estado);
 
     Page<ReservationEntity> findByEstadoOrderByFechaDescHoraInicioDesc(ReservationStatus estado, Pageable pageable);

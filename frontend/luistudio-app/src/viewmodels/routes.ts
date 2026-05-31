@@ -24,7 +24,15 @@ export function getRouteFromPath(pathname: string): RouteKey {
 }
 
 export function resolveRouteByAuth(route: RouteKey, user: AuthUser | null): RouteKey {
-  if (route === 'login' || route === 'reset-password') {
+  if (route === 'reset-password') {
+    return route
+  }
+
+  if (route === 'login' && user) {
+    return user.role === 'student' ? 'misreservas' : 'salas'
+  }
+
+  if (route === 'login') {
     return route
   }
 

@@ -48,7 +48,9 @@ Si usas el script `scripts/start-backend.ps1`, este carga variables automaticame
 ### Salas y disponibilidad
 
 - `GET /api/rooms`
+- `GET /api/rooms?campus&ubicacion`
 - `GET /api/rooms/available?fecha&horaInicio&horaFin`
+- `GET /api/rooms/{id}/bookings?desde&hasta`
 - `POST /api/rooms`
 - `PUT /api/rooms/{id}`
 - `PATCH /api/rooms/{id}`
@@ -71,6 +73,8 @@ Si usas el script `scripts/start-backend.ps1`, este carga variables automaticame
 - `PATCH /api/admin/users/{id}/estado`
 - `GET /api/admin/config`
 - `PUT /api/admin/config`
+- `GET /api/admin/campus-schedules`
+- `PUT /api/admin/campus-schedules`
 - `GET /api/campus/map`
 
 ### Preferencias
@@ -82,12 +86,19 @@ Si usas el script `scripts/start-backend.ps1`, este carga variables automaticame
 ## Notas de implementacion
 
 - Se implementa bloqueo temporal tras intentos fallidos de login.
-- Se implementa 2FA por codigo temporal.
+- Se implementa 2FA por código temporal.
 - `email_outbox` se procesa por scheduler (reintentos automaticos).
 - En local, sin `RESEND_API_KEY`, el envio de correos cae en modo log (no SMTP).
 - Para despliegue en Render, usar `EMAIL_PROVIDER=resend` + `RESEND_API_KEY` (salida por HTTPS/443).
 - Se generan enlaces Google Calendar y descarga `.ics` por reserva.
 - El esquema SQL base (`database/001_init.sql` y `database/002_seed_release01.sql`) define tablas y columnas en ingles para instalaciones desde cero.
+- Para bases existentes del release anterior, aplicar tambien `database/004_rooms_catalog_and_schedules.sql`.
+- Las salas ahora almacenan catalogo en ingles (`campus`, `venue`, `name`) y el backend devuelve equivalencias en espanol (`campusLabel`, `venueLabel`, `resourceLabel`).
+- Se agregan horarios por campus (`campus_schedules`) y override por sala (`room_schedules`) para validar reservas por dia/hora.
+- Se agregan reglas por sala de personas: `minPeople`, `minPeopleRequired`, `maxPeople`.
+- Se agrega configuracion de duracion por bloque de reserva por campus (Monterrico 60 min, Mayorazgo 45 min por defecto).
+- Las reservas solo aceptan fechas/horas dentro de la ventana permitida (semana actual; fin de semana habilita tambien la siguiente semana) y siempre en horas futuras del dia actual.
+- No se permite cancelar reservas que ya finalizaron (validacion en backend).
 
 ## Patrones aplicados
 

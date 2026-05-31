@@ -3,6 +3,7 @@ import type { Room } from '../../models/types'
 
 interface SalasPageProps {
   filteredRooms: Room[]
+  campusOptions: string[]
   locationOptions: string[]
   roomFilterLocation: string
   roomNotice: string
@@ -14,6 +15,7 @@ interface SalasPageProps {
 
 export function SalasPage({
   filteredRooms,
+  campusOptions,
   locationOptions,
   roomFilterLocation,
   roomNotice,
@@ -33,6 +35,11 @@ export function SalasPage({
             <div className="inline-filters">
               <select value={roomFilterLocation} onChange={(event) => onRoomFilterChange(event.target.value)}>
                 <option value="Todas">Todas</option>
+                {campusOptions.map((campus) => (
+                  <option key={campus} value={campus}>
+                    {campus}
+                  </option>
+                ))}
                 {locationOptions.map((location) => (
                   <option key={location} value={location}>{location}</option>
                 ))}
@@ -49,8 +56,11 @@ export function SalasPage({
               <thead>
                 <tr>
                   <th>ID</th>
+                  <th>Campus</th>
+                  <th>Ubicación</th>
+                  <th>Recurso</th>
                   <th>Nombre</th>
-                  <th>Capacidad</th>
+                  <th>Personas</th>
                   <th>Acciones</th>
                 </tr>
               </thead>
@@ -58,8 +68,13 @@ export function SalasPage({
                 {filteredRooms.map((room) => (
                   <tr key={room.id}>
                     <td data-label="ID">{room.id}</td>
+                    <td data-label="Campus">{room.campusLabel}</td>
+                    <td data-label="Ubicación">{room.venueLabel}</td>
+                    <td data-label="Recurso">{room.resourceLabel}</td>
                     <td data-label="Nombre">{room.name}</td>
-                    <td data-label="Capacidad">{room.capacity}</td>
+                    <td data-label="Personas">
+                      {room.minPeopleRequired ? `${room.minPeople} (min obligatorio)` : `${room.minPeople} (min opcional)`} / {room.maxPeople} max
+                    </td>
                     <td data-label="Acciones" className="actions-cell">
                       <button type="button" className="inline-flex min-h-8 items-center justify-center rounded-md bg-slate-200 px-3 text-xs font-semibold text-slate-700 transition hover:-translate-y-px hover:bg-slate-300 disabled:cursor-not-allowed disabled:opacity-60" onClick={() => onOpenEditRoom(room)}>Editar</button>
                       <button type="button" className="danger-btn inline-flex min-h-8 items-center justify-center rounded-md px-3 text-xs font-semibold transition hover:-translate-y-px disabled:cursor-not-allowed disabled:opacity-60" onClick={() => onAskDeleteRoom(room.id)}>Eliminar</button>

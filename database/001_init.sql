@@ -89,12 +89,58 @@ CREATE TABLE IF NOT EXISTS rooms (
   code VARCHAR(20) NOT NULL UNIQUE,
   name VARCHAR(120) NOT NULL,
   capacity INTEGER NOT NULL,
+  campus VARCHAR(120) NOT NULL,
+  venue VARCHAR(160) NOT NULL,
   location VARCHAR(120) NOT NULL,
+  min_people INTEGER NOT NULL DEFAULT 1,
+  min_people_required BOOLEAN NOT NULL DEFAULT FALSE,
+  max_people INTEGER NOT NULL DEFAULT 1,
   status VARCHAR(30) NOT NULL DEFAULT 'DISPONIBLE',
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   CONSTRAINT fk_sala_pabellon FOREIGN KEY (building_id) REFERENCES buildings(id),
   CONSTRAINT chk_sala_capacidad CHECK (capacity > 0),
+  CONSTRAINT chk_sala_personas CHECK (
+    min_people > 0
+    AND max_people > 0
+    AND max_people >= min_people
+    AND max_people <= capacity
+  ),
   CONSTRAINT chk_sala_estado CHECK (status IN ('DISPONIBLE', 'EN_MANTENIMIENTO', 'INACTIVA'))
+);
+
+CREATE TABLE IF NOT EXISTS campus_schedules (
+  id BIGSERIAL PRIMARY KEY,
+  campus VARCHAR(120) NOT NULL,
+  day_of_week INTEGER NOT NULL,
+  open_time TIME,
+  close_time TIME,
+  is_closed BOOLEAN NOT NULL DEFAULT FALSE,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT uq_campus_schedule UNIQUE (campus, day_of_week),
+  CONSTRAINT chk_campus_day CHECK (day_of_week BETWEEN 1 AND 7),
+  CONSTRAINT chk_campus_schedule_window CHECK (
+    (is_closed = TRUE AND open_time IS NULL AND close_time IS NULL)
+    OR
+    (is_closed = FALSE AND open_time IS NOT NULL AND close_time IS NOT NULL AND close_time > open_time)
+  )
+);
+
+CREATE TABLE IF NOT EXISTS room_schedules (
+  id BIGSERIAL PRIMARY KEY,
+  room_id BIGINT NOT NULL,
+  day_of_week INTEGER NOT NULL,
+  open_time TIME,
+  close_time TIME,
+  is_closed BOOLEAN NOT NULL DEFAULT FALSE,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT fk_room_schedule_room FOREIGN KEY (room_id) REFERENCES rooms(id) ON DELETE CASCADE,
+  CONSTRAINT uq_room_schedule UNIQUE (room_id, day_of_week),
+  CONSTRAINT chk_room_day CHECK (day_of_week BETWEEN 1 AND 7),
+  CONSTRAINT chk_room_schedule_window CHECK (
+    (is_closed = TRUE AND open_time IS NULL AND close_time IS NULL)
+    OR
+    (is_closed = FALSE AND open_time IS NOT NULL AND close_time IS NOT NULL AND close_time > open_time)
+  )
 );
 
 CREATE TABLE IF NOT EXISTS maintenances (
@@ -188,6 +234,10 @@ CREATE TABLE IF NOT EXISTS two_factor_codes (
 );
 
 CREATE INDEX IF NOT EXISTS idx_sala_ubicacion ON rooms (location);
+CREATE INDEX IF NOT EXISTS idx_sala_campus ON rooms (campus);
+CREATE INDEX IF NOT EXISTS idx_sala_venue ON rooms (venue);
+CREATE INDEX IF NOT EXISTS idx_campus_schedule_campus_day ON campus_schedules (campus, day_of_week);
+CREATE INDEX IF NOT EXISTS idx_room_schedule_room_day ON room_schedules (room_id, day_of_week);
 CREATE INDEX IF NOT EXISTS idx_bookings_user_date ON bookings (user_id, booking_date);
 CREATE INDEX IF NOT EXISTS idx_bookings_room_date_hours ON bookings (room_id, booking_date, start_time, end_time);
 CREATE INDEX IF NOT EXISTS idx_intento_login_usuario_fecha ON login_attempts (user_id, attempted_at);
@@ -218,8 +268,28 @@ ON CONFLICT DO NOTHING;
 INSERT INTO system_config (config_key, config_value)
 VALUES
   ('max_reservas_simultaneas', '1'),
-  ('duracion_maxima_minutos', '120')
+  ('duracion_maxima_minutos', '120'),
+  ('campus_slot_minutos_monterrico', '60'),
+  ('campus_slot_minutos_mayorazgo', '45')
 ON CONFLICT (config_key) DO NOTHING;
+
+INSERT INTO campus_schedules (campus, day_of_week, open_time, close_time, is_closed)
+VALUES
+  ('Monterrico', 1, TIME '06:00', TIME '22:00', FALSE),
+  ('Monterrico', 2, TIME '06:00', TIME '22:00', FALSE),
+  ('Monterrico', 3, TIME '06:00', TIME '22:00', FALSE),
+  ('Monterrico', 4, TIME '06:00', TIME '22:00', FALSE),
+  ('Monterrico', 5, TIME '06:00', TIME '22:00', FALSE),
+  ('Monterrico', 6, TIME '06:00', TIME '12:00', FALSE),
+  ('Monterrico', 7, NULL, NULL, TRUE),
+  ('Mayorazgo', 1, TIME '05:30', TIME '22:00', FALSE),
+  ('Mayorazgo', 2, TIME '05:30', TIME '22:00', FALSE),
+  ('Mayorazgo', 3, TIME '05:30', TIME '22:00', FALSE),
+  ('Mayorazgo', 4, TIME '05:30', TIME '22:00', FALSE),
+  ('Mayorazgo', 5, TIME '05:30', TIME '22:00', FALSE),
+  ('Mayorazgo', 6, TIME '05:30', TIME '22:00', FALSE),
+  ('Mayorazgo', 7, NULL, NULL, TRUE)
+ON CONFLICT (campus, day_of_week) DO NOTHING;
 
 INSERT INTO role_permissions (role_id, permission_id)
 SELECT r.id, p.id

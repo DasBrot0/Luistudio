@@ -6,15 +6,17 @@ import type {
   AuthUser,
   Booking,
   BookingStatus,
+  CampusSchedule,
   Profile,
   ReservationForm,
   Role,
+  ScheduleDay,
   Room,
   RoomDraft,
   RouteKey,
   SystemConfig,
 } from '../../models/types'
-import { getDefaultReservationForm, minutesBetween, toMinutes } from '../../utils/helpers'
+import { getDefaultReservationForm, minutesBetween } from '../../utils/helpers'
 import { LoginPage } from './LoginPage'
 import { ResetPasswordPage } from './ResetPasswordPage'
 import { ReservasPage } from './ReservasPage'
@@ -29,25 +31,14 @@ import { RoomSuccessModal } from '../components/modals/RoomSuccessModal'
 import { DeleteRoomModal } from '../components/modals/DeleteRoomModal'
 import { ForgotPasswordModal } from '../components/modals/ForgotPasswordModal'
 import { TwoFactorModal } from '../components/modals/TwoFactorModal'
+import { MessageModal } from '../components/modals/MessageModal'
 import { GlobalTopbar } from '../components/layout/GlobalTopbar'
-import { api, type ApiPreferences } from '../../services/api'
+import { api, type ApiCampusSchedule, type ApiPreferences } from '../../services/api'
 
 interface NotificationItem {
   id: number
   message: string
   createdAt: string
-}
-
-interface AvailabilitySlot {
-  start: string
-  end: string
-  isAvailable: boolean
-}
-
-interface AvailabilityDay {
-  date: string
-  label: string
-  hasAvailability: boolean
 }
 
 const clampFontScale = (value: number) => Math.min(1.3, Math.max(0.85, Number.isFinite(value) ? value : 1))
@@ -74,17 +65,47 @@ const toUiRoom = (room: {
   id: number
   code: string
   name: string
+  resourceLabel: string
+  campus: string
+  campusLabel: string
+  venue: string
+  venueLabel: string
   capacity: number
   location: string
+  minPeople: number
+  minPeopleRequired: boolean
+  maxPeople: number
+  slotMinutes: number
+  schedule: ScheduleDay[]
   status: string
 }): Room => ({
   backendId: room.id,
   id: room.code,
   name: room.name,
+  resourceLabel: room.resourceLabel,
+  campus: room.campus,
+  campusLabel: room.campusLabel,
+  venue: room.venue,
+  venueLabel: room.venueLabel,
   capacity: room.capacity,
-  location: room.location,
+  location: room.venueLabel,
+  minPeople: room.minPeople,
+  minPeopleRequired: room.minPeopleRequired,
+  maxPeople: room.maxPeople,
+  slotMinutes: room.slotMinutes,
+  schedule: room.schedule,
   active: room.status !== 'INACTIVA',
 })
+
+const toUiCampusSchedule = (schedule: ApiCampusSchedule): CampusSchedule => ({
+  campus: schedule.campus,
+  campusLabel: schedule.campusLabel,
+  slotMinutes: schedule.slotMinutes,
+  days: schedule.days,
+  warnings: schedule.warnings,
+})
+
+const toHourMinute = (value: string) => value.split(':').slice(0, 2).join(':')
 
 const toUiBooking = (booking: {
   id: number
@@ -108,8 +129,8 @@ const toUiBooking = (booking: {
   roomBackendId: booking.roomId,
   people: booking.people,
   date: booking.date,
-  start: booking.start,
-  end: booking.end,
+  start: toHourMinute(booking.start),
+  end: toHourMinute(booking.end),
   status: booking.status === 'CANCELADA' ? 'Cancelado' : 'Confirmado',
 })
 
@@ -136,6 +157,7 @@ export function MainPage() {
 
   const [token, setToken] = useState('')
   const [authenticatedUser, setAuthenticatedUser] = useState<AuthUser | null>(null)
+  const [authHydrated, setAuthHydrated] = useState(false)
 
   const [loginEmail, setLoginEmail] = useState('')
   const [loginPassword, setLoginPassword] = useState('')
@@ -169,18 +191,22 @@ export function MainPage() {
   const [configNotice, setConfigNotice] = useState('')
 
   const [reservationForm, setReservationForm] = useState<ReservationForm>({
+    campus: '',
     location: '',
     roomId: '',
-    people: 2,
+    people: 0,
     date: '',
-    start: '16:30',
-    end: '17:30',
+    start: '',
+    end: '',
   })
   const [reservationError, setReservationError] = useState('')
+  const [reservationWeekOffset, setReservationWeekOffset] = useState(0)
+  const [roomBookingsWindow, setRoomBookingsWindow] = useState<Booking[]>([])
   const [confirmationBookingId, setConfirmationBookingId] = useState('')
 
   const [editingBookingId, setEditingBookingId] = useState<string | null>(null)
   const [editBookingForm, setEditBookingForm] = useState<ReservationForm>({
+    campus: '',
     location: '',
     roomId: '',
     people: 2,
@@ -194,8 +220,14 @@ export function MainPage() {
   const [roomModalTargetId, setRoomModalTargetId] = useState<string | null>(null)
   const [roomDraft, setRoomDraft] = useState<RoomDraft>({
     name: '',
-    location: 'E3',
+    campus: 'Monterrico',
+    location: 'University Wellness Center',
     capacity: 6,
+    minPeople: 1,
+    minPeopleRequired: false,
+    maxPeople: 6,
+    schedule: [],
+    pabellonCode: '',
   })
   const [roomNotice, setRoomNotice] = useState('')
   const [roomSuccessId, setRoomSuccessId] = useState('')
@@ -208,6 +240,7 @@ export function MainPage() {
   const [profilesQuery, setProfilesQuery] = useState('')
 
   const [toastMessage, setToastMessage] = useState('')
+  const [modalMessage, setModalMessage] = useState<{ title: string; message: string; variant: 'error' | 'success' } | null>(null)
   const [notifications, setNotifications] = useState<NotificationItem[]>([])
   const [isNotificationsModalOpen, setIsNotificationsModalOpen] = useState(false)
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false)
@@ -220,16 +253,39 @@ export function MainPage() {
     reminderEnabled: true,
     bookingChangesEnabled: true,
   })
+  const [campusSchedules, setCampusSchedules] = useState<CampusSchedule[]>([])
 
   const effectiveRoute = useMemo(
     () => resolveRouteByAuth(route, authenticatedUser),
     [route, authenticatedUser],
   )
   const activeRooms = useMemo(() => rooms.filter((room) => room.active), [rooms])
+  const campusValueOptions = useMemo(() => [...new Set(activeRooms.map((room) => room.campus))], [activeRooms])
+  const campusOptions = useMemo(() => [...new Set(activeRooms.map((room) => room.campusLabel))], [activeRooms])
   const locationOptions = useMemo(
-    () => [...new Set(activeRooms.map((room) => room.location))],
+    () => [...new Set(activeRooms.map((room) => room.venueLabel))],
     [activeRooms],
   )
+  const locationOptionsByCampus = useMemo(() => {
+    const grouped = new Map<string, string[]>()
+    for (const room of activeRooms) {
+      const key = room.campusLabel
+      const current = grouped.get(key) ?? []
+      if (!current.includes(room.venueLabel)) current.push(room.venueLabel)
+      grouped.set(key, current)
+    }
+    return grouped
+  }, [activeRooms])
+  const venueOptionsByCampus = useMemo(() => {
+    const grouped = new Map<string, string[]>()
+    for (const room of activeRooms) {
+      const key = room.campus
+      const current = grouped.get(key) ?? []
+      if (!current.includes(room.venue)) current.push(room.venue)
+      grouped.set(key, current)
+    }
+    return grouped
+  }, [activeRooms])
   const myBookings = useMemo(() => {
     if (!authenticatedUser) return []
     return bookings
@@ -250,7 +306,9 @@ export function MainPage() {
   const adminBookingsPage = adminBookings.slice((adminPage - 1) * pageSize, adminPage * pageSize)
   const filteredRooms = useMemo(() => {
     if (roomFilterLocation === 'Todas') return activeRooms
-    return activeRooms.filter((room) => room.location === roomFilterLocation)
+    return activeRooms.filter(
+      (room) => room.venueLabel === roomFilterLocation || room.campusLabel === roomFilterLocation,
+    )
   }, [activeRooms, roomFilterLocation])
   const profilesPerPage = 10
   const totalProfilePages = Math.max(1, Math.ceil(profiles.length / profilesPerPage))
@@ -285,7 +343,6 @@ export function MainPage() {
     const result = await api.getRooms(authToken)
     const mapped = result.map(toUiRoom)
     setRooms(mapped)
-    if (!reservationForm.roomId && mapped.length > 0) setReservationForm(getDefaultReservationForm(mapped))
   }
 
   const loadMyBookings = async (authToken: string) => {
@@ -308,16 +365,45 @@ export function MainPage() {
     setConfigDraft(nextConfig)
   }
 
+  const loadCampusSchedules = async (authToken: string) => {
+    const result = await api.getCampusSchedules(authToken)
+    setCampusSchedules(result.campuses.map(toUiCampusSchedule))
+  }
+
   const loadProfiles = async (authToken: string) => {
     const result = await api.getUsers(authToken, profilesPage, profilesQuery)
     setProfiles(result.content.map(toProfile))
+  }
+
+  const toIsoDate = (date: Date) =>
+    `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+
+  const getWeekRangeForOffset = (weekOffset: number) => {
+    const base = new Date()
+    const mondayShift = (base.getDay() + 6) % 7
+    const monday = new Date(base)
+    monday.setDate(base.getDate() - mondayShift + weekOffset * 7)
+    const sunday = new Date(monday)
+    sunday.setDate(monday.getDate() + 6)
+    return { from: toIsoDate(monday), to: toIsoDate(sunday) }
+  }
+
+  const loadRoomBookingsWindow = async (authToken: string, roomBackendId: number, weekOffset: number) => {
+    const { from, to } = getWeekRangeForOffset(weekOffset)
+    const result = await api.getRoomBookings(authToken, roomBackendId, from, to)
+    setRoomBookingsWindow(result.map(toUiBooking))
   }
 
   const bootstrap = async (authToken: string, user: AuthUser) => {
     await loadRooms(authToken)
     await loadUserPreferences(authToken)
     if (user.role === 'admin') {
-      await Promise.all([loadAdminBookings(authToken), loadAdminConfig(authToken), loadProfiles(authToken)])
+      await Promise.all([
+        loadAdminBookings(authToken),
+        loadAdminConfig(authToken),
+        loadProfiles(authToken),
+        loadCampusSchedules(authToken),
+      ])
     } else {
       await loadMyBookings(authToken)
     }
@@ -344,9 +430,22 @@ export function MainPage() {
   }, [location.pathname])
 
   useEffect(() => {
+    if (route !== 'reset-password') return
+    const params = new URLSearchParams(location.search)
+    const tokenFromLink = params.get('token') ?? ''
+    if (!tokenFromLink) {
+      setResetError('Debes abrir el enlace de recuperación enviado al correo')
+      navigateToRoute('login', { replace: true })
+      return
+    }
+    setResetToken(tokenFromLink)
+  }, [route, location.search])
+
+  useEffect(() => {
     const expectedPath = routePaths[effectiveRoute]
+    if (!authHydrated && route !== 'login' && route !== 'reset-password') return
     if (location.pathname !== expectedPath) navigate(expectedPath, { replace: true })
-  }, [effectiveRoute, location.pathname, navigate])
+  }, [authHydrated, effectiveRoute, route, location.pathname, navigate])
 
   useEffect(() => {
     if (!toastMessage) return
@@ -395,7 +494,14 @@ export function MainPage() {
 
   useEffect(() => {
     const stored = localStorage.getItem('luistudio_token')
-    if (!stored || authenticatedUser) return
+    if (authenticatedUser) {
+      setAuthHydrated(true)
+      return
+    }
+    if (!stored) {
+      setAuthHydrated(true)
+      return
+    }
     api
       .me(stored)
       .then((me) => {
@@ -405,6 +511,7 @@ export function MainPage() {
         bootstrap(stored, user).catch(() => undefined)
       })
       .catch(() => localStorage.removeItem('luistudio_token'))
+      .finally(() => setAuthHydrated(true))
   }, [authenticatedUser])
 
   useEffect(() => {
@@ -416,6 +523,29 @@ export function MainPage() {
     if (!token || authenticatedUser?.role !== 'admin') return
     loadProfiles(token).catch(() => undefined)
   }, [profilesPage, profilesQuery, token, authenticatedUser])
+
+  useEffect(() => {
+    if (!token || authenticatedUser?.role !== 'student') return
+    const room = activeRooms.find((item) => item.id === reservationForm.roomId)
+    if (!room) {
+      setRoomBookingsWindow([])
+      return
+    }
+    loadRoomBookingsWindow(token, room.backendId, reservationWeekOffset).catch(() => setRoomBookingsWindow([]))
+  }, [token, authenticatedUser, activeRooms, reservationForm.roomId, reservationWeekOffset])
+
+  useEffect(() => {
+    if (!showResetSuccess) return
+    const timeout = window.setTimeout(() => {
+      setShowResetSuccess(false)
+      setResetToken('')
+      setResetPassword('')
+      setResetPasswordConfirm('')
+      setResetError('')
+      navigateToRoute('login', { replace: true })
+    }, 1500)
+    return () => window.clearTimeout(timeout)
+  }, [showResetSuccess])
 
   const clearMessages = () => {
     setLoginError('')
@@ -435,6 +565,7 @@ export function MainPage() {
     setTwoFactorCode('')
     setProvisionalToken('')
     localStorage.removeItem('luistudio_token')
+    setAuthHydrated(true)
     navigateToRoute('login')
   }
 
@@ -458,7 +589,7 @@ export function MainPage() {
       await bootstrap(response.token, user)
       navigateToRoute(user.role === 'admin' ? 'salas' : 'misreservas')
     } catch (error) {
-      setLoginError(error instanceof Error ? error.message : 'Error al iniciar sesion')
+      setLoginError(error instanceof Error ? error.message : 'Error al iniciar sesión')
     }
   }
 
@@ -469,18 +600,18 @@ export function MainPage() {
 
     const code = twoFactorCode.trim()
     if (!code) {
-      setTwoFactorError('Ingresa el codigo 2FA.')
+      setTwoFactorError('Ingresa el código 2FA.')
       return
     }
     if (!provisionalToken) {
-      setTwoFactorError('No se encontro un token provisional. Inicia sesion nuevamente.')
+      setTwoFactorError('No se encontró un token provisional. Inicia sesión nuevamente.')
       return
     }
 
     try {
       const verification = await api.verify2fa(provisionalToken, code)
       if (!verification.token) {
-        setTwoFactorError('No se recibio token de sesion.')
+        setTwoFactorError('No se recibió token de sesión.')
         return
       }
       const user = toUiUser(verification.user)
@@ -493,7 +624,7 @@ export function MainPage() {
       await bootstrap(verification.token, user)
       navigateToRoute(user.role === 'admin' ? 'salas' : 'misreservas')
     } catch (error) {
-      setTwoFactorError(error instanceof Error ? error.message : 'No se pudo verificar el codigo 2FA.')
+      setTwoFactorError(error instanceof Error ? error.message : 'No se pudo verificar el código 2FA.')
     }
   }
 
@@ -502,8 +633,11 @@ export function MainPage() {
     try {
       await api.requestReset(forgotEmail)
       setShowForgotModal(false)
-      pushNotification('Te enviamos un token de recuperacion al correo institucional.')
-      navigateToRoute('reset-password')
+      setModalMessage({
+        title: 'Enlace enviado',
+        message: 'Te enviamos un enlace de recuperación al correo institucional.',
+        variant: 'success',
+      })
     } catch (error) {
       setResetError(error instanceof Error ? error.message : 'No se pudo procesar la solicitud')
     }
@@ -511,11 +645,20 @@ export function MainPage() {
 
   const handleResetPasswordSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
+    setResetError('')
+    if (!resetToken) {
+      setResetError('El enlace de recuperación no es válido o no incluye token')
+      return
+    }
+    if (resetPassword !== resetPasswordConfirm) {
+      setResetError('Las contraseñas no coinciden')
+      return
+    }
     try {
       await api.confirmReset(resetToken, resetPassword)
       setShowResetSuccess(true)
     } catch (error) {
-      setResetError(error instanceof Error ? error.message : 'No se pudo actualizar la contrasena')
+      setResetError(error instanceof Error ? error.message : 'No se pudo actualizar la contraseña')
     }
   }
 
@@ -524,9 +667,24 @@ export function MainPage() {
   const handleCreateReservation = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     if (!token) return
+    if (!reservationForm.campus || !reservationForm.location || !reservationForm.roomId || !reservationForm.date || !reservationForm.start || !reservationForm.end) {
+      setModalMessage({
+        title: 'Datos incompletos',
+        message: 'Completa campus, ubicación, recurso, fecha y horario para reservar.',
+        variant: 'error',
+      })
+      return
+    }
     const selectedRoom = getRoomById(reservationForm.roomId)
     if (!selectedRoom) return
-    if (minutesBetween(reservationForm.start, reservationForm.end) <= 0) return
+    if (minutesBetween(reservationForm.start, reservationForm.end) <= 0) {
+      setModalMessage({
+        title: 'Horario inválido',
+        message: 'La hora de fin debe ser posterior a la hora de inicio.',
+        variant: 'error',
+      })
+      return
+    }
     try {
       const created = await api.createBooking(token, {
         roomId: selectedRoom.backendId,
@@ -541,14 +699,18 @@ export function MainPage() {
       setConfirmationBookingId(newBooking.id)
       pushNotification('Reserva confirmada y correo encolado correctamente.')
     } catch (error) {
-      setReservationError(error instanceof Error ? error.message : 'No se pudo crear la reserva')
+      const message = error instanceof Error ? error.message : 'No se pudo crear la reserva'
+      setReservationError(message)
+      setModalMessage({ title: 'No se pudo crear la reserva', message, variant: 'error' })
     }
   }
 
   const openEditBooking = (booking: Booking) => {
+    const room = activeRooms.find((item) => item.id === booking.roomId)
     setEditingBookingId(booking.id)
     setEditBookingForm({
-      location: booking.location,
+      campus: room?.campusLabel ?? '',
+      location: room?.venueLabel ?? booking.location,
       roomId: booking.roomId,
       people: booking.people,
       date: booking.date,
@@ -576,7 +738,9 @@ export function MainPage() {
       setBookings((current) => current.map((booking) => (booking.id === editingBookingId ? next : booking)))
       setEditingBookingId(null)
     } catch (error) {
-      setReservationError(error instanceof Error ? error.message : 'No se pudo actualizar la reserva')
+      const message = error instanceof Error ? error.message : 'No se pudo actualizar la reserva'
+      setReservationError(message)
+      setModalMessage({ title: 'No se pudo actualizar la reserva', message, variant: 'error' })
     }
   }
 
@@ -584,27 +748,54 @@ export function MainPage() {
     if (!token) return
     const target = bookings.find((booking) => booking.id === bookingId)
     if (!target) return
-    await api.cancelBooking(token, target.backendId)
-    setBookings((current) =>
-      current.map((booking) =>
-        booking.id === bookingId ? { ...booking, status: 'Cancelado' } : booking,
-      ),
-    )
-    pushNotification(
-      actor === 'admin'
-        ? 'Reserva cancelada por administrador y notificacion enviada.'
-        : 'La reserva fue cancelada. Recibiras un correo de confirmacion.',
-    )
+    try {
+      await api.cancelBooking(token, target.backendId)
+      setBookings((current) =>
+        current.map((booking) =>
+          booking.id === bookingId ? { ...booking, status: 'Cancelado' } : booking,
+        ),
+      )
+      pushNotification(
+        actor === 'admin'
+          ? 'Reserva cancelada por administrador y notificación enviada.'
+          : 'La reserva fue cancelada. Recibirás un correo de confirmación.',
+      )
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'No se pudo cancelar la reserva'
+      setModalMessage({ title: 'No se pudo cancelar', message, variant: 'error' })
+    }
   }
 
   const openAddRoom = () => {
-    setRoomDraft({ name: '', location: locationOptions[0] ?? 'E3', capacity: 6 })
+    const firstCampus = campusValueOptions[0] ?? 'Monterrico'
+    const firstLocation = venueOptionsByCampus.get(firstCampus)?.[0] ?? 'University Wellness Center'
+    setRoomDraft({
+      name: '',
+      campus: firstCampus,
+      location: firstLocation,
+      capacity: 6,
+      minPeople: 1,
+      minPeopleRequired: false,
+      maxPeople: 6,
+      schedule: [],
+      pabellonCode: `${firstCampus}-${firstLocation}`.replace(/[^A-Za-z0-9]/g, '-').toUpperCase(),
+    })
     setRoomModalTargetId(null)
     setRoomModalMode('add')
   }
 
   const openEditRoom = (room: Room) => {
-    setRoomDraft({ name: room.name, location: room.location, capacity: room.capacity })
+    setRoomDraft({
+      name: room.name,
+      campus: room.campus,
+      location: room.venue,
+      capacity: room.capacity,
+      minPeople: room.minPeople,
+      minPeopleRequired: room.minPeopleRequired,
+      maxPeople: room.maxPeople,
+      schedule: room.schedule,
+      pabellonCode: `${room.campus}-${room.venue}`.replace(/[^A-Za-z0-9]/g, '-').toUpperCase(),
+    })
     setRoomModalTargetId(room.id)
     setRoomModalMode('edit')
   }
@@ -612,20 +803,31 @@ export function MainPage() {
   const handleSaveRoom = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     if (!token) return
+    const payload = {
+      ...roomDraft,
+      schedule: roomDraft.schedule.map((day) => ({
+        dayOfWeek: day.dayOfWeek,
+        openTime: day.openTime,
+        closeTime: day.closeTime,
+        closed: day.closed,
+      })),
+    }
     try {
       if (roomModalMode === 'add') {
-        const created = await api.createRoom(token, roomDraft)
+        const created = await api.createRoom(token, payload)
         setRooms((current) => [toUiRoom(created), ...current])
         setRoomSuccessId(created.code)
       } else if (roomModalMode === 'edit' && roomModalTargetId) {
         const target = rooms.find((room) => room.id === roomModalTargetId)
         if (!target) return
-        const updated = await api.updateRoom(token, target.backendId, roomDraft)
+        const updated = await api.updateRoom(token, target.backendId, payload)
         setRooms((current) => current.map((room) => (room.id === roomModalTargetId ? toUiRoom(updated) : room)))
       }
       setRoomModalMode('none')
     } catch (error) {
-      setRoomNotice(error instanceof Error ? error.message : 'No se pudo guardar la sala')
+      const message = error instanceof Error ? error.message : 'No se pudo guardar la sala'
+      setRoomNotice(message)
+      setModalMessage({ title: 'Error al guardar sala', message, variant: 'error' })
     }
   }
 
@@ -640,6 +842,10 @@ export function MainPage() {
           room.id === pendingDeleteRoomId ? { ...room, active: false } : room,
         ),
       )
+      pushNotification('Sala desactivada correctamente.')
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'No se pudo eliminar la sala'
+      setModalMessage({ title: 'No se pudo eliminar la sala', message, variant: 'error' })
     } finally {
       setPendingDeleteRoomId(null)
     }
@@ -656,47 +862,58 @@ export function MainPage() {
   const saveAdminConfig = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     if (!token) return
-    const updated = await api.updateAdminConfig(token, configDraft)
-    setConfig({
-      maxActiveBookings: updated.maxActiveBookings,
-      maxDurationMinutes: updated.maxDurationMinutes,
-    })
-    setConfigNotice('Configuracion actualizada correctamente.')
+    try {
+      const updated = await api.updateAdminConfig(token, configDraft)
+      setConfig({
+        maxActiveBookings: updated.maxActiveBookings,
+        maxDurationMinutes: updated.maxDurationMinutes,
+      })
+      setConfigNotice('Configuracion actualizada correctamente.')
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'No se pudo actualizar la configuración'
+      setModalMessage({ title: 'Error de configuración', message, variant: 'error' })
+    }
   }
 
-  const availabilitySlots: AvailabilitySlot[] = useMemo(() => {
-    if (!reservationForm.roomId || !reservationForm.date) return []
-    const confirmedBookings = bookings.filter(
-      (booking) =>
-        booking.status === 'Confirmado' &&
-        booking.roomId === reservationForm.roomId &&
-        booking.date === reservationForm.date,
-    )
-    const slots: AvailabilitySlot[] = []
-    for (let current = 420; current < 1320; current += 30) {
-      const start = `${String(Math.floor(current / 60)).padStart(2, '0')}:${String(current % 60).padStart(2, '0')}`
-      const endMin = current + 30
-      const end = `${String(Math.floor(endMin / 60)).padStart(2, '0')}:${String(endMin % 60).padStart(2, '0')}`
-      const overlaps = confirmedBookings.some(
-        (booking) => toMinutes(start) < toMinutes(booking.end) && toMinutes(end) > toMinutes(booking.start),
+  const saveCampusSchedule = async (campus: CampusSchedule) => {
+    if (!token) return
+    try {
+      const updated = await api.updateCampusSchedule(token, {
+        campus: campus.campus,
+        slotMinutes: campus.slotMinutes,
+        days: campus.days.map((day) => ({
+          dayOfWeek: day.dayOfWeek,
+          openTime: day.openTime,
+          closeTime: day.closeTime,
+          closed: day.closed,
+        })),
+      })
+      setCampusSchedules((current) =>
+        current.map((item) => (item.campus === updated.campus ? toUiCampusSchedule(updated) : item)),
       )
-      slots.push({ start, end, isAvailable: !overlaps })
+      if (updated.warnings.length > 0) {
+        setModalMessage({
+          title: 'Advertencia de horarios',
+          message: updated.warnings.join('\n'),
+          variant: 'error',
+        })
+      } else {
+        setModalMessage({
+          title: 'Horarios actualizados',
+          message: `Se actualizó el horario general del campus ${updated.campusLabel}.`,
+          variant: 'success',
+        })
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'No se pudo actualizar el horario del campus'
+      setModalMessage({ title: 'Error al actualizar horario', message, variant: 'error' })
     }
-    return slots
-  }, [bookings, reservationForm.date, reservationForm.roomId])
+  }
 
-  const availabilityByDay = useMemo<AvailabilityDay[]>(() => {
-    if (!reservationForm.roomId) return []
-    const baseDate = reservationForm.date ? new Date(`${reservationForm.date}T00:00:00`) : new Date()
-    return Array.from({ length: 7 }, (_, offset) => {
-      const nextDate = new Date(baseDate)
-      nextDate.setDate(baseDate.getDate() + offset)
-      const date = `${nextDate.getFullYear()}-${String(nextDate.getMonth() + 1).padStart(2, '0')}-${String(nextDate.getDate()).padStart(2, '0')}`
-      const label = `${nextDate.toLocaleDateString('es-PE', { weekday: 'short' })} ${String(nextDate.getDate()).padStart(2, '0')}`
-      const hasAvailability = availabilitySlots.some((slot) => slot.isAvailable)
-      return { date, label, hasAvailability }
-    })
-  }, [availabilitySlots, reservationForm.date, reservationForm.roomId])
+  const roomBookingsForSelectedRoom = useMemo(
+    () => roomBookingsWindow.filter((booking) => booking.roomId === reservationForm.roomId),
+    [roomBookingsWindow, reservationForm.roomId],
+  )
 
   const showGlobalTopbar =
     Boolean(authenticatedUser) && effectiveRoute !== 'login' && effectiveRoute !== 'reset-password'
@@ -746,12 +963,10 @@ export function MainPage() {
         )}
         {effectiveRoute === 'reset-password' && (
           <ResetPasswordPage
-            resetToken={resetToken}
             resetPassword={resetPassword}
             resetPasswordConfirm={resetPasswordConfirm}
             resetError={resetError}
             showResetSuccess={showResetSuccess}
-            onResetTokenChange={setResetToken}
             onResetPasswordChange={setResetPassword}
             onResetPasswordConfirmChange={setResetPasswordConfirm}
             onSubmitResetPassword={handleResetPasswordSubmit}
@@ -762,12 +977,14 @@ export function MainPage() {
           <ReservasPage
             reservationForm={reservationForm}
             reservationError={reservationError}
-            locationOptions={locationOptions}
+            campusOptions={campusOptions}
+            locationOptionsByCampus={locationOptionsByCampus}
             activeRooms={activeRooms}
             selectedRoomCapacity={selectedReservationRoom?.capacity ?? null}
-            availabilitySlots={availabilitySlots}
-            availabilityByDay={availabilityByDay}
+            roomBookings={roomBookingsForSelectedRoom}
+            weekOffset={reservationWeekOffset}
             onReservationChange={setReservationForm}
+            onWeekOffsetChange={setReservationWeekOffset}
             onClearReservationForm={() => setReservationForm(getDefaultReservationForm(activeRooms))}
             onSubmitReservation={handleCreateReservation}
           />
@@ -783,6 +1000,7 @@ export function MainPage() {
         {effectiveRoute === 'salas' && (
           <SalasPage
             filteredRooms={filteredRooms}
+            campusOptions={campusOptions}
             locationOptions={locationOptions}
             roomFilterLocation={roomFilterLocation}
             roomNotice={roomNotice}
@@ -818,6 +1036,7 @@ export function MainPage() {
             config={config}
             configDraft={configDraft}
             configNotice={configNotice}
+            campusSchedules={campusSchedules}
             onStatusFilterChange={(value) => {
               setAdminStatusFilter(value)
               setAdminPage(1)
@@ -832,6 +1051,12 @@ export function MainPage() {
             onCancelBooking={(bookingId) => cancelBooking(bookingId, 'admin')}
             onConfigDraftChange={setConfigDraft}
             onSaveConfig={saveAdminConfig}
+            onCampusScheduleChange={(nextCampus) =>
+              setCampusSchedules((current) =>
+                current.map((item) => (item.campus === nextCampus.campus ? nextCampus : item)),
+              )
+            }
+            onSaveCampusSchedule={saveCampusSchedule}
           />
         )}
       </div>
@@ -856,6 +1081,8 @@ export function MainPage() {
           draft={roomDraft}
           notice={roomNotice}
           targetRoomId={roomModalTargetId}
+          campusOptions={campusValueOptions}
+          venueOptionsByCampus={venueOptionsByCampus}
           onChange={setRoomDraft}
           onCancel={() => setRoomModalMode('none')}
           onSubmit={handleSaveRoom}
@@ -896,7 +1123,7 @@ export function MainPage() {
           <div className="modal-card slim-modal text-left" onClick={(event) => event.stopPropagation()}>
             <h2>Notificaciones</h2>
             {notifications.length === 0 ? (
-              <p className="modal-copy">Aun no hay notificaciones.</p>
+              <p className="modal-copy">Aún no hay notificaciones.</p>
             ) : (
               <ul className="m-0 mt-2 max-h-72 list-none space-y-2 overflow-y-auto p-0">
                 {notifications.map((item) => (
@@ -1002,6 +1229,14 @@ export function MainPage() {
             </div>
           </div>
         </div>
+      )}
+      {modalMessage && (
+        <MessageModal
+          title={modalMessage.title}
+          message={modalMessage.message}
+          variant={modalMessage.variant}
+          onClose={() => setModalMessage(null)}
+        />
       )}
       {toastMessage && <div className="toast">{toastMessage}</div>}
     </>

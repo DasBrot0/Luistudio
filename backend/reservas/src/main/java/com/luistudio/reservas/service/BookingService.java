@@ -3,6 +3,7 @@ package com.luistudio.reservas.service;
 import com.luistudio.reservas.dto.booking.BookingResponse;
 import com.luistudio.reservas.dto.booking.BookingUpsertRequest;
 import com.luistudio.reservas.dto.common.PageResponse;
+import com.luistudio.reservas.exception.BusinessException;
 import com.luistudio.reservas.exception.NotFoundException;
 import com.luistudio.reservas.model.ReservationEntity;
 import com.luistudio.reservas.model.ReservationStatus;
@@ -14,10 +15,12 @@ import com.luistudio.reservas.service.booking.rule.BookingValidationRule;
 import com.luistudio.reservas.service.factory.ReservationFactory;
 import com.luistudio.reservas.util.CalendarUtils;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.util.List;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -110,6 +113,10 @@ public class BookingService {
         if (booking.getEstado() == ReservationStatus.CANCELADA) {
             return dtoMapper.toBooking(booking);
         }
+        LocalDateTime bookingEnd = booking.getFecha().atTime(booking.getHoraFin());
+        if (!bookingEnd.isAfter(LocalDateTime.now())) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST, "No se puede cancelar una reserva que ya finalizó");
+        }
 
         booking.setEstado(ReservationStatus.CANCELADA);
         booking.setUpdatedBy(actorUserId);
@@ -130,6 +137,21 @@ public class BookingService {
     public List<BookingResponse> listMyBookings(Long userId) {
         UserEntity user = userService.getById(userId);
         return reservationRepository.findByUsuarioOrderByFechaDescHoraInicioDesc(user)
+            .stream()
+            .map(dtoMapper::toBooking)
+            .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<BookingResponse> listRoomBookings(Long roomId, LocalDate fromDate, LocalDate toDate) {
+        RoomEntity room = roomService.getRoomEntity(roomId);
+        LocalDate start = fromDate == null ? LocalDate.now() : fromDate;
+        LocalDate end = toDate == null ? start : toDate;
+        if (end.isBefore(start)) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST, "Rango de fechas invalido para listar reservas");
+        }
+
+        return reservationRepository.findActiveByRoomAndDateRange(room, start, end)
             .stream()
             .map(dtoMapper::toBooking)
             .toList();

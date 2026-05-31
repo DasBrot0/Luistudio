@@ -2,12 +2,16 @@ package com.luistudio.reservas.controller;
 
 import com.luistudio.reservas.dto.admin.AdminConfigResponse;
 import com.luistudio.reservas.dto.admin.AdminConfigUpdateRequest;
+import com.luistudio.reservas.dto.admin.CampusScheduleListResponse;
 import com.luistudio.reservas.dto.admin.CampusMapResponse;
+import com.luistudio.reservas.dto.admin.CampusScheduleResponse;
+import com.luistudio.reservas.dto.admin.CampusScheduleUpdateRequest;
 import com.luistudio.reservas.dto.common.PageResponse;
 import com.luistudio.reservas.dto.user.UserResponse;
 import com.luistudio.reservas.dto.user.UserStatusUpdateRequest;
 import com.luistudio.reservas.service.AccessGuard;
 import com.luistudio.reservas.service.CampusMapService;
+import com.luistudio.reservas.service.RoomScheduleService;
 import com.luistudio.reservas.service.SystemConfigService;
 import com.luistudio.reservas.service.UserService;
 import jakarta.validation.Valid;
@@ -28,17 +32,20 @@ public class AdminController {
     private final UserService userService;
     private final SystemConfigService systemConfigService;
     private final CampusMapService campusMapService;
+    private final RoomScheduleService roomScheduleService;
 
     public AdminController(
         AccessGuard accessGuard,
         UserService userService,
         SystemConfigService systemConfigService,
-        CampusMapService campusMapService
+        CampusMapService campusMapService,
+        RoomScheduleService roomScheduleService
     ) {
         this.accessGuard = accessGuard;
         this.userService = userService;
         this.systemConfigService = systemConfigService;
         this.campusMapService = campusMapService;
+        this.roomScheduleService = roomScheduleService;
     }
 
     @GetMapping("/admin/users")
@@ -76,5 +83,17 @@ public class AdminController {
     public CampusMapResponse getCampusMap() {
         accessGuard.requireUser();
         return campusMapService.getCampusMap();
+    }
+
+    @GetMapping("/admin/campus-schedules")
+    public CampusScheduleListResponse getCampusSchedules() {
+        accessGuard.requireAdmin();
+        return roomScheduleService.listCampusSchedules();
+    }
+
+    @PutMapping("/admin/campus-schedules")
+    public CampusScheduleResponse updateCampusSchedule(@Valid @RequestBody CampusScheduleUpdateRequest request) {
+        accessGuard.requireAdmin();
+        return roomScheduleService.updateCampusSchedule(request);
     }
 }

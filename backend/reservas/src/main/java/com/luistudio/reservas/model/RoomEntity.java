@@ -38,8 +38,23 @@ public class RoomEntity {
     @Column(name = "capacity", nullable = false)
     private Integer capacidad;
 
+    @Column(name = "campus", nullable = false, length = 120)
+    private String campus;
+
+    @Column(name = "venue", nullable = false, length = 160)
+    private String venue;
+
     @Column(name = "location", nullable = false, length = 120)
     private String ubicacion;
+
+    @Column(name = "min_people", nullable = false)
+    private Integer minimoPersonas = 1;
+
+    @Column(name = "min_people_required", nullable = false)
+    private Boolean minimoPersonasObligatorio = false;
+
+    @Column(name = "max_people", nullable = false)
+    private Integer maximoPersonas = 1;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 30)

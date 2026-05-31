@@ -4,6 +4,7 @@ import com.luistudio.reservas.dto.auth.AuthUserResponse;
 import com.luistudio.reservas.dto.booking.BookingResponse;
 import com.luistudio.reservas.dto.room.MaintenanceResponse;
 import com.luistudio.reservas.dto.room.RoomResponse;
+import com.luistudio.reservas.dto.room.RoomScheduleResponse;
 import com.luistudio.reservas.dto.user.UserResponse;
 import com.luistudio.reservas.model.MaintenanceEntity;
 import com.luistudio.reservas.model.ReservationEntity;
@@ -14,6 +15,12 @@ import org.springframework.stereotype.Component;
 
 @Component
 public class DtoMapper {
+
+    private final RoomCatalogTranslator roomCatalogTranslator;
+
+    public DtoMapper(RoomCatalogTranslator roomCatalogTranslator) {
+        this.roomCatalogTranslator = roomCatalogTranslator;
+    }
 
     public AuthUserResponse toAuthUser(UserEntity user) {
         return new AuthUserResponse(
@@ -32,8 +39,18 @@ public class DtoMapper {
             room.getId(),
             room.getCodigo(),
             room.getNombre(),
+            roomCatalogTranslator.resourceToEs(room.getNombre()),
+            room.getCampus(),
+            roomCatalogTranslator.campusToEs(room.getCampus()),
+            room.getVenue(),
+            roomCatalogTranslator.venueToEs(room.getVenue()),
             room.getCapacidad(),
             room.getUbicacion(),
+            room.getMinimoPersonas(),
+            room.getMinimoPersonasObligatorio(),
+            room.getMaximoPersonas(),
+            60,
+            java.util.List.<RoomScheduleResponse>of(),
             room.getEstado().name(),
             room.getPabellon().getCodigo()
         );

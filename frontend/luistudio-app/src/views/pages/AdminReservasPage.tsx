@@ -1,6 +1,6 @@
-﻿import type { FormEvent } from 'react'
+import type { FormEvent } from 'react'
 import { AppHeader } from '../components/layout/AppHeader'
-import type { AuthUser, Booking, BookingStatus, SystemConfig } from '../../models/types'
+import type { AuthUser, Booking, BookingStatus, CampusSchedule, ScheduleDay, SystemConfig } from '../../models/types'
 import { formatDate } from '../../utils/helpers'
 
 interface AdminReservasPageProps {
@@ -13,6 +13,7 @@ interface AdminReservasPageProps {
   config: SystemConfig
   configDraft: SystemConfig
   configNotice: string
+  campusSchedules: CampusSchedule[]
   onStatusFilterChange: (value: 'Todos' | BookingStatus) => void
   onDateFilterChange: (value: string) => void
   onPrevPage: () => void
@@ -21,7 +22,14 @@ interface AdminReservasPageProps {
   onCancelBooking: (bookingId: string) => void
   onConfigDraftChange: (draft: SystemConfig) => void
   onSaveConfig: (event: FormEvent<HTMLFormElement>) => void
+  onCampusScheduleChange: (campus: CampusSchedule) => void
+  onSaveCampusSchedule: (campus: CampusSchedule) => void
 }
+
+const dayLabels = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom']
+
+const patchDay = (days: ScheduleDay[], dayOfWeek: number, patch: Partial<ScheduleDay>) =>
+  days.map((day) => (day.dayOfWeek === dayOfWeek ? { ...day, ...patch } : day))
 
 export function AdminReservasPage({
   bookings,
@@ -33,6 +41,7 @@ export function AdminReservasPage({
   config,
   configDraft,
   configNotice,
+  campusSchedules,
   onStatusFilterChange,
   onDateFilterChange,
   onPrevPage,
@@ -41,7 +50,16 @@ export function AdminReservasPage({
   onCancelBooking,
   onConfigDraftChange,
   onSaveConfig,
+  onCampusScheduleChange,
+  onSaveCampusSchedule,
 }: AdminReservasPageProps) {
+  const canCancelBooking = (booking: Booking) => {
+    if (booking.status === 'Cancelado') return false
+    const endDateTime = new Date(`${booking.date}T${booking.end}:00`)
+    if (Number.isNaN(endDateTime.getTime())) return false
+    return endDateTime.getTime() > Date.now()
+  }
+
   return (
     <main className="page dashboard-page">
       <AppHeader title="Reservas registradas" roleLabel="Administrador" />
@@ -90,7 +108,7 @@ export function AdminReservasPage({
                       </td>
                       <td data-label="Acciones" className="actions-cell">
                         <button type="button" className="inline-flex min-h-8 items-center justify-center rounded-md bg-slate-200 px-3 text-xs font-semibold text-slate-700 transition hover:-translate-y-px hover:bg-slate-300 disabled:cursor-not-allowed disabled:opacity-60" onClick={() => onEditBooking(booking)}>Editar</button>
-                        <button type="button" className="inline-flex min-h-8 items-center justify-center rounded-md bg-slate-200 px-3 text-xs font-semibold text-slate-700 transition hover:-translate-y-px hover:bg-slate-300 disabled:cursor-not-allowed disabled:opacity-60" disabled={booking.status === 'Cancelado'} onClick={() => onCancelBooking(booking.id)}>Cancelar</button>
+                        <button type="button" className="inline-flex min-h-8 items-center justify-center rounded-md bg-red-100 px-3 text-xs font-semibold text-red-700 transition hover:-translate-y-px hover:bg-red-200 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500 disabled:opacity-60" disabled={!canCancelBooking(booking)} onClick={() => onCancelBooking(booking.id)}>Cancelar</button>
                       </td>
                     </tr>
                   )
@@ -127,8 +145,91 @@ export function AdminReservasPage({
 
           {configNotice && <p className="success-text">{configNotice}</p>}
         </article>
+
+        <article className="card config-card">
+          <h2>Horario General por Campus</h2>
+          <p className="description">Regla base para todas las salas. Si hay override por sala, se validará conflicto.</p>
+
+          {campusSchedules.map((campusSchedule) => (
+            <div key={campusSchedule.campus} className="campus-schedule-card">
+              <h3>{campusSchedule.campusLabel}</h3>
+              <div className="form-grid two-cols">
+                <div>
+                  <label htmlFor={`slot-${campusSchedule.campus}`}>Duración por botón</label>
+                  <select
+                    id={`slot-${campusSchedule.campus}`}
+                    value={campusSchedule.slotMinutes}
+                    onChange={(event) =>
+                      onCampusScheduleChange({
+                        ...campusSchedule,
+                        slotMinutes: Number(event.target.value),
+                      })
+                    }
+                  >
+                    <option value={30}>30 minutos</option>
+                    <option value={45}>45 minutos</option>
+                    <option value={60}>1 hora</option>
+                    <option value={120}>2 horas</option>
+                  </select>
+                </div>
+              </div>
+              <div className="room-schedule-grid">
+                {campusSchedule.days.map((day) => (
+                  <div key={`${campusSchedule.campus}-${day.dayOfWeek}`} className="room-schedule-row">
+                    <span className="text-xs font-semibold text-slate-700">{dayLabels[day.dayOfWeek - 1]}</span>
+                    <label className="remember-check m-0">
+                      <input
+                        type="checkbox"
+                        checked={day.closed}
+                        onChange={(event) =>
+                          onCampusScheduleChange({
+                            ...campusSchedule,
+                            days: patchDay(campusSchedule.days, day.dayOfWeek, {
+                              closed: event.target.checked,
+                              openTime: event.target.checked ? null : day.openTime ?? '06:00',
+                              closeTime: event.target.checked ? null : day.closeTime ?? '22:00',
+                            }),
+                          })
+                        }
+                      />
+                      Cerrado
+                    </label>
+                    <input
+                      type="time"
+                      value={day.openTime ?? ''}
+                      disabled={day.closed}
+                      onChange={(event) =>
+                        onCampusScheduleChange({
+                          ...campusSchedule,
+                          days: patchDay(campusSchedule.days, day.dayOfWeek, { openTime: event.target.value }),
+                        })
+                      }
+                    />
+                    <input
+                      type="time"
+                      value={day.closeTime ?? ''}
+                      disabled={day.closed}
+                      onChange={(event) =>
+                        onCampusScheduleChange({
+                          ...campusSchedule,
+                          days: patchDay(campusSchedule.days, day.dayOfWeek, { closeTime: event.target.value }),
+                        })
+                      }
+                    />
+                  </div>
+                ))}
+              </div>
+              <button
+                type="button"
+                className="inline-flex min-h-10 items-center justify-center rounded-full bg-primary px-4 text-sm font-semibold text-white transition hover:-translate-y-px hover:bg-primary-dark disabled:cursor-not-allowed disabled:opacity-60"
+                onClick={() => onSaveCampusSchedule(campusSchedule)}
+              >
+                Guardar horario de {campusSchedule.campusLabel}
+              </button>
+            </div>
+          ))}
+        </article>
       </section>
     </main>
   )
 }
-

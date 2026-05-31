@@ -15,6 +15,13 @@ export function MisReservasPage({
   onCancelBooking,
   onCreateFirstReservation,
 }: MisReservasPageProps) {
+  const canCancelBooking = (booking: Booking) => {
+    if (booking.status === 'Cancelado') return false
+    const endDateTime = new Date(`${booking.date}T${booking.end}:00`)
+    if (Number.isNaN(endDateTime.getTime())) return false
+    return endDateTime.getTime() > Date.now()
+  }
+
   return (
     <main className="page dashboard-page">
       <AppHeader title="Mis reservas" roleLabel="Estudiante" />
@@ -27,7 +34,7 @@ export function MisReservasPage({
 
           {myBookings.length === 0 ? (
             <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-6 text-center">
-              <p className="m-0 text-sm font-semibold text-slate-700">Aun no tienes reservas.</p>
+              <p className="m-0 text-sm font-semibold text-slate-700">Aún no tienes reservas.</p>
               <p className="mb-0 mt-1 text-xs text-slate-600">Cuando confirmes tu primera reserva, aparecera en este listado.</p>
               <button
                 type="button"
@@ -63,7 +70,7 @@ export function MisReservasPage({
                         </td>
                         <td data-label="Acciones" className="actions-cell">
                           <button type="button" className="inline-flex min-h-8 items-center justify-center rounded-md bg-slate-200 px-3 text-xs font-semibold text-slate-700 transition hover:-translate-y-px hover:bg-slate-300 disabled:cursor-not-allowed disabled:opacity-60" onClick={() => onEditBooking(booking)}>Editar</button>
-                          <button type="button" className="inline-flex min-h-8 items-center justify-center rounded-md bg-slate-200 px-3 text-xs font-semibold text-slate-700 transition hover:-translate-y-px hover:bg-slate-300 disabled:cursor-not-allowed disabled:opacity-60" disabled={booking.status === 'Cancelado'} onClick={() => onCancelBooking(booking.id)}>Cancelar</button>
+                          <button type="button" className="inline-flex min-h-8 items-center justify-center rounded-md bg-red-100 px-3 text-xs font-semibold text-red-700 transition hover:-translate-y-px hover:bg-red-200 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500 disabled:opacity-60" disabled={!canCancelBooking(booking)} onClick={() => onCancelBooking(booking.id)}>Cancelar</button>
                         </td>
                       </tr>
                     ))}
@@ -74,7 +81,7 @@ export function MisReservasPage({
               <div className="mt-3 flex justify-end">
                 <button
                   type="button"
-                  className="inline-flex min-h-8 items-center justify-center rounded-md bg-slate-200 px-3 text-xs font-semibold text-slate-700 transition hover:-translate-y-px hover:bg-slate-300 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="inline-flex min-h-8 items-center justify-center rounded-md bg-primary px-3 text-xs font-semibold text-white transition hover:-translate-y-px hover:bg-primary-dark disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   Exportar
                 </button>

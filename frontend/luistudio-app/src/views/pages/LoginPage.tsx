@@ -118,7 +118,7 @@ export function LoginPage({
           <div className="auth-tip">
             <div>Usuarios seed BD:</div>
             <div>
-              estudiante <strong>email@universidad.edu.pe</strong> / <strong>Student123!</strong>
+              estudiante <strong>20224692@aloe.ulima.edu.pe</strong> / <strong>Student123!</strong>
             </div>
             <div>
               admin <strong>20233916@aloe.ulima.edu.pe</strong> / <strong>Admin123!</strong>

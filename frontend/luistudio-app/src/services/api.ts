@@ -22,10 +22,28 @@ interface ApiRoom {
   id: number
   code: string
   name: string
+  resourceLabel: string
+  campus: string
+  campusLabel: string
+  venue: string
+  venueLabel: string
   capacity: number
   location: string
+  minPeople: number
+  minPeopleRequired: boolean
+  maxPeople: number
+  slotMinutes: number
+  schedule: ApiScheduleDay[]
   status: string
   pabellonCode: string
+}
+
+export interface ApiScheduleDay {
+  dayOfWeek: number
+  openTime: string | null
+  closeTime: string | null
+  closed: boolean
+  override?: boolean
 }
 
 interface ApiBooking {
@@ -56,6 +74,18 @@ interface ApiPage<T> {
 interface ApiConfig {
   maxActiveBookings: number
   maxDurationMinutes: number
+}
+
+export interface ApiCampusSchedule {
+  campus: string
+  campusLabel: string
+  slotMinutes: number
+  days: ApiScheduleDay[]
+  warnings: string[]
+}
+
+interface ApiCampusScheduleListResponse {
+  campuses: ApiCampusSchedule[]
 }
 
 interface ApiUser {
@@ -153,8 +183,11 @@ export const api = {
     return http<{ message: string }>('/auth/2fa/disable', { method: 'POST' }, token)
   },
 
-  getRooms(token: string, location?: string) {
-    const query = location && location !== 'Todas' ? `?ubicacion=${encodeURIComponent(location)}` : ''
+  getRooms(token: string, params?: { campus?: string; location?: string }) {
+    const queryParams = new URLSearchParams()
+    if (params?.campus && params.campus !== 'Todas') queryParams.set('campus', params.campus)
+    if (params?.location && params.location !== 'Todas') queryParams.set('ubicacion', params.location)
+    const query = queryParams.toString() ? `?${queryParams.toString()}` : ''
     return http<ApiRoom[]>(`/rooms${query}`, {}, token)
   },
 
@@ -165,10 +198,23 @@ export const api = {
     return http<ApiRoom[]>(`/rooms/available${query}`, {}, token)
   },
 
-  createRoom(token: string, payload: { name: string; location: string; capacity: number }) {
+  createRoom(
+    token: string,
+    payload: {
+      name: string
+      campus: string
+      location: string
+      capacity: number
+      minPeople: number
+      minPeopleRequired: boolean
+      maxPeople: number
+      schedule: ApiScheduleDay[]
+      pabellonCode: string
+    },
+  ) {
     return http<ApiRoom>(
       '/rooms',
-      { method: 'POST', body: JSON.stringify({ ...payload, pabellonCode: payload.location }) },
+      { method: 'POST', body: JSON.stringify(payload) },
       token,
     )
   },
@@ -176,11 +222,21 @@ export const api = {
   updateRoom(
     token: string,
     roomId: number,
-    payload: { name: string; location: string; capacity: number },
+    payload: {
+      name: string
+      campus: string
+      location: string
+      capacity: number
+      minPeople: number
+      minPeopleRequired: boolean
+      maxPeople: number
+      schedule: ApiScheduleDay[]
+      pabellonCode: string
+    },
   ) {
     return http<ApiRoom>(
       `/rooms/${roomId}`,
-      { method: 'PUT', body: JSON.stringify({ ...payload, pabellonCode: payload.location }) },
+      { method: 'PUT', body: JSON.stringify(payload) },
       token,
     )
   },
@@ -191,6 +247,11 @@ export const api = {
 
   getBookingsMe(token: string) {
     return http<ApiBooking[]>('/bookings/me', {}, token)
+  },
+
+  getRoomBookings(token: string, roomId: number, fromDate: string, toDate: string) {
+    const query = `?desde=${encodeURIComponent(fromDate)}&hasta=${encodeURIComponent(toDate)}`
+    return http<ApiBooking[]>(`/rooms/${roomId}/bookings${query}`, {}, token)
   },
 
   createBooking(
@@ -246,6 +307,18 @@ export const api = {
 
   updateAdminConfig(token: string, config: ApiConfig) {
     return http<ApiConfig>('/admin/config', { method: 'PUT', body: JSON.stringify(config) }, token)
+  },
+
+  getCampusSchedules(token: string) {
+    return http<ApiCampusScheduleListResponse>('/admin/campus-schedules', {}, token)
+  },
+
+  updateCampusSchedule(token: string, schedule: { campus: string; slotMinutes: number; days: ApiScheduleDay[] }) {
+    return http<ApiCampusSchedule>(
+      '/admin/campus-schedules',
+      { method: 'PUT', body: JSON.stringify(schedule) },
+      token,
+    )
   },
 
   getUsers(token: string, page: number, query: string) {

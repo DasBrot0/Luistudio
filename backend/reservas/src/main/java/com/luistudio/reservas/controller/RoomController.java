@@ -1,10 +1,12 @@
 package com.luistudio.reservas.controller;
 
+import com.luistudio.reservas.dto.booking.BookingResponse;
 import com.luistudio.reservas.dto.room.MaintenanceRequest;
 import com.luistudio.reservas.dto.room.MaintenanceResponse;
 import com.luistudio.reservas.dto.room.RoomResponse;
 import com.luistudio.reservas.dto.room.RoomUpsertRequest;
 import com.luistudio.reservas.service.AccessGuard;
+import com.luistudio.reservas.service.BookingService;
 import com.luistudio.reservas.service.RoomService;
 import jakarta.validation.Valid;
 import java.time.LocalDate;
@@ -27,17 +29,22 @@ import org.springframework.web.bind.annotation.RestController;
 public class RoomController {
 
     private final RoomService roomService;
+    private final BookingService bookingService;
     private final AccessGuard accessGuard;
 
-    public RoomController(RoomService roomService, AccessGuard accessGuard) {
+    public RoomController(RoomService roomService, BookingService bookingService, AccessGuard accessGuard) {
         this.roomService = roomService;
+        this.bookingService = bookingService;
         this.accessGuard = accessGuard;
     }
 
     @GetMapping
-    public List<RoomResponse> listRooms(@RequestParam(required = false) String ubicacion) {
+    public List<RoomResponse> listRooms(
+        @RequestParam(required = false) String campus,
+        @RequestParam(required = false) String ubicacion
+    ) {
         accessGuard.requireUser();
-        return roomService.listRooms(ubicacion);
+        return roomService.listRooms(campus, ubicacion);
     }
 
     @GetMapping("/available")
@@ -48,6 +55,16 @@ public class RoomController {
     ) {
         accessGuard.requireUser();
         return roomService.listAvailableRooms(fecha, horaInicio, horaFin);
+    }
+
+    @GetMapping("/{roomId}/bookings")
+    public List<BookingResponse> listRoomBookings(
+        @PathVariable Long roomId,
+        @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate desde,
+        @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate hasta
+    ) {
+        accessGuard.requireUser();
+        return bookingService.listRoomBookings(roomId, desde, hasta);
     }
 
     @PostMapping

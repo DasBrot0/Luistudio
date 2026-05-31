@@ -34,6 +34,7 @@ public class RoomService {
     private final DtoMapper dtoMapper;
     private final RoomFactory roomFactory;
     private final MaintenanceFactory maintenanceFactory;
+    private final RoomScheduleService roomScheduleService;
 
     public RoomService(
         RoomRepository roomRepository,
@@ -42,7 +43,8 @@ public class RoomService {
         MaintenanceRepository maintenanceRepository,
         DtoMapper dtoMapper,
         RoomFactory roomFactory,
-        MaintenanceFactory maintenanceFactory
+        MaintenanceFactory maintenanceFactory,
+        RoomScheduleService roomScheduleService
     ) {
         this.roomRepository = roomRepository;
         this.pabellonRepository = pabellonRepository;
@@ -51,20 +53,26 @@ public class RoomService {
         this.dtoMapper = dtoMapper;
         this.roomFactory = roomFactory;
         this.maintenanceFactory = maintenanceFactory;
+        this.roomScheduleService = roomScheduleService;
     }
 
     @Transactional(readOnly = true)
-    public List<RoomResponse> listRooms(String location) {
-        List<RoomEntity> rooms = (location == null || location.isBlank())
-            ? roomRepository.findByEstadoNot(RoomState.INACTIVA)
-            : roomRepository.findByUbicacionIgnoreCaseAndEstadoNot(location, RoomState.INACTIVA);
-        return rooms.stream().map(dtoMapper::toRoom).toList();
+    public List<RoomResponse> listRooms(String campus, String location) {
+        List<RoomEntity> rooms;
+        if (location != null && !location.isBlank()) {
+            rooms = roomRepository.findByUbicacionIgnoreCaseAndEstadoNot(location, RoomState.INACTIVA);
+        } else if (campus != null && !campus.isBlank()) {
+            rooms = roomRepository.findByCampusIgnoreCaseAndEstadoNot(campus, RoomState.INACTIVA);
+        } else {
+            rooms = roomRepository.findByEstadoNot(RoomState.INACTIVA);
+        }
+        return rooms.stream().map(this::toRoomResponse).toList();
     }
 
     @Transactional(readOnly = true)
     public List<RoomResponse> listAvailableRooms(LocalDate date, LocalTime start, LocalTime end) {
         List<RoomEntity> rooms = roomRepository.findByEstadoNot(RoomState.INACTIVA);
-        return rooms.stream().filter(room -> isRoomAvailable(room, date, start, end, null)).map(dtoMapper::toRoom).toList();
+        return rooms.stream().filter(room -> isRoomAvailable(room, date, start, end, null)).map(this::toRoomResponse).toList();
     }
 
     @Transactional
@@ -72,26 +80,42 @@ public class RoomService {
         if (request.name().isBlank()) {
             throw new BusinessException(HttpStatus.BAD_REQUEST, "El nombre de sala es obligatorio");
         }
+        validatePeopleConstraints(request.capacity(), request.minPeople(), request.minPeopleRequired(), request.maxPeople());
 
         PabellonEntity pabellon = resolvePabellon(request.pabellonCode(), request.location());
         RoomEntity room = roomFactory.createAvailableRoom(
             request.name(),
+            request.campus(),
+            request.location(),
             request.capacity(),
+            resolveMinPeople(request.minPeople()),
+            request.minPeopleRequired(),
+            request.maxPeople(),
             request.location(),
             pabellon,
-            generateRoomCode(request.location())
+            generateRoomCode(request.campus(), request.location())
         );
-        return dtoMapper.toRoom(roomRepository.save(room));
+        RoomEntity saved = roomRepository.save(room);
+        roomScheduleService.saveRoomSchedule(saved, request.schedule());
+        return toRoomResponse(saved);
     }
 
     @Transactional
     public RoomResponse updateRoom(Long roomId, RoomUpsertRequest request) {
         RoomEntity room = getRoomEntity(roomId);
+        validatePeopleConstraints(request.capacity(), request.minPeople(), request.minPeopleRequired(), request.maxPeople());
         room.setNombre(request.name().trim());
+        room.setCampus(request.campus().trim());
+        room.setVenue(request.location().trim());
         room.setCapacidad(request.capacity());
         room.setUbicacion(request.location().trim());
+        room.setMinimoPersonas(resolveMinPeople(request.minPeople()));
+        room.setMinimoPersonasObligatorio(request.minPeopleRequired());
+        room.setMaximoPersonas(request.maxPeople());
         room.setPabellon(resolvePabellon(request.pabellonCode(), request.location()));
-        return dtoMapper.toRoom(roomRepository.save(room));
+        RoomEntity saved = roomRepository.save(room);
+        roomScheduleService.saveRoomSchedule(saved, request.schedule());
+        return toRoomResponse(saved);
     }
 
     @Transactional
@@ -135,6 +159,9 @@ public class RoomService {
         if (room.getEstado() == RoomState.INACTIVA) {
             return false;
         }
+        if (!roomScheduleService.isTimeWithinSchedule(room, date, start, end)) {
+            return false;
+        }
 
         OffsetDateTime from = date.atTime(start).atOffset(OffsetDateTime.now().getOffset());
         OffsetDateTime to = date.atTime(end).atOffset(OffsetDateTime.now().getOffset());
@@ -150,15 +177,62 @@ public class RoomService {
         return pabellonRepository.findByCodigo(pabellonCode).orElseGet(() -> {
             PabellonEntity pabellon = new PabellonEntity();
             pabellon.setCodigo(pabellonCode);
-            pabellon.setNombre("Pabellon " + pabellonCode);
+            pabellon.setNombre(pabellonCode);
             pabellon.setUbicacion(location);
             return pabellonRepository.save(pabellon);
         });
     }
 
-    private String generateRoomCode(String location) {
+    private String generateRoomCode(String campus, String location) {
         long seed = System.currentTimeMillis() % 10000;
-        String prefix = (location == null || location.isBlank()) ? "R" : location.replaceAll("[^A-Za-z0-9]", "").toUpperCase();
+        String base = (campus == null ? "" : campus) + "-" + (location == null ? "" : location);
+        String prefix = base.isBlank() ? "R" : base.replaceAll("[^A-Za-z0-9]", "").toUpperCase();
         return prefix + "-" + String.format("%04d", seed);
+    }
+
+    private RoomResponse toRoomResponse(RoomEntity room) {
+        RoomResponse base = dtoMapper.toRoom(room);
+        return new RoomResponse(
+            base.id(),
+            base.code(),
+            base.name(),
+            base.resourceLabel(),
+            base.campus(),
+            base.campusLabel(),
+            base.venue(),
+            base.venueLabel(),
+            base.capacity(),
+            base.location(),
+            base.minPeople(),
+            base.minPeopleRequired(),
+            base.maxPeople(),
+            roomScheduleService.getCampusSlotMinutes(room.getCampus()),
+            roomScheduleService.getEffectiveWeeklySchedule(room),
+            base.status(),
+            base.pabellonCode()
+        );
+    }
+
+    private int resolveMinPeople(Integer minPeople) {
+        return minPeople == null ? 1 : minPeople;
+    }
+
+    private void validatePeopleConstraints(int capacity, Integer minPeople, boolean minRequired, int maxPeople) {
+        int normalizedMin = minPeople == null ? 1 : minPeople;
+        if (normalizedMin <= 0) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST, "El minimo de personas debe ser mayor que cero");
+        }
+        if (maxPeople <= 0) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST, "El maximo de personas debe ser mayor que cero");
+        }
+        if (maxPeople > capacity) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST, "El maximo de personas no puede superar la capacidad de la sala");
+        }
+        if (normalizedMin > maxPeople) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST, "El minimo de personas no puede superar el maximo");
+        }
+        if (minRequired && normalizedMin < 1) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST, "El minimo obligatorio de personas es invalido");
+        }
     }
 }

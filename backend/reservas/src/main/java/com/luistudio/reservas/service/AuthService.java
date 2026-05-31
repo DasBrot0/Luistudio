@@ -21,8 +21,11 @@ import com.luistudio.reservas.repository.UserRepository;
 import com.luistudio.reservas.security.JwtService;
 import com.luistudio.reservas.service.auth.strategy.LoginStrategy;
 import com.luistudio.reservas.service.factory.SecurityEntityFactory;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.time.OffsetDateTime;
 import java.util.List;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -41,6 +44,7 @@ public class AuthService {
     private final EmailOutboxService emailOutboxService;
     private final SecurityEntityFactory securityEntityFactory;
     private final List<LoginStrategy> loginStrategies;
+    private final String resetPasswordUrl;
 
     public AuthService(
         UserRepository userRepository,
@@ -52,7 +56,8 @@ public class AuthService {
         DtoMapper dtoMapper,
         EmailOutboxService emailOutboxService,
         SecurityEntityFactory securityEntityFactory,
-        List<LoginStrategy> loginStrategies
+        List<LoginStrategy> loginStrategies,
+        @Value("${app.frontend.reset-password-url}") String resetPasswordUrl
     ) {
         this.userRepository = userRepository;
         this.loginAttemptRepository = loginAttemptRepository;
@@ -64,6 +69,7 @@ public class AuthService {
         this.emailOutboxService = emailOutboxService;
         this.securityEntityFactory = securityEntityFactory;
         this.loginStrategies = loginStrategies;
+        this.resetPasswordUrl = resetPasswordUrl;
     }
 
     @Transactional
@@ -119,14 +125,14 @@ public class AuthService {
             .orElseThrow(() -> new NotFoundException("Usuario no encontrado"));
 
         TwoFactorCodeEntity latest = twoFactorCodeRepository.findTopByUsuarioAndUsadoFalseOrderByIdDesc(user)
-            .orElseThrow(() -> new BusinessException(HttpStatus.BAD_REQUEST, "No existe codigo 2FA activo"));
+            .orElseThrow(() -> new BusinessException(HttpStatus.BAD_REQUEST, "No existe código 2FA activo"));
 
         if (latest.getExpiraAt().isBefore(OffsetDateTime.now())) {
-            throw new BusinessException(HttpStatus.BAD_REQUEST, "Codigo 2FA expirado");
+            throw new BusinessException(HttpStatus.BAD_REQUEST, "Código 2FA expirado");
         }
 
         if (!latest.getCode().equals(request.code())) {
-            throw new BusinessException(HttpStatus.BAD_REQUEST, "Codigo 2FA invalido");
+            throw new BusinessException(HttpStatus.BAD_REQUEST, "Código 2FA inválido");
         }
 
         latest.setUsado(true);
@@ -148,11 +154,14 @@ public class AuthService {
         userRepository.findByCorreoIgnoreCase(request.email()).ifPresent(user -> {
             PasswordResetEntity reset = securityEntityFactory.newPasswordReset(user, 30);
             passwordResetRepository.save(reset);
+            String encodedToken = URLEncoder.encode(reset.getToken(), StandardCharsets.UTF_8);
+            String separator = resetPasswordUrl.contains("?") ? "&" : "?";
+            String resetLink = resetPasswordUrl + separator + "token=" + encodedToken;
 
             emailOutboxService.enqueue(
                 user,
-                "Recuperacion de contrasena",
-                "Tu token de recuperacion es: " + reset.getToken(),
+                "Recuperación de contraseña",
+                "Haz clic para restablecer tu contraseña: " + resetLink,
                 null
             );
         });
@@ -170,6 +179,9 @@ public class AuthService {
         }
 
         UserEntity user = reset.getUsuario();
+        if (passwordEncoder.matches(request.newPassword(), user.getPasswordHash())) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST, "La nueva contraseña no puede ser igual a la anterior");
+        }
         user.setPasswordHash(passwordEncoder.encode(request.newPassword()));
         user.setActualizadoEn(OffsetDateTime.now());
         userRepository.save(user);
@@ -184,14 +196,14 @@ public class AuthService {
         TwoFactorCodeEntity twoFactor = securityEntityFactory.newTwoFactorCode(user, 10);
         twoFactorCodeRepository.save(twoFactor);
 
-        emailOutboxService.enqueue(user, "Activacion de 2FA", "Codigo para activar 2FA: " + twoFactor.getCode(), null);
+        emailOutboxService.enqueue(user, "Activación de 2FA", "Código para activar 2FA: " + twoFactor.getCode(), null);
     }
 
     @Transactional
     public void verify2faEnrollment(Long userId, TwoFactorCodeInput request) {
         UserEntity user = userRepository.findById(userId).orElseThrow(() -> new NotFoundException("Usuario no encontrado"));
         TwoFactorCodeEntity latest = twoFactorCodeRepository.findTopByUsuarioAndUsadoFalseOrderByIdDesc(user)
-            .orElseThrow(() -> new BusinessException(HttpStatus.BAD_REQUEST, "No existe codigo 2FA"));
+            .orElseThrow(() -> new BusinessException(HttpStatus.BAD_REQUEST, "No existe código 2FA"));
 
         if (latest.getExpiraAt().isBefore(OffsetDateTime.now()) || !latest.getCode().equals(request.code())) {
             throw new BusinessException(HttpStatus.BAD_REQUEST, "Codigo invalido o expirado");
