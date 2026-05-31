@@ -2,4 +2,5 @@ AGENTS.md
 /.agents
 /.codex
 .env
+.env.prod
 backend/reservas/.m2/
