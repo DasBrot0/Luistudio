@@ -32,11 +32,12 @@ public class SendEndingSoonReservationReminderCommand implements BookingReminder
 
         List<ReservationEntity> endingSoon = reservationRepository.findEndingSoon(date, now.plusMinutes(15), min);
         for (ReservationEntity booking : endingSoon) {
-            emailOutboxService.enqueue(
+            emailOutboxService.enqueueReminderOnce(
                 booking.getUsuario(),
                 "Tu reserva termina pronto #" + booking.getId(),
                 "Tu reserva termina en menos de 15 minutos.",
-                null
+                booking.getId(),
+                "ENDING_SOON_15M"
             );
         }
     }

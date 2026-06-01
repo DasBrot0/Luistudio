@@ -13,6 +13,7 @@ import com.luistudio.reservas.service.email.gateway.EmailGatewayFactory;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.slf4j.Logger;
@@ -75,6 +76,29 @@ public class EmailOutboxService {
     }
 
     @Transactional
+    public void enqueueReminderOnce(
+        UserEntity recipient,
+        String subject,
+        String body,
+        Long reservationId,
+        String reminderType
+    ) {
+        boolean alreadyQueued = emailOutboxRepository.existsReminderByRecipientAndTypeAndReservation(
+            recipient.getCorreo(),
+            reminderType,
+            reservationId
+        );
+        if (alreadyQueued) {
+            return;
+        }
+        String payload = toJsonPayload(Map.of(
+            "reservationId", reservationId,
+            "reminderType", reminderType
+        ));
+        enqueue(recipient, subject, body, payload);
+    }
+
+    @Transactional
     @Scheduled(fixedDelay = 60000)
     public void processPendingEmails() {
         List<EmailOutboxEntity> pending = emailOutboxRepository.findReadyToProcess(EmailStatus.PENDIENTE, OffsetDateTime.now());
@@ -107,6 +131,15 @@ public class EmailOutboxService {
 
     private void sendEmail(EmailOutboxEntity email) {
         emailGateway.send(email);
+    }
+
+    private String toJsonPayload(Map<String, Object> payload) {
+        try {
+            return objectMapper.writeValueAsString(payload);
+        } catch (Exception ex) {
+            log.warn("[EMAIL_OUTBOX] No se pudo serializar payload: {}", ex.getMessage());
+            return null;
+        }
     }
 
     private JsonNode parsePayload(String payload) {

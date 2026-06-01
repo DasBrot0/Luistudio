@@ -19,4 +19,24 @@ public interface EmailOutboxRepository extends JpaRepository<EmailOutboxEntity, 
         @Param("status") EmailStatus status,
         @Param("nowValue") OffsetDateTime nowValue
     );
+
+    @Query(
+        value = """
+            SELECT EXISTS (
+                SELECT 1
+                FROM email_outbox e
+                WHERE e.recipient = :recipient
+                  AND e.status IN ('PENDIENTE', 'ENVIADO')
+                  AND e.payload IS NOT NULL
+                  AND e.payload->>'reminderType' = :reminderType
+                  AND e.payload->>'reservationId' = CAST(:reservationId AS TEXT)
+            )
+        """,
+        nativeQuery = true
+    )
+    boolean existsReminderByRecipientAndTypeAndReservation(
+        @Param("recipient") String recipient,
+        @Param("reminderType") String reminderType,
+        @Param("reservationId") Long reservationId
+    );
 }
