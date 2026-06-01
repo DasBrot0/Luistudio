@@ -54,7 +54,7 @@ export function LoginPage({
                 autoComplete="current-password"
                 value={loginPassword}
                 onChange={(event) => onLoginPasswordChange(event.target.value)}
-                placeholder="************"
+                placeholder="••••••••••••"
               />
               <button
                 type="button"

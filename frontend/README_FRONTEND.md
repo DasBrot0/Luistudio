@@ -65,3 +65,7 @@ npm run dev
 
 - Este frontend usa React Router, por lo que rutas como `/reservas` o `/salas` deben reescribirse a `index.html` en produccion.
 - El archivo `frontend/luistudio-app/vercel.json` ya incluye el rewrite global para evitar `404 NOT_FOUND` al recargar con `F5`.
+
+- Notificaciones de reserva: ahora incluyen detalle legible de recurso, ubicacion, fecha y horario.
+- Para evitar duplicados visuales, el cliente conserva solo la ultima accion por reserva logica (usuario + recurso + ubicacion + fecha + horario), ignorando diferencias de cantidad de personas.
+- Configuracion incluye switch de 2FA por usuario con confirmacion por codigo enviado al correo (activar y desactivar).

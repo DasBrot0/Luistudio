@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
 import type { AuthUser, ReservationCompanion, ReservationForm, Room } from '../../../models/types'
 
@@ -19,6 +19,13 @@ interface EditBookingModalProps {
   onSubmit: (event: FormEvent<HTMLFormElement>) => void
 }
 
+interface CalendarDay {
+  isoDate: string
+  weekdayLabel: string
+  dateLabel: string
+  weekday: number
+}
+
 function toMinutes(time: string) {
   const [hours, minutes] = time.split(':').map(Number)
   return hours * 60 + minutes
@@ -31,9 +38,34 @@ function toTime(minutes: number) {
   return `${String(hours).padStart(2, '0')}:${String(rest).padStart(2, '0')}`
 }
 
-function dayOfWeekFromIsoDate(isoDate: string) {
-  const date = new Date(`${isoDate}T00:00:00`)
-  return ((date.getDay() + 6) % 7) + 1
+function toIsoDate(date: Date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+}
+
+function toDisplayDate(isoDate: string) {
+  if (!isoDate) return ''
+  const [year, month, day] = isoDate.split('-')
+  if (!year || !month || !day) return isoDate
+  return `${day}/${month}/${year}`
+}
+
+function getWeekDays(referenceDate: Date, weekOffset: number): CalendarDay[] {
+  const mondayOffset = (referenceDate.getDay() + 6) % 7
+  const monday = new Date(referenceDate)
+  monday.setDate(referenceDate.getDate() - mondayOffset + weekOffset * 7)
+
+  return Array.from({ length: 7 }, (_, index) => {
+    const current = new Date(monday)
+    current.setDate(monday.getDate() + index)
+    const isoDate = toIsoDate(current)
+    const weekdayLabel = current
+      .toLocaleDateString('es-PE', { weekday: 'short' })
+      .replace('.', '')
+      .toLowerCase()
+    const dateLabel = current.toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit' })
+    const weekday = ((current.getDay() + 6) % 7) + 1
+    return { isoDate, weekdayLabel, dateLabel, weekday }
+  })
 }
 
 function CheckIcon() {
@@ -89,6 +121,7 @@ export function EditBookingModal({
   onCancel,
   onSubmit,
 }: EditBookingModalProps) {
+  const [weekOffset, setWeekOffset] = useState(0)
   const roomsByCampus = useMemo(
     () => activeRooms.filter((room) => room.campusLabel === form.campus),
     [activeRooms, form.campus],
@@ -110,25 +143,61 @@ export function EditBookingModal({
   )
 
   const slotMinutes = selectedRoom?.slotMinutes ?? 60
+  const baseDate = form.date ? new Date(`${form.date}T00:00:00`) : new Date()
+  const weekDays = useMemo(() => getWeekDays(baseDate, weekOffset), [baseDate, weekOffset])
+  const scheduleByDay = useMemo(() => {
+    const values = new Map<number, { open: string | null; close: string | null; closed: boolean }>()
+    for (const day of selectedRoom?.schedule ?? []) {
+      values.set(day.dayOfWeek, {
+        open: day.openTime,
+        close: day.closeTime,
+        closed: day.closed,
+      })
+    }
+    return values
+  }, [selectedRoom])
   const totalPeople = (currentUser ? 1 : 0) + companions.length
   const peopleLabel = `${totalPeople} ${totalPeople === 1 ? 'persona' : 'personas'}`
   const maxPeople = selectedRoom?.maxPeople ?? 12
   const canAddCompanion = Boolean(selectedRoom && currentUser && companionCodeInput.trim() && totalPeople < maxPeople)
 
-  const availableStartSlots = useMemo(() => {
-    if (!selectedRoom || !form.date) return []
-    const weekday = dayOfWeekFromIsoDate(form.date)
-    const schedule = selectedRoom.schedule.find((day) => day.dayOfWeek === weekday)
-    if (!schedule || schedule.closed || !schedule.openTime || !schedule.closeTime) return []
+  const now = new Date()
+  const todayIso = toIsoDate(now)
+  const nowMinutes = now.getHours() * 60 + now.getMinutes()
+  const weekendToday = now.getDay() === 6 || now.getDay() === 0
+  const maxWeekOffset = weekendToday ? 1 : 0
 
-    const open = toMinutes(schedule.openTime)
-    const close = toMinutes(schedule.closeTime)
+  const isInsideWindow = (date: string, start: string) => {
+    if (weekOffset < 0 || weekOffset > maxWeekOffset) return false
+    if (date < todayIso) return false
+    if (date === todayIso && toMinutes(start) <= nowMinutes) return false
+    return true
+  }
+
+  const isInsideSchedule = (weekday: number, start: string, end: string) => {
+    const schedule = scheduleByDay.get(weekday)
+    if (!schedule || schedule.closed || !schedule.open || !schedule.close) return false
+    return toMinutes(start) >= toMinutes(schedule.open) && toMinutes(end) <= toMinutes(schedule.close)
+  }
+
+  const timeSlots = useMemo(() => {
+    if (!selectedRoom) return []
+    const starts = selectedRoom.schedule
+      .filter((day) => !day.closed && day.openTime && day.closeTime)
+      .map((day) => toMinutes(day.openTime as string))
+    const ends = selectedRoom.schedule
+      .filter((day) => !day.closed && day.openTime && day.closeTime)
+      .map((day) => toMinutes(day.closeTime as string))
+    if (starts.length === 0 || ends.length === 0) return []
+
+    const minStart = Math.min(...starts)
+    const maxEnd = Math.max(...ends)
     const slots: string[] = []
-    for (let minute = open; minute + slotMinutes <= close; minute += slotMinutes) {
+    for (let minute = minStart; minute + slotMinutes <= maxEnd; minute += slotMinutes) {
       slots.push(toTime(minute))
     }
     return slots
-  }, [selectedRoom, form.date, slotMinutes])
+  }, [selectedRoom, slotMinutes])
 
   return (
     <section className="modal-layer" role="dialog" aria-modal="true">
@@ -236,48 +305,95 @@ export function EditBookingModal({
                 <div className="reservation-time-row booking-time-grid">
                   <div className="compact-field">
                     <label htmlFor="edit-date">Fecha</label>
-                    <input
-                      id="edit-date"
-                      type="date"
-                      value={form.date}
-                      onChange={(event) =>
-                        onChange({
-                          ...form,
-                          date: event.target.value,
-                          start: '',
-                          end: '',
-                        })
-                      }
-                    />
+                    <input id="edit-date" type="text" value={toDisplayDate(form.date)} placeholder="--/--/----" readOnly />
                   </div>
                   <div className="compact-field">
                     <label htmlFor="edit-start">Inicio</label>
-                    <select
-                      id="edit-start"
-                      value={form.start}
-                      disabled={!form.date}
-                      onChange={(event) =>
-                        onChange({
-                          ...form,
-                          start: event.target.value,
-                          end: event.target.value ? toTime(toMinutes(event.target.value) + slotMinutes) : '',
-                        })
-                      }
-                    >
-                      <option value="">--</option>
-                      {availableStartSlots.map((start) => (
-                        <option key={start} value={start}>
-                          {start}
-                        </option>
-                      ))}
-                    </select>
+                    <input id="edit-start" type="text" value={form.start} placeholder="--:--" readOnly />
                   </div>
                   <div className="compact-field">
                     <label htmlFor="edit-end">Fin</label>
-                    <input id="edit-end" type="time" value={form.end} readOnly />
+                    <input id="edit-end" type="text" value={form.end} placeholder="--:--" readOnly />
                   </div>
                 </div>
               </section>
+
+              <div className="reservation-week-nav">
+                <button
+                  type="button"
+                  className="inline-flex min-h-8 items-center justify-center gap-2 rounded-md border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 transition hover:-translate-y-px hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                  onClick={() => setWeekOffset(Math.max(0, weekOffset - 1))}
+                  disabled={weekOffset <= 0}
+                >
+                  Semana anterior
+                </button>
+                <p className="m-0 text-xs font-semibold text-slate-600">
+                  {weekOffset === 0 ? 'Semana actual' : 'Semana siguiente'}
+                </p>
+                <button
+                  type="button"
+                  className="inline-flex min-h-8 items-center justify-center gap-2 rounded-md border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 transition hover:-translate-y-px hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                  onClick={() => setWeekOffset(Math.min(maxWeekOffset, weekOffset + 1))}
+                  disabled={weekOffset >= maxWeekOffset}
+                >
+                  Semana siguiente
+                </button>
+              </div>
+
+              <div className="calendar-grid-wrap">
+                <table className="calendar-grid">
+                  <thead>
+                    <tr>
+                      <th>Hora</th>
+                      {weekDays.map((day) => (
+                        <th key={day.isoDate}>
+                          <span className="calendar-day-header">
+                            <span>{day.weekdayLabel}</span>
+                            <span>{day.dateLabel}</span>
+                          </span>
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {timeSlots.map((slot) => {
+                      const slotEnd = toTime(toMinutes(slot) + slotMinutes)
+                      return (
+                        <tr key={slot}>
+                          <td>{slot}</td>
+                          {weekDays.map((day) => {
+                            const outsideWindow = !isInsideWindow(day.isoDate, slot)
+                            if (outsideWindow) {
+                              return <td key={`${day.isoDate}-${slot}`} className="calendar-empty-slot" />
+                            }
+
+                            const blockedBySchedule = !isInsideSchedule(day.weekday, slot, slotEnd)
+                            const selected = form.date === day.isoDate && form.start === slot
+                            return (
+                              <td key={`${day.isoDate}-${slot}`}>
+                                <button
+                                  type="button"
+                                  className={`calendar-cell-btn ${selected ? 'selected' : ''} ${blockedBySchedule ? 'blocked' : 'available'}`}
+                                  disabled={blockedBySchedule}
+                                  aria-label={`${day.weekdayLabel} ${day.dateLabel} ${slot} ${slotEnd}`}
+                                  onClick={() =>
+                                    onChange({
+                                      ...form,
+                                      date: day.isoDate,
+                                      start: slot,
+                                      end: slotEnd,
+                                    })
+                                  }
+                                />
+                              </td>
+                            )
+                          })}
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
 
               <section className="booking-block">
                 <div className="participants-panel participants-panel-modern">

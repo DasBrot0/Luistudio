@@ -187,6 +187,10 @@ public class RoomService {
         long seed = System.currentTimeMillis() % 10000;
         String base = (campus == null ? "" : campus) + "-" + (location == null ? "" : location);
         String prefix = base.isBlank() ? "R" : base.replaceAll("[^A-Za-z0-9]", "").toUpperCase();
+        int maxPrefixLength = 15; // rooms.code tiene límite VARCHAR(20) y usamos "-NNNN"
+        if (prefix.length() > maxPrefixLength) {
+            prefix = prefix.substring(0, maxPrefixLength);
+        }
         return prefix + "-" + String.format("%04d", seed);
     }
 

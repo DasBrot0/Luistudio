@@ -13,6 +13,7 @@ import com.luistudio.reservas.model.RoomEntity;
 import com.luistudio.reservas.model.RoomScheduleEntity;
 import com.luistudio.reservas.model.RoomState;
 import com.luistudio.reservas.repository.CampusScheduleRepository;
+import com.luistudio.reservas.repository.ReservationRepository;
 import com.luistudio.reservas.repository.RoomRepository;
 import com.luistudio.reservas.repository.RoomScheduleRepository;
 import java.time.DayOfWeek;
@@ -44,6 +45,7 @@ public class RoomScheduleService {
     private final CampusScheduleRepository campusScheduleRepository;
     private final RoomScheduleRepository roomScheduleRepository;
     private final RoomRepository roomRepository;
+    private final ReservationRepository reservationRepository;
     private final RoomCatalogTranslator roomCatalogTranslator;
     private final SystemConfigService systemConfigService;
 
@@ -51,12 +53,14 @@ public class RoomScheduleService {
         CampusScheduleRepository campusScheduleRepository,
         RoomScheduleRepository roomScheduleRepository,
         RoomRepository roomRepository,
+        ReservationRepository reservationRepository,
         RoomCatalogTranslator roomCatalogTranslator,
         SystemConfigService systemConfigService
     ) {
         this.campusScheduleRepository = campusScheduleRepository;
         this.roomScheduleRepository = roomScheduleRepository;
         this.roomRepository = roomRepository;
+        this.reservationRepository = reservationRepository;
         this.roomCatalogTranslator = roomCatalogTranslator;
         this.systemConfigService = systemConfigService;
     }
@@ -88,6 +92,14 @@ public class RoomScheduleService {
         validateScheduleInputs(request.days());
         String campus = request.campus().trim();
         systemConfigService.validateCampusSlotMinutes(request.slotMinutes());
+        int currentSlot = systemConfigService.getCampusSlotMinutes(campus);
+        if (currentSlot != request.slotMinutes()
+            && reservationRepository.existsFutureActiveReservationsByCampus(campus, LocalDate.now(), LocalTime.now())) {
+            throw new BusinessException(
+                HttpStatus.BAD_REQUEST,
+                "No se puede cambiar la duración por bloque del campus porque existen reservas futuras activas"
+            );
+        }
         systemConfigService.setCampusSlotMinutes(campus, request.slotMinutes());
 
         List<CampusScheduleEntity> existing = campusScheduleRepository.findByCampusIgnoreCaseOrderByDiaSemanaAsc(campus);

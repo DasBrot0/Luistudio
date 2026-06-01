@@ -51,6 +51,7 @@ type LoginLandingViewCode =
 const LOCAL_STORAGE_THEME_KEY = 'luistudio_dark_mode'
 const LOCAL_STORAGE_FONT_SCALE_KEY = 'luistudio_font_scale'
 const LOCAL_STORAGE_LANDING_KEY = 'luistudio_login_landing_route'
+const SESSION_STORAGE_NOTIFICATIONS_KEY = 'luistudio_notifications'
 
 const clampFontScale = (value: number) => Math.min(1.3, Math.max(0.85, Number.isFinite(value) ? value : 1))
 
@@ -77,6 +78,7 @@ const toUiUser = (user: {
   lastName: string
   email: string
   role: 'ADMIN' | 'ESTUDIANTE'
+  has2fa: boolean
 }): AuthUser => ({
   id: user.id,
   role: toUiRole(user.role),
@@ -84,6 +86,7 @@ const toUiUser = (user: {
   firstName: user.firstName,
   lastName: user.lastName,
   email: user.email,
+  has2fa: user.has2fa,
 })
 
 const toUiRoom = (room: {
@@ -161,6 +164,31 @@ const toUiBooking = (booking: {
   observation: booking.observation,
 })
 
+const formatDisplayDate = (isoDate: string) => {
+  const [year, month, day] = isoDate.split('-')
+  if (!year || !month || !day) return isoDate
+  return `${day}/${month}/${year}`
+}
+
+const dedupeBookingsByIdentity = (items: Booking[]) => {
+  const latestByIdentity = new Map<string, Booking>()
+  for (const booking of items) {
+    const identity = [
+      booking.userId,
+      booking.roomId,
+      booking.location,
+      booking.date,
+      booking.start,
+      booking.end,
+    ].join('|')
+    const current = latestByIdentity.get(identity)
+    if (!current || booking.backendId > current.backendId) {
+      latestByIdentity.set(identity, booking)
+    }
+  }
+  return Array.from(latestByIdentity.values())
+}
+
 const parseParticipantsFromObservation = (observation?: string): ReservationCompanion[] => {
   if (!observation) return []
   const parts = observation.split('Participantes:')[1]?.trim()
@@ -211,6 +239,26 @@ const landingViewCodeToRoute = (role: Role, code: LoginLandingViewCode): RouteKe
     return code === 'ADMIN_BOOKINGS' ? 'admin-reservas' : 'salas'
   }
   return code === 'STUDENT_RESERVE' ? 'reservas' : 'misreservas'
+}
+
+const getInitialNotifications = (): NotificationItem[] => {
+  try {
+    const raw = sessionStorage.getItem(SESSION_STORAGE_NOTIFICATIONS_KEY)
+    if (!raw) return []
+    const parsed = JSON.parse(raw)
+    if (!Array.isArray(parsed)) return []
+    return parsed
+      .filter(
+        (item): item is NotificationItem =>
+          item &&
+          typeof item.id === 'number' &&
+          typeof item.message === 'string' &&
+          typeof item.createdAt === 'string',
+      )
+      .slice(0, 100)
+  } catch {
+    return []
+  }
 }
 
 export function MainPage() {
@@ -267,7 +315,7 @@ export function MainPage() {
   const [reservationCompanionCodeInput, setReservationCompanionCodeInput] = useState('')
   const [reservationWeekOffset, setReservationWeekOffset] = useState(0)
   const [roomBookingsWindow, setRoomBookingsWindow] = useState<Booking[]>([])
-  const [confirmationBookingId, setConfirmationBookingId] = useState('')
+  const [showBookingSuccess, setShowBookingSuccess] = useState(false)
 
   const [editingBookingId, setEditingBookingId] = useState<string | null>(null)
   const [editBookingForm, setEditBookingForm] = useState<ReservationForm>({
@@ -308,12 +356,13 @@ export function MainPage() {
 
   const [toastMessage, setToastMessage] = useState('')
   const [modalMessage, setModalMessage] = useState<{ title: string; message: string; variant: 'error' | 'success' } | null>(null)
-  const [notifications, setNotifications] = useState<NotificationItem[]>([])
+  const [notifications, setNotifications] = useState<NotificationItem[]>(getInitialNotifications)
   const [isNotificationsModalOpen, setIsNotificationsModalOpen] = useState(false)
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false)
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
   const [isDarkMode, setIsDarkMode] = useState<boolean>(getInitialDarkMode)
   const [fontScale, setFontScale] = useState<number>(getInitialFontScale)
+  const [twoFactorAction, setTwoFactorAction] = useState<'none' | 'enable' | 'disable'>('none')
   const [preferencesLoaded, setPreferencesLoaded] = useState(false)
   const [notificationPrefs, setNotificationPrefs] = useState<Pick<ApiPreferences, 'emailEnabled' | 'reminderEnabled' | 'bookingChangesEnabled'>>({
     emailEnabled: true,
@@ -480,12 +529,12 @@ export function MainPage() {
 
   const loadMyBookings = async (authToken: string) => {
     const result = await api.getBookingsMe(authToken)
-    setBookings(result.map(toUiBooking))
+    setBookings(dedupeBookingsByIdentity(result.map(toUiBooking)))
   }
 
   const loadAdminBookings = async (authToken: string) => {
     const result = await api.getAdminBookings(authToken, adminPage, adminStatusFilter, adminDateFilter)
-    setBookings(result.content.map(toUiBooking))
+    setBookings(dedupeBookingsByIdentity(result.content.map(toUiBooking)))
   }
 
   const loadAdminConfig = async (authToken: string) => {
@@ -608,6 +657,10 @@ export function MainPage() {
   }, [toastMessage])
 
   useEffect(() => {
+    sessionStorage.setItem(SESSION_STORAGE_NOTIFICATIONS_KEY, JSON.stringify(notifications))
+  }, [notifications])
+
+  useEffect(() => {
     setIsNotificationsModalOpen(false)
     setIsSettingsModalOpen(false)
   }, [effectiveRoute])
@@ -717,6 +770,8 @@ export function MainPage() {
     setTwoFactorCode('')
     setProvisionalToken('')
     setLoginLandingRoute(null)
+    setNotifications([])
+    sessionStorage.removeItem(SESSION_STORAGE_NOTIFICATIONS_KEY)
     localStorage.removeItem('luistudio_token')
     setAuthHydrated(true)
     navigateToRoute('login')
@@ -756,12 +811,48 @@ export function MainPage() {
       setTwoFactorError('Ingresa el código 2FA.')
       return
     }
-    if (!provisionalToken) {
-      setTwoFactorError('No se encontró un token provisional. Inicia sesión nuevamente.')
-      return
-    }
-
     try {
+      if (twoFactorAction === 'enable') {
+        if (!token) {
+          setTwoFactorError('Tu sesión expiró. Vuelve a iniciar sesión.')
+          return
+        }
+        await api.confirm2faEnrollment(token, code)
+        setAuthenticatedUser((current) => (current ? { ...current, has2fa: true } : current))
+        setShowTwoFactorModal(false)
+        setTwoFactorCode('')
+        setTwoFactorAction('none')
+        setModalMessage({
+          title: '2FA activado',
+          message: 'La autenticación en dos pasos quedó activada correctamente.',
+          variant: 'success',
+        })
+        return
+      }
+
+      if (twoFactorAction === 'disable') {
+        if (!token) {
+          setTwoFactorError('Tu sesión expiró. Vuelve a iniciar sesión.')
+          return
+        }
+        await api.confirmDisable2fa(token, code)
+        setAuthenticatedUser((current) => (current ? { ...current, has2fa: false } : current))
+        setShowTwoFactorModal(false)
+        setTwoFactorCode('')
+        setTwoFactorAction('none')
+        setModalMessage({
+          title: '2FA desactivado',
+          message: 'La autenticación en dos pasos quedó desactivada correctamente.',
+          variant: 'success',
+        })
+        return
+      }
+
+      if (!provisionalToken) {
+        setTwoFactorError('No se encontró un token provisional. Inicia sesión nuevamente.')
+        return
+      }
+
       const verification = await api.verify2fa(provisionalToken, code)
       if (!verification.token) {
         setTwoFactorError('No se recibió token de sesión.')
@@ -778,6 +869,26 @@ export function MainPage() {
       navigateToRoute(landingRoute)
     } catch (error) {
       setTwoFactorError(error instanceof Error ? error.message : 'No se pudo verificar el código 2FA.')
+    }
+  }
+
+  const handleToggleTwoFactor = async () => {
+    if (!token || !authenticatedUser) return
+    setTwoFactorError('')
+    setTwoFactorCode('')
+    try {
+      if (authenticatedUser.has2fa) {
+        await api.disable2fa(token)
+        setTwoFactorAction('disable')
+        setShowTwoFactorModal(true)
+        return
+      }
+      await api.enroll2fa(token)
+      setTwoFactorAction('enable')
+      setShowTwoFactorModal(true)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'No se pudo iniciar la verificación de 2FA'
+      setModalMessage({ title: 'Error de seguridad', message, variant: 'error' })
     }
   }
 
@@ -878,11 +989,16 @@ export function MainPage() {
         observation,
       })
       const newBooking = toUiBooking(created)
-      setBookings((current) => [newBooking, ...current])
-      setConfirmationBookingId(newBooking.id)
+      setBookings((current) => dedupeBookingsByIdentity([newBooking, ...current.filter((booking) => booking.id !== newBooking.id)]))
+      setShowBookingSuccess(true)
+      setReservationForm(getDefaultReservationForm(activeRooms))
+      setReservationWeekOffset(0)
+      setReservationError('')
       setReservationCompanions([])
       setReservationCompanionCodeInput('')
-      pushNotification('Reserva confirmada y correo encolado correctamente.')
+      pushNotification(
+        `Reserva confirmada: ${selectedRoom.resourceLabel} (${reservationForm.location}), ${formatDisplayDate(reservationForm.date)} ${reservationForm.start}-${reservationForm.end}.`,
+      )
     } catch (error) {
       const message = error instanceof Error ? error.message : 'No se pudo crear la reserva'
       setReservationError(message)
@@ -1041,6 +1157,9 @@ export function MainPage() {
       setEditingBookingId(null)
       setEditBookingCompanions([])
       setEditCompanionCodeInput('')
+      pushNotification(
+        `Reserva editada: ${selectedRoom.resourceLabel} (${editBookingForm.location}), ${formatDisplayDate(editBookingForm.date)} ${editBookingForm.start}-${editBookingForm.end}.`,
+      )
     } catch (error) {
       const message = error instanceof Error ? error.message : 'No se pudo actualizar la reserva'
       setReservationError(message)
@@ -1052,6 +1171,8 @@ export function MainPage() {
     if (!token) return
     const target = bookings.find((booking) => booking.id === bookingId)
     if (!target) return
+    const targetRoom = activeRooms.find((room) => room.id === target.roomId)
+    const targetRoomLabel = targetRoom?.resourceLabel ?? target.roomId
     try {
       await api.cancelBooking(token, target.backendId)
       setBookings((current) =>
@@ -1061,8 +1182,8 @@ export function MainPage() {
       )
       pushNotification(
         actor === 'admin'
-          ? 'Reserva cancelada por administrador y notificación enviada.'
-          : 'La reserva fue cancelada. Recibirás un correo de confirmación.',
+          ? `Reserva cancelada por administrador: ${targetRoomLabel} (${target.location}), ${formatDisplayDate(target.date)} ${target.start}-${target.end}.`
+          : `Reserva cancelada: ${targetRoomLabel} (${target.location}), ${formatDisplayDate(target.date)} ${target.start}-${target.end}.`,
       )
     } catch (error) {
       const message = error instanceof Error ? error.message : 'No se pudo cancelar la reserva'
@@ -1376,8 +1497,13 @@ export function MainPage() {
         )}
       </div>
 
-      {confirmationBookingId && (
-        <BookingSuccessModal bookingId={confirmationBookingId} onClose={() => setConfirmationBookingId('')} />
+      {showBookingSuccess && (
+        <BookingSuccessModal
+          onClose={() => {
+            setShowBookingSuccess(false)
+            navigateToRoute('misreservas')
+          }}
+        />
       )}
       {editingBookingId && (
         <EditBookingModal
@@ -1434,12 +1560,26 @@ export function MainPage() {
         <TwoFactorModal
           code={twoFactorCode}
           errorMessage={twoFactorError}
+          title={
+            twoFactorAction === 'enable'
+              ? 'Confirmar activación de 2FA'
+              : twoFactorAction === 'disable'
+                ? 'Confirmar desactivación de 2FA'
+                : 'Verificar inicio de sesión'
+          }
+          description={
+            twoFactorAction === 'none'
+              ? 'Ingresa el código 2FA enviado a tu correo.'
+              : 'Te enviamos un código de confirmación a tu correo. Ingrésalo para continuar.'
+          }
+          submitLabel={twoFactorAction === 'none' ? 'Verificar' : 'Confirmar'}
           onCodeChange={setTwoFactorCode}
           onCancel={() => {
             setShowTwoFactorModal(false)
             setTwoFactorCode('')
             setProvisionalToken('')
             setTwoFactorError('')
+            setTwoFactorAction('none')
           }}
           onSubmit={handleTwoFactorSubmit}
         />
@@ -1537,6 +1677,19 @@ export function MainPage() {
                 <span>A</span>
                 <span>A+</span>
               </div>
+            </div>
+
+            <div className="settings-divider" />
+
+            <div className="settings-section">
+              <p className="settings-badge-ink">Seguridad</p>
+              <p className="settings-field-title">Autenticación en dos pasos (2FA)</p>
+              <p className="settings-note">
+                Estado actual: <strong>{authenticatedUser?.has2fa ? 'Activado' : 'Desactivado'}</strong>
+              </p>
+              <button type="button" className="settings-logout-btn" onClick={handleToggleTwoFactor} disabled={!authenticatedUser}>
+                {authenticatedUser?.has2fa ? 'Desactivar 2FA' : 'Activar 2FA'}
+              </button>
             </div>
 
             <div className="settings-divider" />

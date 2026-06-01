@@ -3,6 +3,9 @@ import type { FormEvent } from 'react'
 interface TwoFactorModalProps {
   code: string
   errorMessage: string
+  title?: string
+  description?: string
+  submitLabel?: string
   onCodeChange: (value: string) => void
   onCancel: () => void
   onSubmit: (event: FormEvent<HTMLFormElement>) => void
@@ -11,17 +14,20 @@ interface TwoFactorModalProps {
 export function TwoFactorModal({
   code,
   errorMessage,
+  title,
+  description,
+  submitLabel,
   onCodeChange,
   onCancel,
   onSubmit,
 }: TwoFactorModalProps) {
   return (
-    <section className="modal-layer" role="dialog" aria-modal="true" aria-label="Verificación de dos factores">
+    <section className="modal-layer" role="dialog" aria-modal="true" aria-label="Verificacion de dos factores">
       <div className="modal-card slim-modal">
-        <h2>Verificar inicio de sesión</h2>
-        <p className="modal-copy">Ingresa el código 2FA enviado a tu correo institucional.</p>
+        <h2>{title ?? 'Verificar inicio de sesion'}</h2>
+        <p className="modal-copy">{description ?? 'Ingresa el codigo 2FA enviado a tu correo.'}</p>
         <form onSubmit={onSubmit} className="stack">
-          <label htmlFor="two-factor-code">Código 2FA</label>
+          <label htmlFor="two-factor-code">Codigo 2FA</label>
           <input
             id="two-factor-code"
             type="text"
@@ -44,7 +50,7 @@ export function TwoFactorModal({
               type="submit"
               className="inline-flex min-h-10 items-center justify-center rounded-full bg-primary px-4 text-sm font-semibold text-white transition hover:-translate-y-px hover:bg-primary-dark disabled:cursor-not-allowed disabled:opacity-60"
             >
-              Verificar
+              {submitLabel ?? 'Verificar'}
             </button>
           </div>
         </form>

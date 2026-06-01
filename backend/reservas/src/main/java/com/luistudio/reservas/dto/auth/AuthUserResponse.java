@@ -7,6 +7,7 @@ public record AuthUserResponse(
     String lastName,
     String email,
     String role,
-    String status
+    String status,
+    boolean has2fa
 ) {
 }

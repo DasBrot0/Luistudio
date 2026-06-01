@@ -5,14 +5,9 @@ param(
 $root = Split-Path -Parent $PSScriptRoot
 . "$PSScriptRoot\Load-Env.ps1"
 
-$envCandidates = @(
-    (Join-Path $root $EnvFile),
-    (Join-Path $root "backend\reservas\.env")
-)
-
-$resolvedEnvFile = $envCandidates | Where-Object { Test-Path $_ } | Select-Object -First 1
-if (-not $resolvedEnvFile) {
-    throw "No se encontro archivo .env. Rutas probadas: $($envCandidates -join ', ')"
+$resolvedEnvFile = Join-Path $root $EnvFile
+if (-not (Test-Path $resolvedEnvFile)) {
+    throw "No se encontro archivo de entorno: $resolvedEnvFile"
 }
 
 Write-Host "Cargando variables de entorno desde: $resolvedEnvFile"

@@ -5,6 +5,7 @@ import com.luistudio.reservas.dto.user.NotificationPreferencesUpdateRequest;
 import com.luistudio.reservas.security.AuthPrincipal;
 import com.luistudio.reservas.service.AccessGuard;
 import com.luistudio.reservas.service.PreferenceService;
+import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -30,7 +31,7 @@ public class PreferenceController {
     }
 
     @PutMapping("/preferences")
-    public NotificationPreferencesResponse updatePreferences(@RequestBody NotificationPreferencesUpdateRequest request) {
+    public NotificationPreferencesResponse updatePreferences(@Valid @RequestBody NotificationPreferencesUpdateRequest request) {
         AuthPrincipal principal = accessGuard.requireUser();
         return preferenceService.updatePreferences(principal.userId(), request);
     }

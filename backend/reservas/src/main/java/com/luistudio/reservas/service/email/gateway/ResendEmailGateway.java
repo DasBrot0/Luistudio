@@ -30,11 +30,12 @@ public class ResendEmailGateway implements EmailGateway {
 
     @Override
     public void send(EmailOutboxEntity email) {
+        boolean html = isHtml(email.getCuerpo());
         Map<String, Object> payload = Map.of(
             "from", emailFrom,
             "to", List.of(email.getDestinatario()),
             "subject", email.getAsunto(),
-            "text", email.getCuerpo()
+            html ? "html" : "text", email.getCuerpo()
         );
 
         String response = restClient.post()
@@ -46,5 +47,11 @@ public class ResendEmailGateway implements EmailGateway {
             .body(String.class);
 
         log.info("[RESEND] Email enviado a {} | Subject: {} | Response: {}", email.getDestinatario(), email.getAsunto(), response);
+    }
+
+    private boolean isHtml(String body) {
+        if (body == null) return false;
+        String normalized = body.trim().toLowerCase();
+        return normalized.startsWith("<!doctype html") || normalized.startsWith("<html");
     }
 }

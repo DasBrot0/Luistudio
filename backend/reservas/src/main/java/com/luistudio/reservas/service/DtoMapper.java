@@ -30,7 +30,8 @@ public class DtoMapper {
             user.getApellidos(),
             user.getCorreo(),
             user.getRol().getNombre(),
-            user.getEstado().name()
+            user.getEstado().name(),
+            Boolean.TRUE.equals(user.getHas2fa())
         );
     }
 

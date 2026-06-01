@@ -357,6 +357,10 @@ select {
   background: var(--surface-000);
 }
 
+input[type='password'] {
+  -webkit-text-security: disc;
+}
+
 input:hover,
 select:hover {
   border-color: var(--field-hover);
@@ -1611,6 +1615,17 @@ th {
   width: min(100%, 46rem);
 }
 
+.room-form-modal-card .modal-actions {
+  position: static !important;
+  bottom: auto !important;
+  left: auto !important;
+  right: auto !important;
+  z-index: auto !important;
+  background: transparent !important;
+  margin-top: 0.9rem;
+  padding-top: 0;
+}
+
 .room-schedule-grid {
   display: grid;
   gap: 0.45rem;
@@ -2040,6 +2055,12 @@ th {
     bottom: 0;
     background: var(--surface-000);
     padding-top: 0.55rem;
+  }
+
+  .room-form-modal-card .modal-actions {
+    position: static;
+    background: transparent;
+    padding-top: 0;
   }
 
   .settings-dialog .modal-actions {

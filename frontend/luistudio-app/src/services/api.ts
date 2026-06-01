@@ -10,6 +10,7 @@ export interface ApiAuthUser {
   email: string
   role: 'ADMIN' | 'ESTUDIANTE'
   status: string
+  has2fa: boolean
 }
 
 interface ApiLoginResponse {
@@ -192,6 +193,14 @@ export const api = {
 
   disable2fa(token: string) {
     return http<{ message: string }>('/auth/2fa/disable', { method: 'POST' }, token)
+  },
+
+  confirmDisable2fa(token: string, code: string) {
+    return http<{ message: string }>(
+      '/auth/2fa/disable/confirm',
+      { method: 'POST', body: JSON.stringify({ code }) },
+      token,
+    )
   },
 
   getRooms(token: string, params?: { campus?: string; location?: string }) {

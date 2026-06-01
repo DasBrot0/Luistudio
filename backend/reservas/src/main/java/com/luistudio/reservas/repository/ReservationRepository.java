@@ -8,6 +8,7 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Optional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -17,6 +18,14 @@ import org.springframework.data.repository.query.Param;
 public interface ReservationRepository extends JpaRepository<ReservationEntity, Long> {
 
     List<ReservationEntity> findByUsuarioOrderByFechaDescHoraInicioDesc(UserEntity usuario);
+
+    Optional<ReservationEntity> findTopByUsuarioAndSalaAndFechaAndHoraInicioAndHoraFinOrderByIdDesc(
+        UserEntity usuario,
+        RoomEntity sala,
+        LocalDate fecha,
+        LocalTime horaInicio,
+        LocalTime horaFin
+    );
 
     @Query("""
         SELECT r FROM ReservationEntity r
@@ -37,15 +46,11 @@ public interface ReservationRepository extends JpaRepository<ReservationEntity, 
 
     Page<ReservationEntity> findByFechaOrderByHoraInicioDesc(LocalDate fecha, Pageable pageable);
 
-    @Query("""
-        SELECT r FROM ReservationEntity r
-        WHERE (:estado IS NULL OR r.estado = :estado)
-          AND (:fecha IS NULL OR r.fecha = :fecha)
-        ORDER BY r.fecha DESC, r.horaInicio DESC
-    """)
-    Page<ReservationEntity> findForAdmin(
-        @Param("estado") ReservationStatus estado,
-        @Param("fecha") LocalDate fecha,
+    Page<ReservationEntity> findAllByOrderByFechaDescHoraInicioDesc(Pageable pageable);
+
+    Page<ReservationEntity> findByEstadoAndFechaOrderByHoraInicioDesc(
+        ReservationStatus estado,
+        LocalDate fecha,
         Pageable pageable
     );
 
@@ -74,6 +79,18 @@ public interface ReservationRepository extends JpaRepository<ReservationEntity, 
     """)
     boolean existsFutureActiveReservations(
         @Param("room") RoomEntity room,
+        @Param("today") LocalDate today,
+        @Param("nowTime") LocalTime nowTime
+    );
+
+    @Query("""
+        SELECT COUNT(r) > 0 FROM ReservationEntity r
+        WHERE LOWER(r.sala.campus) = LOWER(:campus)
+          AND r.estado = com.luistudio.reservas.model.ReservationStatus.ACTIVA
+          AND (r.fecha > :today OR (r.fecha = :today AND r.horaInicio >= :nowTime))
+    """)
+    boolean existsFutureActiveReservationsByCampus(
+        @Param("campus") String campus,
         @Param("today") LocalDate today,
         @Param("nowTime") LocalTime nowTime
     );

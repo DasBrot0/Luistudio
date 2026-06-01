@@ -72,7 +72,7 @@ public class AuthService {
         this.resetPasswordUrl = resetPasswordUrl;
     }
 
-    @Transactional
+    @Transactional(noRollbackFor = BusinessException.class)
     public LoginResponse login(LoginRequest request, String ipAddress) {
         UserEntity user = userRepository.findByCorreoIgnoreCase(request.email())
             .orElseThrow(() -> new BusinessException(HttpStatus.UNAUTHORIZED, "Credenciales incorrectas"));
@@ -193,17 +193,24 @@ public class AuthService {
     @Transactional
     public void enroll2fa(Long userId) {
         UserEntity user = userRepository.findById(userId).orElseThrow(() -> new NotFoundException("Usuario no encontrado"));
+        if (Boolean.TRUE.equals(user.getHas2fa())) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST, "2FA ya esta activado");
+        }
         TwoFactorCodeEntity twoFactor = securityEntityFactory.newTwoFactorCode(user, 10);
         twoFactorCodeRepository.save(twoFactor);
-
-        emailOutboxService.enqueue(user, "Activación de 2FA", "Código para activar 2FA: " + twoFactor.getCode(), null);
+        emailOutboxService.enqueue(
+            user,
+            "Confirmacion de activacion de 2FA",
+            "Recibimos una solicitud para activar la autenticacion en dos pasos. Codigo de confirmacion: " + twoFactor.getCode(),
+            null
+        );
     }
 
     @Transactional
     public void verify2faEnrollment(Long userId, TwoFactorCodeInput request) {
         UserEntity user = userRepository.findById(userId).orElseThrow(() -> new NotFoundException("Usuario no encontrado"));
         TwoFactorCodeEntity latest = twoFactorCodeRepository.findTopByUsuarioAndUsadoFalseOrderByIdDesc(user)
-            .orElseThrow(() -> new BusinessException(HttpStatus.BAD_REQUEST, "No existe código 2FA"));
+            .orElseThrow(() -> new BusinessException(HttpStatus.BAD_REQUEST, "No existe codigo 2FA"));
 
         if (latest.getExpiraAt().isBefore(OffsetDateTime.now()) || !latest.getCode().equals(request.code())) {
             throw new BusinessException(HttpStatus.BAD_REQUEST, "Codigo invalido o expirado");
@@ -218,13 +225,41 @@ public class AuthService {
     @Transactional
     public void disable2fa(Long userId) {
         UserEntity user = userRepository.findById(userId).orElseThrow(() -> new NotFoundException("Usuario no encontrado"));
+        if (!Boolean.TRUE.equals(user.getHas2fa())) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST, "2FA ya esta desactivado");
+        }
+        TwoFactorCodeEntity twoFactor = securityEntityFactory.newTwoFactorCode(user, 10);
+        twoFactorCodeRepository.save(twoFactor);
+        emailOutboxService.enqueue(
+            user,
+            "Confirmacion de desactivacion de 2FA",
+            "Recibimos una solicitud para desactivar la autenticacion en dos pasos. Codigo de confirmacion: " + twoFactor.getCode(),
+            null
+        );
+    }
+
+    @Transactional
+    public void confirmDisable2fa(Long userId, TwoFactorCodeInput request) {
+        UserEntity user = userRepository.findById(userId).orElseThrow(() -> new NotFoundException("Usuario no encontrado"));
+        if (!Boolean.TRUE.equals(user.getHas2fa())) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST, "2FA ya esta desactivado");
+        }
+        TwoFactorCodeEntity latest = twoFactorCodeRepository.findTopByUsuarioAndUsadoFalseOrderByIdDesc(user)
+            .orElseThrow(() -> new BusinessException(HttpStatus.BAD_REQUEST, "No existe codigo 2FA"));
+
+        if (latest.getExpiraAt().isBefore(OffsetDateTime.now()) || !latest.getCode().equals(request.code())) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST, "Codigo invalido o expirado");
+        }
+
+        latest.setUsado(true);
         user.setHas2fa(false);
         userRepository.save(user);
+        twoFactorCodeRepository.save(latest);
     }
 
     private void registerAttempt(UserEntity user, boolean success, String ipAddress) {
         LoginAttemptEntity attempt = securityEntityFactory.newLoginAttempt(user, success, ipAddress);
-        loginAttemptRepository.save(attempt);
+        loginAttemptRepository.saveAndFlush(attempt);
     }
 
     private LoginStrategy resolveLoginStrategy(UserEntity user) {
@@ -234,3 +269,4 @@ public class AuthService {
             .orElseThrow(() -> new IllegalStateException("No existe estrategia de login para el usuario"));
     }
 }
+

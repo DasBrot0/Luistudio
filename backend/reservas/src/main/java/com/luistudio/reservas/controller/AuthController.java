@@ -82,6 +82,14 @@ public class AuthController {
         AuthPrincipal principal = currentUserProvider.requireCurrentUser();
         currentUserProvider.requireNotProvisionalToken();
         authService.disable2fa(principal.userId());
+        return ResponseEntity.ok(new MessageResponse("Código de confirmación enviado para desactivar 2FA"));
+    }
+
+    @PostMapping("/2fa/disable/confirm")
+    public ResponseEntity<MessageResponse> confirmDisable2fa(@Valid @RequestBody TwoFactorCodeInput request) {
+        AuthPrincipal principal = currentUserProvider.requireCurrentUser();
+        currentUserProvider.requireNotProvisionalToken();
+        authService.confirmDisable2fa(principal.userId(), request);
         return ResponseEntity.ok(new MessageResponse("2FA desactivado"));
     }
 }

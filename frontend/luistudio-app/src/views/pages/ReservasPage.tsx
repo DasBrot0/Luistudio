@@ -122,6 +122,13 @@ function getWeekDays(weekOffset: number): CalendarDay[] {
   })
 }
 
+function toDisplayDate(isoDate: string) {
+  if (!isoDate) return ''
+  const [year, month, day] = isoDate.split('-')
+  if (!year || !month || !day) return isoDate
+  return `${day}/${month}/${year}`
+}
+
 export function ReservasPage({
   reservationForm,
   reservationError,
@@ -222,19 +229,6 @@ export function ReservasPage({
     }
     return slots
   }, [selectedRoom, slotMinutes])
-
-  const availableStartSlotsForSelectedDate = useMemo(() => {
-    if (!reservationForm.date || !selectedRoom) return []
-    const selectedDay = weekDays.find((day) => day.isoDate === reservationForm.date)
-    if (!selectedDay) return []
-    return timeSlots.filter((start) => {
-      const end = toTime(toMinutes(start) + slotMinutes)
-      if (!isInsideWindow(reservationForm.date, start)) return false
-      if (!isInsideSchedule(selectedDay.weekday, start, end)) return false
-      if (overlapsBooking(reservationForm.date, start, end)) return false
-      return true
-    })
-  }, [reservationForm.date, selectedRoom, weekDays, timeSlots, slotMinutes, roomBookings])
 
   const maxPeople = selectedRoom?.maxPeople ?? selectedRoomCapacity ?? 12
   const totalPeople = (currentUser ? 1 : 0) + companions.length
@@ -438,33 +432,21 @@ export function ReservasPage({
                   <div className="reservation-time-row booking-time-grid">
                     <div className="compact-field">
                       <label htmlFor="date">Fecha</label>
-                      <input id="date" type="date" value={reservationForm.date} readOnly />
+                      <input
+                        id="date"
+                        type="text"
+                        value={toDisplayDate(reservationForm.date)}
+                        placeholder="--/--/----"
+                        readOnly
+                      />
                     </div>
                     <div className="compact-field">
                       <label htmlFor="start">Inicio</label>
-                      <select
-                        id="start"
-                        value={reservationForm.start}
-                        disabled={!reservationForm.date}
-                        onChange={(event) =>
-                          onReservationChange({
-                            ...reservationForm,
-                            start: event.target.value,
-                            end: event.target.value ? toTime(toMinutes(event.target.value) + slotMinutes) : '',
-                          })
-                        }
-                      >
-                        <option value="">--</option>
-                        {availableStartSlotsForSelectedDate.map((start) => (
-                          <option key={start} value={start}>
-                            {start}
-                          </option>
-                        ))}
-                      </select>
+                      <input id="start" type="text" value={reservationForm.start} placeholder="--:--" readOnly />
                     </div>
                     <div className="compact-field">
                       <label htmlFor="end">Fin</label>
-                      <input id="end" type="time" value={reservationForm.end} readOnly />
+                      <input id="end" type="text" value={reservationForm.end} placeholder="--:--" readOnly />
                     </div>
                   </div>
                 </section>

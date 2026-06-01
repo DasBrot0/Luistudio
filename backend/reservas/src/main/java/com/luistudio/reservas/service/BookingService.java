@@ -17,6 +17,7 @@ import com.luistudio.reservas.util.CalendarUtils;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -61,13 +62,31 @@ public class BookingService {
         UserEntity user = userService.getById(userId);
         RoomEntity room = roomService.getRoomEntity(request.roomId());
 
-        validateBookingRules(user, room, request, null);
-
-        ReservationEntity booking = reservationFactory.createActiveReservation(user, room, request);
-        ReservationEntity saved = reservationRepository.save(booking);
+        ReservationEntity saved = reservationRepository
+            .findTopByUsuarioAndSalaAndFechaAndHoraInicioAndHoraFinOrderByIdDesc(
+                user,
+                room,
+                request.date(),
+                request.start(),
+                request.end()
+            )
+            .map(existing -> {
+                validateBookingRules(user, room, request, existing.getId());
+                existing.setEstado(ReservationStatus.ACTIVA);
+                existing.setCantidadPersonas(request.people());
+                existing.setObservacion(request.observation());
+                existing.setUpdatedBy(userId);
+                existing.setActualizadaEn(OffsetDateTime.now());
+                return reservationRepository.save(existing);
+            })
+            .orElseGet(() -> {
+                validateBookingRules(user, room, request, null);
+                ReservationEntity booking = reservationFactory.createActiveReservation(user, room, request);
+                return reservationRepository.save(booking);
+            });
 
         String title = "Reserva confirmada #" + saved.getId();
-        String body = "Sala " + room.getNombre() + " | " + saved.getFecha() + " " + saved.getHoraInicio() + "-" + saved.getHoraFin();
+        String body = buildBookingEmailBody(saved, "confirmada", null);
         String ics = getIcsContent(saved.getId());
         emailOutboxService.enqueue(user, title, body, "{\"ics\":\"" + ics.replace("\n", "\\n") + "\"}");
 
@@ -99,7 +118,7 @@ public class BookingService {
         emailOutboxService.enqueue(
             saved.getUsuario(),
             "Reserva modificada #" + saved.getId(),
-            "Anterior: " + previous + " | Nuevo: " + next,
+            buildBookingEmailBody(saved, "editada", "Antes: " + previous + " | Ahora: " + next),
             null
         );
         auditService.record(actor, "BOOKING_UPDATED", "reserva", String.valueOf(saved.getId()), "from=" + previous + ";to=" + next);
@@ -127,7 +146,7 @@ public class BookingService {
         emailOutboxService.enqueue(
             saved.getUsuario(),
             "Reserva cancelada #" + saved.getId(),
-            "Tu reserva fue " + reason + ". Puedes reservar nuevamente.",
+            buildBookingEmailBody(saved, "cancelada", "Estado: " + reason + ". Puedes reservar nuevamente."),
             null
         );
         return dtoMapper.toBooking(saved);
@@ -164,7 +183,16 @@ public class BookingService {
             parsedStatus = ReservationStatus.valueOf(status.toUpperCase());
         }
 
-        Page<ReservationEntity> bookingPage = reservationRepository.findForAdmin(parsedStatus, date, PageRequest.of(page, size));
+        Page<ReservationEntity> bookingPage;
+        if (parsedStatus != null && date != null) {
+            bookingPage = reservationRepository.findByEstadoAndFechaOrderByHoraInicioDesc(parsedStatus, date, PageRequest.of(page, size));
+        } else if (parsedStatus != null) {
+            bookingPage = reservationRepository.findByEstadoOrderByFechaDescHoraInicioDesc(parsedStatus, PageRequest.of(page, size));
+        } else if (date != null) {
+            bookingPage = reservationRepository.findByFechaOrderByHoraInicioDesc(date, PageRequest.of(page, size));
+        } else {
+            bookingPage = reservationRepository.findAllByOrderByFechaDescHoraInicioDesc(PageRequest.of(page, size));
+        }
         return new PageResponse<>(
             bookingPage.getContent().stream().map(dtoMapper::toBooking).toList(),
             bookingPage.getNumber(),
@@ -198,4 +226,39 @@ public class BookingService {
             rule.validate(context);
         }
     }
+
+    private String buildBookingEmailBody(ReservationEntity booking, String action, String extraInfo) {
+        RoomEntity room = booking.getSala();
+        List<String> participants = extractParticipants(booking.getObservacion());
+        String participantsText = participants.isEmpty()
+            ? "- Sin integrantes registrados"
+            : participants.stream().map(item -> "- " + item).collect(java.util.stream.Collectors.joining("\n"));
+        String extra = (extraInfo == null || extraInfo.isBlank()) ? "" : "\nDetalle: " + extraInfo;
+
+        return "Tu reserva fue " + action + " correctamente.\n\n"
+            + "Sala: " + room.getNombre() + "\n"
+            + "Campus: " + room.getCampus() + "\n"
+            + "Recinto: " + room.getVenue() + "\n"
+            + "Ubicación: " + room.getUbicacion() + "\n"
+            + "Fecha: " + booking.getFecha() + "\n"
+            + "Horario: " + booking.getHoraInicio() + " - " + booking.getHoraFin() + "\n"
+            + "Personas: " + booking.getCantidadPersonas() + "\n\n"
+            + "Integrantes:\n" + participantsText + extra;
+    }
+
+    private List<String> extractParticipants(String observation) {
+        List<String> values = new ArrayList<>();
+        if (observation == null || observation.isBlank()) return values;
+        int marker = observation.indexOf("Participantes:");
+        if (marker < 0) return values;
+        String raw = observation.substring(marker + "Participantes:".length()).trim();
+        if (raw.isBlank()) return values;
+        String[] chunks = raw.split("\\|");
+        for (String chunk : chunks) {
+            String cleaned = chunk == null ? "" : chunk.trim();
+            if (!cleaned.isBlank()) values.add(cleaned);
+        }
+        return values;
+    }
+
 }

@@ -164,3 +164,24 @@ Nota:
   - Seleccion de proveedor de envio de correo (`service/email/gateway/EmailGatewayFactory`).
 - `Adapter`:
   - Adaptacion de proveedor de correo (`service/email/gateway/*Gateway`).
+
+- Regla de no duplicacion de reservas: si el usuario vuelve a reservar exactamente el mismo recurso, fecha y horario (misma identidad logica), se reutiliza el mismo registro en BD y se actualiza su estado/datos; no se crea una fila adicional. La cantidad de personas no define identidad para esta regla.
+
+## Envio de correo por Gmail API (sin SMTP)
+
+Configura estas variables de entorno para usar Gmail como proveedor de correo:
+
+- EMAIL_PROVIDER=gmail
+- EMAIL_FROM=Luistudio <iaboysender@gmail.com>
+- GMAIL_CLIENT_ID=...
+- GMAIL_CLIENT_SECRET=...
+- GMAIL_REFRESH_TOKEN=...
+
+Si falta alguna credencial, el sistema hace fallback a `log` y deja warning en logs.
+- Correos de reservas (confirmacion, edicion, cancelacion) se generan en HTML con estilo Luistudio e incluyen: sala, campus, recinto, ubicacion, fecha, horario, personas e integrantes.
+- La duración máxima de reserva se valida por bloque configurado del campus de la sala (no por un límite global único).
+- El admin puede cambiar la duración por campus, pero el sistema bloquea el cambio si existen reservas futuras activas en ese campus para evitar conflictos.
+- Los endpoints de escritura validan longitudes y formatos de entrada alineados con los tamaños de columna (ej. estado VARCHAR(20), observaciones/motivos VARCHAR(255), textos de sala VARCHAR(120/160)), para evitar errores SQL por datos demasiado largos.
+
+- 2FA opcional configurable por usuario desde Configuracion: activar/desactivar requiere codigo de confirmacion enviado por correo.
+- Los correos salientes se renderizan con plantilla HTML unificada (resumen, detalles clave, enlaces y codigos), para mantener formato consistente e informativo en todos los eventos.

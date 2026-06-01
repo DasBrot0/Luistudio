@@ -19,6 +19,7 @@ export interface AuthUser {
   firstName: string
   lastName: string
   email: string
+  has2fa: boolean
 }
 
 export interface Room {

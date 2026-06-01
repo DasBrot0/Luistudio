@@ -29,7 +29,7 @@ public class PreferenceService {
         this.notificationPreferenceRepository = notificationPreferenceRepository;
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public NotificationPreferencesResponse getPreferences(Long userId) {
         UserEntity user = userService.getById(userId);
         NotificationPreferenceEntity pref = userService.getOrCreatePreferences(user);
