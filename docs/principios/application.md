@@ -51,6 +51,8 @@ Este documento resume los patrones aplicados en el proyecto y su ubicacion princ
   - `backend/reservas/src/main/java/com/luistudio/reservas/service/email/gateway/EmailGateway.java`
 - Adaptador concreto para Resend:
   - `backend/reservas/src/main/java/com/luistudio/reservas/service/email/gateway/ResendEmailGateway.java`
+- Adaptador concreto para Gmail API:
+  - `backend/reservas/src/main/java/com/luistudio/reservas/service/email/gateway/GmailEmailGateway.java`
 - Adaptador de fallback por logs:
   - `backend/reservas/src/main/java/com/luistudio/reservas/service/email/gateway/LogEmailGateway.java`
 
@@ -77,11 +79,17 @@ Este documento resume los patrones aplicados en el proyecto y su ubicacion princ
 
 ## Patrones de Spring usados en backend
 
+- `Controller-Service-Repository`:
+  - `controller`: entrada HTTP y contrato REST.
+  - `service`: casos de uso y reglas de negocio.
+  - `repository`: persistencia con Spring Data JPA.
 - `Repository` (Spring Data JPA):
   - `backend/reservas/src/main/java/com/luistudio/reservas/repository/*`
 - `Controller + Service`:
   - `backend/reservas/src/main/java/com/luistudio/reservas/controller/*`
   - `backend/reservas/src/main/java/com/luistudio/reservas/service/*`
+- `DTO Mapper`:
+  - `backend/reservas/src/main/java/com/luistudio/reservas/service/DtoMapper.java`
 - `Global Exception Handler`:
   - `backend/reservas/src/main/java/com/luistudio/reservas/exception/GlobalExceptionHandler.java`
 

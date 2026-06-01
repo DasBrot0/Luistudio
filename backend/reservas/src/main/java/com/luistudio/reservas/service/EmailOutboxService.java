@@ -1,5 +1,7 @@
 package com.luistudio.reservas.service;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.luistudio.reservas.model.EmailOutboxEntity;
 import com.luistudio.reservas.model.EmailStatus;
 import com.luistudio.reservas.model.NotificationPreferenceEntity;
@@ -28,15 +30,18 @@ public class EmailOutboxService {
     private final EmailOutboxRepository emailOutboxRepository;
     private final NotificationPreferenceRepository notificationPreferenceRepository;
     private final EmailGateway emailGateway;
+    private final ObjectMapper objectMapper;
 
     public EmailOutboxService(
         EmailOutboxRepository emailOutboxRepository,
         NotificationPreferenceRepository notificationPreferenceRepository,
-        EmailGatewayFactory emailGatewayFactory
+        EmailGatewayFactory emailGatewayFactory,
+        ObjectMapper objectMapper
     ) {
         this.emailOutboxRepository = emailOutboxRepository;
         this.notificationPreferenceRepository = notificationPreferenceRepository;
         this.emailGateway = emailGatewayFactory.createGateway();
+        this.objectMapper = objectMapper;
     }
 
     @Transactional
@@ -57,7 +62,7 @@ public class EmailOutboxService {
         email.setDestinatario(recipient.getCorreo());
         email.setAsunto(subject);
         email.setCuerpo(toBrandedHtml(subject, body));
-        email.setPayload(payload);
+        email.setPayload(parsePayload(payload));
         email.setEstado(EmailStatus.PENDIENTE);
         email.setIntentos(0);
         email.setDisponibleDesde(OffsetDateTime.now());
@@ -102,6 +107,18 @@ public class EmailOutboxService {
 
     private void sendEmail(EmailOutboxEntity email) {
         emailGateway.send(email);
+    }
+
+    private JsonNode parsePayload(String payload) {
+        if (payload == null || payload.isBlank()) {
+            return null;
+        }
+
+        try {
+            return objectMapper.readTree(payload);
+        } catch (Exception ex) {
+            return objectMapper.getNodeFactory().textNode(payload);
+        }
     }
 
     private String toBrandedHtml(String subject, String body) {

@@ -45,7 +45,16 @@ export function SalasPage({
                 ))}
               </select>
 
-              <button type="button" className="inline-flex min-h-10 items-center justify-center rounded-full bg-primary px-4 text-sm font-semibold text-white transition hover:-translate-y-px hover:bg-primary-dark disabled:cursor-not-allowed disabled:opacity-60" onClick={onOpenAddRoom}>
+              <button
+                type="button"
+                className="inline-flex min-h-8 items-center justify-center gap-2 rounded-md border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 transition hover:-translate-y-px hover:bg-slate-50"
+                onClick={onOpenAddRoom}
+              >
+                <span className="btn-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24">
+                    <path d="M12 5v14M5 12h14" />
+                  </svg>
+                </span>
                 Agregar
               </button>
             </div>
@@ -55,11 +64,11 @@ export function SalasPage({
             <table>
               <thead>
                 <tr>
-                  <th>ID</th>
-                  <th>Campus</th>
-                  <th>Ubicación</th>
-                  <th>Recurso</th>
+                  <th>Código</th>
                   <th>Nombre</th>
+                  <th>Campus</th>
+                  <th>Recinto</th>
+                  <th>Ubicación</th>
                   <th>Personas</th>
                   <th>Acciones</th>
                 </tr>
@@ -67,11 +76,11 @@ export function SalasPage({
               <tbody>
                 {filteredRooms.map((room) => (
                   <tr key={room.id}>
-                    <td data-label="ID">{room.id}</td>
-                    <td data-label="Campus">{room.campusLabel}</td>
-                    <td data-label="Ubicación">{room.venueLabel}</td>
-                    <td data-label="Recurso">{room.resourceLabel}</td>
+                    <td data-label="Código">{room.id}</td>
                     <td data-label="Nombre">{room.name}</td>
+                    <td data-label="Campus">{room.campusLabel}</td>
+                    <td data-label="Recinto">{room.venueLabel}</td>
+                    <td data-label="Ubicación">{room.location}</td>
                     <td data-label="Personas">
                       {room.minPeopleRequired ? `${room.minPeople} (min obligatorio)` : `${room.minPeople} (min opcional)`} / {room.maxPeople} max
                     </td>
@@ -91,11 +100,11 @@ export function SalasPage({
             {filteredRooms.map((room) => (
               <article key={`room-mobile-${room.id}`} className="mobile-record-card">
                 <div className="mobile-record-grid">
-                  <p><strong>ID:</strong> {room.id}</p>
-                  <p><strong>Campus:</strong> {room.campusLabel}</p>
-                  <p><strong>Ubicación:</strong> {room.venueLabel}</p>
-                  <p><strong>Recurso:</strong> {room.resourceLabel}</p>
+                  <p><strong>Código:</strong> {room.id}</p>
                   <p><strong>Nombre:</strong> {room.name}</p>
+                  <p><strong>Campus:</strong> {room.campusLabel}</p>
+                  <p><strong>Recinto:</strong> {room.venueLabel}</p>
+                  <p><strong>Ubicación:</strong> {room.location}</p>
                   <p>
                     <strong>Personas:</strong>{' '}
                     {room.minPeopleRequired ? `${room.minPeople} (min obligatorio)` : `${room.minPeople} (min opcional)`} / {room.maxPeople} max

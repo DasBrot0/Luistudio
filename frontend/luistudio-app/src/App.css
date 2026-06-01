@@ -1185,7 +1185,7 @@ button.inline-flex {
 }
 
 .table-wrap {
-  overflow-x: clip;
+  overflow-x: auto;
   max-width: 100%;
 }
 
@@ -1925,6 +1925,43 @@ th {
   background: color-mix(in srgb, var(--danger-bg) 50%, transparent);
 }
 
+.settings-action-btn {
+  min-height: 2.45rem;
+  border-radius: 0.9rem;
+  border: 1px solid var(--brand-500);
+  background: var(--brand-500);
+  color: #fff;
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0 1rem;
+}
+
+.settings-action-btn:hover {
+  background: var(--brand-600);
+  border-color: var(--brand-600);
+}
+
+.settings-action-btn svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+.settings-action-btn.danger {
+  border: 1px solid color-mix(in srgb, var(--danger-ink) 55%, transparent);
+  background: color-mix(in srgb, var(--danger-bg) 30%, transparent);
+  color: var(--danger-ink);
+}
+
+.settings-action-btn.danger:hover {
+  background: color-mix(in srgb, var(--danger-bg) 50%, transparent);
+  border-color: color-mix(in srgb, var(--danger-ink) 70%, transparent);
+}
+
 .danger-btn {
   border: 1px solid color-mix(in srgb, var(--danger-ink) 55%, transparent);
   background: color-mix(in srgb, var(--danger-bg) 30%, transparent);
@@ -2158,6 +2195,7 @@ th {
     width: 2.2rem;
     max-width: 2.2rem;
   }
+
 }
 
 @media (max-width: 47.99rem) {
@@ -2254,7 +2292,23 @@ th {
   }
 
   .inline-filters {
-    flex-direction: column;
+    flex-direction: row;
+    align-items: center;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    width: 100%;
+    margin-left: 0;
+    gap: 8px;
+  }
+
+  .inline-filters > select,
+  .inline-filters > input {
+    flex: 1 1 12rem;
+    min-width: 0;
+  }
+
+  .inline-filters > button {
+    flex: 0 0 auto;
   }
 
   .calendar-link {
@@ -2439,3 +2493,4 @@ th {
 :root.dark .border-border {
   border-color: var(--line-300) !important;
 }
+

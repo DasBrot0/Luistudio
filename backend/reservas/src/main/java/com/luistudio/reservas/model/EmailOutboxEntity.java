@@ -9,6 +9,9 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.time.OffsetDateTime;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
+import com.fasterxml.jackson.databind.JsonNode;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -31,8 +34,9 @@ public class EmailOutboxEntity {
     @Column(name = "body", nullable = false, columnDefinition = "TEXT")
     private String cuerpo;
 
-    @Column(columnDefinition = "TEXT")
-    private String payload;
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(columnDefinition = "jsonb")
+    private JsonNode payload;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 20)
