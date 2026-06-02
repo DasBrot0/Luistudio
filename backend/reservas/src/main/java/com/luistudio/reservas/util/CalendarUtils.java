@@ -5,10 +5,14 @@ import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 
 public final class CalendarUtils {
+
+    private static final ZoneId LIMA_ZONE = ZoneId.of("America/Lima");
+    private static final DateTimeFormatter UTC_FORMATTER = DateTimeFormatter.ofPattern("yyyyMMdd'T'HHmmss'Z'");
 
     private CalendarUtils() {
     }
@@ -21,19 +25,15 @@ public final class CalendarUtils {
         LocalTime start,
         LocalTime end
     ) {
-        OffsetDateTime startDateTime = date.atTime(start).atOffset(ZoneOffset.ofHours(-5));
-        OffsetDateTime endDateTime = date.atTime(end).atOffset(ZoneOffset.ofHours(-5));
-
-        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyyMMdd'T'HHmmss'Z'");
-        String dates = startDateTime.withOffsetSameInstant(ZoneOffset.UTC).format(formatter)
+        String dates = toUtcCalendarInstant(date, start)
             + "/"
-            + endDateTime.withOffsetSameInstant(ZoneOffset.UTC).format(formatter);
+            + toUtcCalendarInstant(date, end);
 
-        return "https://calendar.google.com/calendar/r/eventedit?text="
+        return "https://calendar.google.com/calendar/render?action=TEMPLATE&text="
             + encode(title)
             + "&details=" + encode(description)
             + "&location=" + encode(location)
-            + "&dates=" + encode(dates);
+            + "&dates=" + dates;
     }
 
     public static String createIcs(
@@ -44,23 +44,26 @@ public final class CalendarUtils {
         LocalTime start,
         LocalTime end
     ) {
-        OffsetDateTime startDateTime = date.atTime(start).atOffset(ZoneOffset.ofHours(-5));
-        OffsetDateTime endDateTime = date.atTime(end).atOffset(ZoneOffset.ofHours(-5));
-        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyyMMdd'T'HHmmss'Z'");
+        return "BEGIN:VCALENDAR\r\n"
+            + "VERSION:2.0\r\n"
+            + "PRODID:-//Luistudio//Reservas//ES\r\n"
+            + "CALSCALE:GREGORIAN\r\n"
+            + "METHOD:PUBLISH\r\n"
+            + "BEGIN:VEVENT\r\n"
+            + "UID:" + System.currentTimeMillis() + "@luistudio\r\n"
+            + "DTSTAMP:" + OffsetDateTime.now(java.time.ZoneOffset.UTC).format(UTC_FORMATTER) + "\r\n"
+            + "DTSTART:" + toUtcCalendarInstant(date, start) + "\r\n"
+            + "DTEND:" + toUtcCalendarInstant(date, end) + "\r\n"
+            + "SUMMARY:" + sanitize(title) + "\r\n"
+            + "DESCRIPTION:" + sanitize(description) + "\r\n"
+            + "LOCATION:" + sanitize(location) + "\r\n"
+            + "END:VEVENT\r\n"
+            + "END:VCALENDAR\r\n";
+    }
 
-        return "BEGIN:VCALENDAR\n"
-            + "VERSION:2.0\n"
-            + "PRODID:-//Luistudio//Reservas//ES\n"
-            + "BEGIN:VEVENT\n"
-            + "UID:" + System.currentTimeMillis() + "@luistudio\n"
-            + "DTSTAMP:" + OffsetDateTime.now().withOffsetSameInstant(ZoneOffset.UTC).format(formatter) + "\n"
-            + "DTSTART:" + startDateTime.withOffsetSameInstant(ZoneOffset.UTC).format(formatter) + "\n"
-            + "DTEND:" + endDateTime.withOffsetSameInstant(ZoneOffset.UTC).format(formatter) + "\n"
-            + "SUMMARY:" + sanitize(title) + "\n"
-            + "DESCRIPTION:" + sanitize(description) + "\n"
-            + "LOCATION:" + sanitize(location) + "\n"
-            + "END:VEVENT\n"
-            + "END:VCALENDAR\n";
+    private static String toUtcCalendarInstant(LocalDate date, LocalTime time) {
+        ZonedDateTime limaDateTime = date.atTime(time).atZone(LIMA_ZONE);
+        return limaDateTime.withZoneSameInstant(java.time.ZoneOffset.UTC).format(UTC_FORMATTER);
     }
 
     private static String encode(String value) {

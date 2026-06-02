@@ -168,6 +168,7 @@ CREATE TABLE IF NOT EXISTS bookings (
   note VARCHAR(255),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_by BIGINT,
   CONSTRAINT fk_reserva_usuario FOREIGN KEY (user_id) REFERENCES users(id),
   CONSTRAINT fk_reserva_sala FOREIGN KEY (room_id) REFERENCES rooms(id),
   CONSTRAINT chk_reserva_horas CHECK (end_time > start_time),
@@ -224,7 +225,7 @@ CREATE TABLE IF NOT EXISTS audit_log (
   action VARCHAR(80) NOT NULL,
   entity VARCHAR(80) NOT NULL,
   entity_id VARCHAR(80),
-  detail JSONB,
+  detail TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   CONSTRAINT fk_audit_log_actor FOREIGN KEY (actor_user_id) REFERENCES users(id)
 );
@@ -232,7 +233,7 @@ CREATE TABLE IF NOT EXISTS audit_log (
 CREATE TABLE IF NOT EXISTS two_factor_codes (
   id BIGSERIAL PRIMARY KEY,
   user_id BIGINT NOT NULL,
-  code VARCHAR(10) NOT NULL,
+  code VARCHAR(128) NOT NULL,
   expires_at TIMESTAMPTZ NOT NULL,
   used BOOLEAN NOT NULL DEFAULT FALSE,
   CONSTRAINT fk_two_factor_code_user FOREIGN KEY (user_id) REFERENCES users(id)

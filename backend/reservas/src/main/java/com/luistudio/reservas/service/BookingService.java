@@ -12,12 +12,12 @@ import com.luistudio.reservas.model.UserEntity;
 import com.luistudio.reservas.repository.ReservationRepository;
 import com.luistudio.reservas.service.booking.rule.BookingRuleContext;
 import com.luistudio.reservas.service.booking.rule.BookingValidationRule;
+import com.luistudio.reservas.service.email.EmailTemplateService;
 import com.luistudio.reservas.service.factory.ReservationFactory;
 import com.luistudio.reservas.util.CalendarUtils;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
-import java.util.ArrayList;
 import java.util.List;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -36,6 +36,7 @@ public class BookingService {
     private final DtoMapper dtoMapper;
     private final ReservationFactory reservationFactory;
     private final List<BookingValidationRule> bookingValidationRules;
+    private final EmailTemplateService emailTemplateService;
 
     public BookingService(
         ReservationRepository reservationRepository,
@@ -45,7 +46,8 @@ public class BookingService {
         AuditService auditService,
         DtoMapper dtoMapper,
         ReservationFactory reservationFactory,
-        List<BookingValidationRule> bookingValidationRules
+        List<BookingValidationRule> bookingValidationRules,
+        EmailTemplateService emailTemplateService
     ) {
         this.reservationRepository = reservationRepository;
         this.roomService = roomService;
@@ -55,6 +57,7 @@ public class BookingService {
         this.dtoMapper = dtoMapper;
         this.reservationFactory = reservationFactory;
         this.bookingValidationRules = bookingValidationRules;
+        this.emailTemplateService = emailTemplateService;
     }
 
     @Transactional
@@ -86,7 +89,7 @@ public class BookingService {
             });
 
         String title = "Reserva confirmada";
-        String body = buildBookingEmailBody(saved, "confirmada", null);
+        String body = emailTemplateService.bookingStatus(saved, title, "confirmada", null);
         String ics = getIcsContent(saved.getId());
         emailOutboxService.enqueue(user, title, body, "{\"notificationType\":\"BOOKING_CONFIRMATION\",\"ics\":\"" + ics.replace("\n", "\\n") + "\"}");
 
@@ -118,7 +121,7 @@ public class BookingService {
         emailOutboxService.enqueue(
             saved.getUsuario(),
             "Reserva modificada",
-            buildBookingEmailBody(saved, "editada", "Antes: " + previous + " | Ahora: " + next),
+            emailTemplateService.bookingStatus(saved, "Reserva modificada", "editada", "Antes: " + previous + " | Ahora: " + next),
             "{\"notificationType\":\"BOOKING_UPDATE\"}"
         );
         auditService.record(actor, "BOOKING_UPDATED", "reserva", String.valueOf(saved.getId()), "from=" + previous + ";to=" + next);
@@ -134,7 +137,7 @@ public class BookingService {
         }
         LocalDateTime bookingEnd = booking.getFecha().atTime(booking.getHoraFin());
         if (!bookingEnd.isAfter(LocalDateTime.now())) {
-            throw new BusinessException(HttpStatus.BAD_REQUEST, "No se puede cancelar una reserva que ya finaliz\u00f3");
+            throw new BusinessException(HttpStatus.BAD_REQUEST, "No se puede cancelar una reserva que ya finalizo");
         }
 
         booking.setEstado(ReservationStatus.CANCELADA);
@@ -146,7 +149,7 @@ public class BookingService {
         emailOutboxService.enqueue(
             saved.getUsuario(),
             "Reserva cancelada",
-            buildBookingEmailBody(saved, "cancelada", "Estado: " + reason + ". Puedes reservar nuevamente."),
+            emailTemplateService.bookingStatus(saved, "Reserva cancelada", "cancelada", "Estado: " + reason + ". Puedes reservar nuevamente."),
             "{\"notificationType\":\"BOOKING_CANCELLATION\"}"
         );
         return dtoMapper.toBooking(saved);
@@ -210,6 +213,28 @@ public class BookingService {
     @Transactional(readOnly = true)
     public String getIcsContent(Long bookingId) {
         ReservationEntity reservation = getBookingEntity(bookingId);
+        return createIcsContent(reservation);
+    }
+
+    @Transactional(readOnly = true)
+    public String getStudentIcsContent(Long bookingId, Long studentUserId) {
+        UserEntity student = userService.getById(studentUserId);
+        if (!"ESTUDIANTE".equalsIgnoreCase(student.getRol().getNombre())) {
+            throw new BusinessException(HttpStatus.FORBIDDEN, "Solo estudiantes pueden exportar reservas");
+        }
+
+        ReservationEntity reservation = getBookingEntity(bookingId);
+        if (!reservation.getUsuario().getId().equals(studentUserId)) {
+            throw new BusinessException(HttpStatus.FORBIDDEN, "Solo puedes exportar tus propias reservas");
+        }
+        if (reservation.getEstado() != ReservationStatus.ACTIVA) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST, "Solo se pueden exportar reservas confirmadas");
+        }
+
+        return createIcsContent(reservation);
+    }
+
+    private String createIcsContent(ReservationEntity reservation) {
         return CalendarUtils.createIcs(
             "Reserva - " + reservation.getSala().getNombre(),
             "Reserva Luistudio",
@@ -226,50 +251,4 @@ public class BookingService {
             rule.validate(context);
         }
     }
-
-    private String buildBookingEmailBody(ReservationEntity booking, String action, String extraInfo) {
-        RoomEntity room = booking.getSala();
-        List<String> participants = extractParticipants(booking.getObservacion());
-        String participantsText = participants.isEmpty()
-            ? "Sin integrantes registrados"
-            : String.join(" | ", participants);
-        String extra = (extraInfo == null || extraInfo.isBlank()) ? "" : "\nDetalle: " + extraInfo;
-
-        return "Tu reserva fue " + action + " correctamente.\n\n"
-            + "Sala: " + room.getNombre() + "\n"
-            + "Campus: " + room.getCampus() + "\n"
-            + "Recinto: " + room.getVenue() + "\n"
-            + "Ubicaci\u00f3n: " + room.getUbicacion() + "\n"
-            + "Fecha: " + booking.getFecha() + "\n"
-            + "Horario: " + booking.getHoraInicio() + " - " + booking.getHoraFin() + "\n"
-            + "Personas: " + booking.getCantidadPersonas() + "\n"
-            + "Integrantes: " + participantsText + extra;
-    }
-
-    private List<String> extractParticipants(String observation) {
-        List<String> values = new ArrayList<>();
-        if (observation == null || observation.isBlank()) return values;
-
-        String raw = extractAfterLabel(observation, "Participantes:");
-        if (raw == null) raw = extractAfterLabel(observation, "Integrantes:");
-        if (raw == null) raw = observation.trim();
-        if (raw.isBlank()) return values;
-
-        String[] chunks = raw.split("\\|");
-        for (String chunk : chunks) {
-            String cleaned = chunk == null ? "" : chunk.trim();
-            if (!cleaned.isBlank()) values.add(cleaned);
-        }
-        return values;
-    }
-
-    private String extractAfterLabel(String source, String label) {
-        String sourceLower = source.toLowerCase();
-        String labelLower = label.toLowerCase();
-        int marker = sourceLower.indexOf(labelLower);
-        if (marker < 0) return null;
-        return source.substring(marker + label.length()).trim();
-    }
-
 }
-

@@ -42,6 +42,7 @@ npm run dev
 - `Editar reserva` usa el mismo esquema moderno de `Reservar` (Recurso, Fecha y hora, Personas de la reserva), sin campo legacy de número de personas.
 - `Nueva reserva` usa un layout por bloques (`Recurso`, `Fecha y hora`, `Personas de la reserva`) con proporciones desktop (campus más angosto que ubicación/recurso) y adaptación responsive para móvil.
 - `Mis reservas` incluye alternancia de vista compacta/detallada (con campus, recinto y ubicación) sin scroll horizontal en desktop ni móvil.
+- `Mis reservas` permite exportar reservas confirmadas del estudiante como archivo `.ics` o abrir Google Calendar con el evento precargado.
 - Vistas separadas por componente para desktop/móvil en listados principales (Mis reservas, Reservas registradas, Salas y Perfiles), evitando mezcla de estilos al redimensionar.
 - CRUD de salas (admin).
 - Edición completa de sala (campus, ubicación, recurso, capacidad, min/max personas y horario semanal por sala).

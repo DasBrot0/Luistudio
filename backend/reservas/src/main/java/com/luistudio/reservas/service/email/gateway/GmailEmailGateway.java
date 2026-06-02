@@ -1,6 +1,7 @@
 package com.luistudio.reservas.service.email.gateway;
 
 import com.luistudio.reservas.model.EmailOutboxEntity;
+import com.luistudio.reservas.service.email.EmailTemplateService;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.Map;
@@ -19,13 +20,15 @@ public class GmailEmailGateway implements EmailGateway {
     private final String clientSecret;
     private final String refreshToken;
     private final String emailFrom;
+    private final EmailTemplateService emailTemplateService;
 
     public GmailEmailGateway(
         RestClient.Builder restClientBuilder,
         @Value("${app.email.gmail.client-id:}") String clientId,
         @Value("${app.email.gmail.client-secret:}") String clientSecret,
         @Value("${app.email.gmail.refresh-token:}") String refreshToken,
-        @Value("${app.email.from:}") String emailFrom
+        @Value("${app.email.from:}") String emailFrom,
+        EmailTemplateService emailTemplateService
     ) {
         this.oauthClient = restClientBuilder.baseUrl("https://oauth2.googleapis.com").build();
         this.gmailClient = restClientBuilder.baseUrl("https://gmail.googleapis.com").build();
@@ -33,6 +36,7 @@ public class GmailEmailGateway implements EmailGateway {
         this.clientSecret = clientSecret;
         this.refreshToken = refreshToken;
         this.emailFrom = emailFrom;
+        this.emailTemplateService = emailTemplateService;
     }
 
     @Override
@@ -73,7 +77,7 @@ public class GmailEmailGateway implements EmailGateway {
     }
 
     private String buildRawMessage(EmailOutboxEntity email) {
-        boolean html = isHtml(email.getCuerpo());
+        boolean html = emailTemplateService.isHtml(email.getCuerpo());
         String contentType = html
             ? "text/html; charset=UTF-8"
             : "text/plain; charset=UTF-8";
@@ -84,12 +88,6 @@ public class GmailEmailGateway implements EmailGateway {
             + "Content-Type: " + contentType + "\r\n"
             + "\r\n"
             + (email.getCuerpo() == null ? "" : email.getCuerpo());
-    }
-
-    private boolean isHtml(String body) {
-        if (body == null) return false;
-        String normalized = body.trim().toLowerCase();
-        return normalized.startsWith("<!doctype html") || normalized.startsWith("<html");
     }
 
     private String encode(String value) {

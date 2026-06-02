@@ -9,6 +9,7 @@ interface MisReservasPageProps {
   onEditBooking: (booking: Booking) => void
   onCancelBooking: (bookingId: string) => void
   onCreateFirstReservation: () => void
+  onDownloadIcs: (booking: Booking) => void
 }
 
 function PanelIcon() {
@@ -30,15 +31,36 @@ function ExportIcon() {
   )
 }
 
+const formatGoogleCalendarDate = (date: string, time: string) => {
+  const utcDate = new Date(`${date}T${time}:00-05:00`)
+  const pad = (value: number) => String(value).padStart(2, '0')
+  return `${utcDate.getUTCFullYear()}${pad(utcDate.getUTCMonth() + 1)}${pad(utcDate.getUTCDate())}T${pad(
+    utcDate.getUTCHours(),
+  )}${pad(utcDate.getUTCMinutes())}${pad(utcDate.getUTCSeconds())}Z`
+}
+
+const buildGoogleCalendarUrl = (booking: Booking, roomName: string) => {
+  const params = new URLSearchParams({
+    action: 'TEMPLATE',
+    text: `Reserva - ${roomName}`,
+    details: `Reserva Luistudio ID ${booking.backendId}`,
+    location: booking.location,
+    dates: `${formatGoogleCalendarDate(booking.date, booking.start)}/${formatGoogleCalendarDate(booking.date, booking.end)}`,
+  })
+  return `https://calendar.google.com/calendar/render?${params.toString()}`
+}
+
 export function MisReservasPage({
   myBookings,
   activeRooms,
   onEditBooking,
   onCancelBooking,
   onCreateFirstReservation,
+  onDownloadIcs,
 }: MisReservasPageProps) {
   const [showDetailedView, setShowDetailedView] = useState(false)
   const [mobileExpanded, setMobileExpanded] = useState<Record<string, boolean>>({})
+  const [exportModalOpen, setExportModalOpen] = useState(false)
 
   const canCancelBooking = (booking: Booking) => {
     if (booking.status === 'Cancelado') return false
@@ -57,6 +79,7 @@ export function MisReservasPage({
     const roomName = room?.name ?? booking.roomId
     return { booking, room, roomName }
   })
+  const confirmedBookingRows = bookingRows.filter(({ booking }) => booking.status === 'Confirmado')
 
   const toggleMobileCard = (bookingId: string) => {
     setMobileExpanded((current) => ({ ...current, [bookingId]: !current[bookingId] }))
@@ -243,6 +266,7 @@ export function MisReservasPage({
                 <button
                   type="button"
                   className="inline-flex min-h-8 items-center justify-center gap-2 rounded-md bg-primary px-3 text-xs font-semibold text-white transition hover:-translate-y-px hover:bg-primary-dark disabled:cursor-not-allowed disabled:opacity-60"
+                  onClick={() => setExportModalOpen(true)}
                 >
                   <span className="btn-icon" aria-hidden="true">
                     <ExportIcon />
@@ -254,6 +278,56 @@ export function MisReservasPage({
           )}
         </article>
       </section>
+
+      {exportModalOpen && (
+        <section className="modal-layer" role="dialog" aria-modal="true" aria-labelledby="export-bookings-title">
+          <div className="modal-card slim-modal text-left">
+            <h2 id="export-bookings-title">Exportar reservas</h2>
+            <div className="confirm-booking-copy">
+              {confirmedBookingRows.length === 0 ? (
+                <p>No tienes reservas confirmadas para exportar.</p>
+              ) : (
+                <div className="export-booking-list">
+                  {confirmedBookingRows.map(({ booking, roomName }) => (
+                    <div key={`export-${booking.id}`} className="export-booking-item">
+                      <div>
+                        <strong>{roomName}</strong>
+                        <span>{formatDate(booking.date)} · {booking.start}-{booking.end}</span>
+                      </div>
+                      <div className="actions-inline">
+                        <button
+                          type="button"
+                          className="inline-flex min-h-8 items-center justify-center rounded-md bg-slate-200 px-3 text-xs font-semibold text-slate-700 transition hover:-translate-y-px hover:bg-slate-300"
+                          onClick={() => onDownloadIcs(booking)}
+                        >
+                          Exportar como .ics
+                        </button>
+                        <a
+                          className="inline-flex min-h-8 items-center justify-center rounded-md bg-primary px-3 text-xs font-semibold text-white transition hover:-translate-y-px hover:bg-primary-dark"
+                          href={buildGoogleCalendarUrl(booking, roomName)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          Exportar a Google Calendar
+                        </a>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div className="modal-actions">
+              <button
+                type="button"
+                className="inline-flex min-h-10 items-center justify-center rounded-full border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:-translate-y-px hover:bg-slate-50"
+                onClick={() => setExportModalOpen(false)}
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </section>
+      )}
     </main>
   )
 }

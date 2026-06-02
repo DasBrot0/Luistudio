@@ -63,8 +63,8 @@ public class BookingController {
 
     @GetMapping("/bookings/{bookingId}/ics")
     public ResponseEntity<String> getIcs(@PathVariable Long bookingId) {
-        accessGuard.requireUser();
-        String ics = bookingService.getIcsContent(bookingId);
+        AuthPrincipal principal = accessGuard.requireUser();
+        String ics = bookingService.getStudentIcsContent(bookingId, principal.userId());
         return ResponseEntity.ok()
             .contentType(MediaType.parseMediaType("text/calendar"))
             .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=booking-" + bookingId + ".ics")

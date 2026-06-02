@@ -80,6 +80,8 @@ export interface Booking {
   end: string
   status: BookingStatus
   observation?: string
+  googleCalendarUrl?: string
+  icsUrl?: string
 }
 
 export interface Profile {

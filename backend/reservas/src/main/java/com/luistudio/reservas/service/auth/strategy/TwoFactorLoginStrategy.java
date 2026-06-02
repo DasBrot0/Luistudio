@@ -7,6 +7,7 @@ import com.luistudio.reservas.repository.TwoFactorCodeRepository;
 import com.luistudio.reservas.security.JwtService;
 import com.luistudio.reservas.service.DtoMapper;
 import com.luistudio.reservas.service.EmailOutboxService;
+import com.luistudio.reservas.service.email.EmailTemplateService;
 import com.luistudio.reservas.service.factory.SecurityEntityFactory;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
@@ -18,6 +19,7 @@ public class TwoFactorLoginStrategy implements LoginStrategy {
     private final TwoFactorCodeRepository twoFactorCodeRepository;
     private final SecurityEntityFactory securityEntityFactory;
     private final EmailOutboxService emailOutboxService;
+    private final EmailTemplateService emailTemplateService;
     private final JwtService jwtService;
     private final DtoMapper dtoMapper;
 
@@ -25,12 +27,14 @@ public class TwoFactorLoginStrategy implements LoginStrategy {
         TwoFactorCodeRepository twoFactorCodeRepository,
         SecurityEntityFactory securityEntityFactory,
         EmailOutboxService emailOutboxService,
+        EmailTemplateService emailTemplateService,
         JwtService jwtService,
         DtoMapper dtoMapper
     ) {
         this.twoFactorCodeRepository = twoFactorCodeRepository;
         this.securityEntityFactory = securityEntityFactory;
         this.emailOutboxService = emailOutboxService;
+        this.emailTemplateService = emailTemplateService;
         this.jwtService = jwtService;
         this.dtoMapper = dtoMapper;
     }
@@ -48,14 +52,18 @@ public class TwoFactorLoginStrategy implements LoginStrategy {
 
         emailOutboxService.enqueue(
             user,
-            "C\u00f3digo de verificaci\u00f3n 2FA",
-            "Usa este c\u00f3digo para completar tu inicio de sesi\u00f3n.\nC\u00f3digo de verificaci\u00f3n: " + generatedTwoFactor.rawCode(),
+            "Codigo de verificacion 2FA",
+            emailTemplateService.securityCode(
+                "Codigo de verificacion 2FA",
+                "Usa este codigo para completar tu inicio de sesion.",
+                generatedTwoFactor.rawCode()
+            ),
             null
         );
 
         String provisionalToken = jwtService.generateProvisionalToken(user.getId(), user.getRol().getNombre());
 
-        return new LoginResponse(null, provisionalToken, true, dtoMapper.toAuthUser(user), "C\u00f3digo 2FA enviado");
+        return new LoginResponse(null, provisionalToken, true, dtoMapper.toAuthUser(user), "Código 2FA enviado");
     }
 }
 

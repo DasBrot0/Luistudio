@@ -1,6 +1,7 @@
 package com.luistudio.reservas.service.email.gateway;
 
 import com.luistudio.reservas.model.EmailOutboxEntity;
+import com.luistudio.reservas.service.email.EmailTemplateService;
 import java.util.List;
 import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
@@ -17,20 +18,23 @@ public class ResendEmailGateway implements EmailGateway {
     private final RestClient restClient;
     private final String emailFrom;
     private final String resendApiKey;
+    private final EmailTemplateService emailTemplateService;
 
     public ResendEmailGateway(
         RestClient.Builder restClientBuilder,
         @Value("${app.email.from:Luistudio <onboarding@resend.dev>}") String emailFrom,
-        @Value("${app.email.resend.api-key:}") String resendApiKey
+        @Value("${app.email.resend.api-key:}") String resendApiKey,
+        EmailTemplateService emailTemplateService
     ) {
         this.restClient = restClientBuilder.baseUrl("https://api.resend.com").build();
         this.emailFrom = emailFrom;
         this.resendApiKey = resendApiKey;
+        this.emailTemplateService = emailTemplateService;
     }
 
     @Override
     public void send(EmailOutboxEntity email) {
-        boolean html = isHtml(email.getCuerpo());
+        boolean html = emailTemplateService.isHtml(email.getCuerpo());
         Map<String, Object> payload = Map.of(
             "from", emailFrom,
             "to", List.of(email.getDestinatario()),
@@ -47,11 +51,5 @@ public class ResendEmailGateway implements EmailGateway {
             .body(String.class);
 
         log.info("[RESEND] Email enviado a {} | Subject: {} | Response: {}", email.getDestinatario(), email.getAsunto(), response);
-    }
-
-    private boolean isHtml(String body) {
-        if (body == null) return false;
-        String normalized = body.trim().toLowerCase();
-        return normalized.startsWith("<!doctype html") || normalized.startsWith("<html");
     }
 }

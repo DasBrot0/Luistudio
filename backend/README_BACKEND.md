@@ -90,7 +90,7 @@ Memoria (500 MB):
 - `PUT /api/bookings/{id}`
 - `PATCH /api/bookings/{id}/cancel`
 - `GET /api/bookings/me`
-- `GET /api/bookings/{id}/ics`
+- `GET /api/bookings/{id}/ics` descarga un archivo calendario para reservas confirmadas propias del estudiante autenticado. Convierte horarios locales con zona `America/Lima` a UTC.
 - `GET /api/admin/bookings`
 
 ### Administracion
@@ -195,7 +195,7 @@ Si falta alguna credencial, el sistema hace fallback a `log` y deja warning en l
 - Los endpoints de escritura validan longitudes y formatos de entrada alineados con los tamaños de columna (ej. estado VARCHAR(20), observaciones/motivos VARCHAR(255), textos de sala VARCHAR(120/160)), para evitar errores SQL por datos demasiado largos.
 
 - 2FA opcional configurable por usuario desde Configuracion: activar/desactivar requiere codigo de confirmacion enviado por correo.
-- Los correos salientes se renderizan con plantilla HTML unificada (resumen, detalles clave, enlaces y codigos), para mantener formato consistente e informativo en todos los eventos.
+- Los correos salientes se renderizan con `EmailTemplateService`, una plantilla HTML unificada para alertas, recuperacion de contrasena, 2FA, reservas y recordatorios; no hay layouts HTML duplicados en los servicios de negocio.
 - Correos de 2FA (activacion, desactivacion e inicio de sesion) ajustados con tildes correctas y render de codigo sin duplicados en plantilla HTML.
 - Para desarrollo, el backend incluye spring-boot-devtools (runtime) para reinicio automatico al detectar cambios mientras se ejecuta ./mvnw spring-boot:run.
 - El admin puede cambiar salas a disponible, mantenimiento o inactiva; inactivar/eliminar una sala se bloquea si tiene reservas activas en curso o futuras.

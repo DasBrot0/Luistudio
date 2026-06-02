@@ -203,6 +203,8 @@ const toUiBooking = (booking: {
   end: string
   status: 'ACTIVA' | 'CANCELADA' | 'COMPLETADA'
   observation?: string
+  googleCalendarUrl?: string
+  icsUrl?: string
 }): Booking => ({
   id: `RES-${booking.id}`,
   backendId: booking.id,
@@ -217,6 +219,8 @@ const toUiBooking = (booking: {
   end: toHourMinute(booking.end),
   status: booking.status === 'CANCELADA' ? 'Cancelado' : 'Confirmado',
   observation: booking.observation,
+  googleCalendarUrl: booking.googleCalendarUrl,
+  icsUrl: booking.icsUrl,
 })
 
 const formatDisplayDate = (isoDate: string) => {
@@ -1436,6 +1440,33 @@ export function MainPage() {
     }
   }
 
+  const downloadBookingIcs = async (booking: Booking) => {
+    if (!token) return
+    if (authenticatedUser?.role !== 'student' || booking.status !== 'Confirmado') {
+      setModalMessage({
+        title: 'No se puede exportar',
+        message: 'Solo puedes exportar tus propias reservas confirmadas como estudiante.',
+        variant: 'error',
+      })
+      return
+    }
+
+    try {
+      const blob = await api.downloadBookingIcs(token, booking.backendId)
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `reserva-${booking.backendId}.ics`
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      URL.revokeObjectURL(url)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'No se pudo descargar el calendario'
+      setModalMessage({ title: 'No se pudo exportar', message, variant: 'error' })
+    }
+  }
+
   const openAddRoom = () => {
     const firstCampus = campusValueOptions[0] ?? 'Monterrico'
     const firstLocation = venueOptionsByCampus.get(firstCampus)?.[0] ?? 'University Wellness Center'
@@ -1703,6 +1734,7 @@ export function MainPage() {
                 onEditBooking={openEditBooking}
                 onCancelBooking={(bookingId) => requestCancelBooking(bookingId, 'student')}
                 onCreateFirstReservation={() => navigateToRoute('reservas')}
+                onDownloadIcs={downloadBookingIcs}
               />
             )}
             {effectiveRoute === 'salas' && (

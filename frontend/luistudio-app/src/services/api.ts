@@ -326,6 +326,26 @@ export const api = {
     return http<ApiBooking>(`/bookings/${bookingId}/cancel`, { method: 'PATCH' }, token)
   },
 
+  async downloadBookingIcs(token: string, bookingId: number) {
+    const response = await fetch(`${API_BASE}/bookings/${bookingId}/ics`, {
+      credentials: 'include',
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    })
+
+    if (!response.ok) {
+      let message = `Error ${response.status}`
+      try {
+        const data = await response.json()
+        message = data.message ?? data.error ?? message
+      } catch {
+        // no-op
+      }
+      throw new Error(message)
+    }
+
+    return response.blob()
+  },
+
   getAdminBookings(token: string, _page: number, status: string, date: string) {
     const params = new URLSearchParams({
       page: '0',

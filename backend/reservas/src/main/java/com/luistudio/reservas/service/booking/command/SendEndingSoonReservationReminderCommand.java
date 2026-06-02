@@ -3,6 +3,7 @@ package com.luistudio.reservas.service.booking.command;
 import com.luistudio.reservas.model.ReservationEntity;
 import com.luistudio.reservas.repository.ReservationRepository;
 import com.luistudio.reservas.service.EmailOutboxService;
+import com.luistudio.reservas.service.email.EmailTemplateService;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
@@ -14,13 +15,16 @@ public class SendEndingSoonReservationReminderCommand implements BookingReminder
 
     private final ReservationRepository reservationRepository;
     private final EmailOutboxService emailOutboxService;
+    private final EmailTemplateService emailTemplateService;
 
     public SendEndingSoonReservationReminderCommand(
         ReservationRepository reservationRepository,
-        EmailOutboxService emailOutboxService
+        EmailOutboxService emailOutboxService,
+        EmailTemplateService emailTemplateService
     ) {
         this.reservationRepository = reservationRepository;
         this.emailOutboxService = emailOutboxService;
+        this.emailTemplateService = emailTemplateService;
     }
 
     @Override
@@ -35,7 +39,11 @@ public class SendEndingSoonReservationReminderCommand implements BookingReminder
             emailOutboxService.enqueueReminderOnce(
                 booking.getUsuario(),
                 "Tu reserva termina pronto",
-                "Tu reserva termina en menos de 15 minutos.",
+                emailTemplateService.bookingReminder(
+                    booking,
+                    "Tu reserva termina pronto",
+                    "Tu reserva termina en menos de 15 minutos."
+                ),
                 booking.getId(),
                 "ENDING_SOON_15M"
             );

@@ -3,6 +3,7 @@ package com.luistudio.reservas.service.booking.command;
 import com.luistudio.reservas.model.ReservationEntity;
 import com.luistudio.reservas.repository.ReservationRepository;
 import com.luistudio.reservas.service.EmailOutboxService;
+import com.luistudio.reservas.service.email.EmailTemplateService;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.OffsetDateTime;
@@ -16,13 +17,16 @@ public class SendUpcomingReservationReminderCommand implements BookingReminderCo
 
     private final ReservationRepository reservationRepository;
     private final EmailOutboxService emailOutboxService;
+    private final EmailTemplateService emailTemplateService;
 
     public SendUpcomingReservationReminderCommand(
         ReservationRepository reservationRepository,
-        EmailOutboxService emailOutboxService
+        EmailOutboxService emailOutboxService,
+        EmailTemplateService emailTemplateService
     ) {
         this.reservationRepository = reservationRepository;
         this.emailOutboxService = emailOutboxService;
+        this.emailTemplateService = emailTemplateService;
     }
 
     @Override
@@ -43,7 +47,11 @@ public class SendUpcomingReservationReminderCommand implements BookingReminderCo
             emailOutboxService.enqueueReminderOnce(
                 booking.getUsuario(),
                 "Recordatorio de reserva",
-                "Tu reserva inicia en menos de 60 minutos en sala " + booking.getSala().getNombre(),
+                emailTemplateService.bookingReminder(
+                    booking,
+                    "Recordatorio de reserva",
+                    "Tu reserva inicia en menos de 60 minutos."
+                ),
                 booking.getId(),
                 "UPCOMING_60M"
             );
