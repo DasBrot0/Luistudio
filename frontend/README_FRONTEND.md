@@ -30,6 +30,7 @@ npm run dev
 ## Funcionalidades conectadas a backend
 
 - Login con roles (admin/estudiante) y flujo 2FA.
+- Restauracion de sesion con pantalla de carga breve para evitar el flash del login al recargar una ruta protegida.
 - Verificación 2FA mediante modal propio (sin depender de `window.prompt`).
 - Solicitud y confirmación de restablecimiento de contraseña.
 - Reserva, edición y cancelación de reservas.
@@ -44,7 +45,7 @@ npm run dev
 - Vistas separadas por componente para desktop/móvil en listados principales (Mis reservas, Reservas registradas, Salas y Perfiles), evitando mezcla de estilos al redimensionar.
 - CRUD de salas (admin).
 - Edición completa de sala (campus, ubicación, recurso, capacidad, min/max personas y horario semanal por sala).
-- Filtro y cambio de estado de perfiles (admin).
+- Filtro por boton, busqueda por codigo/correo/nombres/apellidos, ordenamiento y cambio de estado de perfiles (admin).
 - Configuración de límites de reservas (admin).
 - Configuración de horario general por campus (admin), con advertencias si entra en conflicto con overrides de salas.
 - Configuración de duración por bloque de reserva por campus (30/45/60/120 min).
@@ -59,7 +60,8 @@ npm run dev
 ## Capa API
 
 - Archivo principal: `src/services/api.ts`
-- Token JWT en `localStorage` con clave `luistudio_token`.
+- La sesion autenticada se consume por cookie `HttpOnly`; el frontend no persiste tokens de acceso en `localStorage`.
+- Solo se guarda una marca no sensible para restaurar sesion y decidir si mostrar la pantalla breve de carga al recargar.
 
 ## Deploy en Vercel (SPA)
 

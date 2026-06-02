@@ -9,9 +9,11 @@ import com.luistudio.reservas.dto.auth.TwoFactorCodeInput;
 import com.luistudio.reservas.dto.auth.TwoFactorVerifyInput;
 import com.luistudio.reservas.dto.common.MessageResponse;
 import com.luistudio.reservas.security.AuthPrincipal;
+import com.luistudio.reservas.security.AuthCookieService;
 import com.luistudio.reservas.security.CurrentUserProvider;
 import com.luistudio.reservas.service.AuthService;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -26,20 +28,39 @@ public class AuthController {
 
     private final AuthService authService;
     private final CurrentUserProvider currentUserProvider;
+    private final AuthCookieService authCookieService;
 
-    public AuthController(AuthService authService, CurrentUserProvider currentUserProvider) {
+    public AuthController(
+        AuthService authService,
+        CurrentUserProvider currentUserProvider,
+        AuthCookieService authCookieService
+    ) {
         this.authService = authService;
         this.currentUserProvider = currentUserProvider;
+        this.authCookieService = authCookieService;
     }
 
     @PostMapping("/login")
-    public LoginResponse login(@Valid @RequestBody LoginRequest request, HttpServletRequest httpServletRequest) {
-        return authService.login(request, httpServletRequest.getRemoteAddr());
+    public ResponseEntity<LoginResponse> login(
+        @Valid @RequestBody LoginRequest request,
+        HttpServletRequest httpServletRequest,
+        HttpServletResponse httpServletResponse
+    ) {
+        LoginResponse response = authService.login(request, httpServletRequest.getRemoteAddr());
+        attachAuthCookie(response, request.rememberMe(), httpServletResponse);
+        return ResponseEntity.ok(sanitizeLoginResponse(response));
     }
 
     @PostMapping("/2fa/verify")
-    public LoginResponse verify2fa(@Valid @RequestBody TwoFactorVerifyInput request) {
-        return authService.verify2fa(request);
+    public ResponseEntity<LoginResponse> verify2fa(
+        @Valid @RequestBody TwoFactorVerifyInput request,
+        HttpServletResponse httpServletResponse
+    ) {
+        AuthPrincipal principal = currentUserProvider.requireCurrentUser();
+        currentUserProvider.requireProvisionalToken();
+        LoginResponse response = authService.verify2fa(principal.userId(), request.code());
+        attachAuthCookie(response, request.rememberMe(), httpServletResponse);
+        return ResponseEntity.ok(sanitizeLoginResponse(response));
     }
 
     @GetMapping("/me")
@@ -91,5 +112,29 @@ public class AuthController {
         currentUserProvider.requireNotProvisionalToken();
         authService.confirmDisable2fa(principal.userId(), request);
         return ResponseEntity.ok(new MessageResponse("2FA desactivado"));
+    }
+
+    @PostMapping("/logout")
+    public ResponseEntity<MessageResponse> logout(HttpServletResponse httpServletResponse) {
+        httpServletResponse.addHeader("Set-Cookie", authCookieService.clearCookie().toString());
+        return ResponseEntity.ok(new MessageResponse("Sesion cerrada"));
+    }
+
+    private void attachAuthCookie(LoginResponse response, boolean rememberMe, HttpServletResponse httpServletResponse) {
+        if (response.token() != null) {
+            httpServletResponse.addHeader(
+                "Set-Cookie",
+                authCookieService.buildSessionCookie(response.token(), rememberMe).toString()
+            );
+        } else if (response.provisionalToken() != null) {
+            httpServletResponse.addHeader(
+                "Set-Cookie",
+                authCookieService.buildProvisionalCookie(response.provisionalToken()).toString()
+            );
+        }
+    }
+
+    private LoginResponse sanitizeLoginResponse(LoginResponse response) {
+        return new LoginResponse(null, null, response.twoFactorRequired(), response.user(), response.message());
     }
 }

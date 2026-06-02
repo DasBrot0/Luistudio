@@ -27,7 +27,7 @@ public class TwoFactorCodeEntity {
     @JoinColumn(name = "user_id", nullable = false)
     private UserEntity usuario;
 
-    @Column(nullable = false, length = 10)
+    @Column(nullable = false, length = 128)
     private String code;
 
     @Column(name = "expires_at", nullable = false)

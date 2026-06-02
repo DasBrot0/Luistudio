@@ -19,6 +19,7 @@ import com.luistudio.reservas.repository.PasswordResetRepository;
 import com.luistudio.reservas.repository.TwoFactorCodeRepository;
 import com.luistudio.reservas.repository.UserRepository;
 import com.luistudio.reservas.security.JwtService;
+import com.luistudio.reservas.security.SecretHashService;
 import com.luistudio.reservas.service.auth.strategy.LoginStrategy;
 import com.luistudio.reservas.service.factory.SecurityEntityFactory;
 import java.net.URLEncoder;
@@ -43,6 +44,7 @@ public class AuthService {
     private final DtoMapper dtoMapper;
     private final EmailOutboxService emailOutboxService;
     private final SecurityEntityFactory securityEntityFactory;
+    private final SecretHashService secretHashService;
     private final List<LoginStrategy> loginStrategies;
     private final String resetPasswordUrl;
 
@@ -56,6 +58,7 @@ public class AuthService {
         DtoMapper dtoMapper,
         EmailOutboxService emailOutboxService,
         SecurityEntityFactory securityEntityFactory,
+        SecretHashService secretHashService,
         List<LoginStrategy> loginStrategies,
         @Value("${app.frontend.reset-password-url}") String resetPasswordUrl
     ) {
@@ -68,6 +71,7 @@ public class AuthService {
         this.dtoMapper = dtoMapper;
         this.emailOutboxService = emailOutboxService;
         this.securityEntityFactory = securityEntityFactory;
+        this.secretHashService = secretHashService;
         this.loginStrategies = loginStrategies;
         this.resetPasswordUrl = resetPasswordUrl;
     }
@@ -115,13 +119,8 @@ public class AuthService {
     }
 
     @Transactional
-    public LoginResponse verify2fa(TwoFactorVerifyInput request) {
-        JwtService.ParsedToken parsed = jwtService.validate(request.provisionalToken());
-        if (!parsed.provisional()) {
-            throw new BusinessException(HttpStatus.BAD_REQUEST, "Token no es provisional");
-        }
-
-        UserEntity user = userRepository.findById(parsed.userId())
+    public LoginResponse verify2fa(Long userId, String code) {
+        UserEntity user = userRepository.findById(userId)
             .orElseThrow(() -> new NotFoundException("Usuario no encontrado"));
 
         TwoFactorCodeEntity latest = twoFactorCodeRepository.findTopByUsuarioAndUsadoFalseOrderByIdDesc(user)
@@ -131,14 +130,14 @@ public class AuthService {
             throw new BusinessException(HttpStatus.BAD_REQUEST, "C\u00f3digo 2FA expirado");
         }
 
-        if (!latest.getCode().equals(request.code())) {
+        if (!secretHashService.matches(code, latest.getCode())) {
             throw new BusinessException(HttpStatus.BAD_REQUEST, "C\u00f3digo 2FA inv\u00e1lido");
         }
 
         latest.setUsado(true);
         twoFactorCodeRepository.save(latest);
 
-        String token = jwtService.generateToken(user.getId(), user.getCorreo(), user.getRol().getNombre());
+        String token = jwtService.generateToken(user.getId(), user.getRol().getNombre());
         return new LoginResponse(token, null, false, dtoMapper.toAuthUser(user), "2FA validado");
     }
 
@@ -152,9 +151,10 @@ public class AuthService {
     @Transactional
     public void requestReset(ResetRequestInput request) {
         userRepository.findByCorreoIgnoreCase(request.email()).ifPresent(user -> {
-            PasswordResetEntity reset = securityEntityFactory.newPasswordReset(user, 30);
+            SecurityEntityFactory.GeneratedPasswordReset generatedReset = securityEntityFactory.newPasswordReset(user, 30);
+            PasswordResetEntity reset = generatedReset.entity();
             passwordResetRepository.save(reset);
-            String encodedToken = URLEncoder.encode(reset.getToken(), StandardCharsets.UTF_8);
+            String encodedToken = URLEncoder.encode(generatedReset.rawToken(), StandardCharsets.UTF_8);
             String separator = resetPasswordUrl.contains("?") ? "&" : "?";
             String resetLink = resetPasswordUrl + separator + "token=" + encodedToken;
 
@@ -171,7 +171,8 @@ public class AuthService {
     public void confirmReset(ResetConfirmInput request) {
         passwordResetRepository.deleteByExpiraEnBefore(OffsetDateTime.now());
 
-        PasswordResetEntity reset = passwordResetRepository.findByTokenAndUsadoFalse(request.token())
+        String tokenHash = secretHashService.hash(request.token());
+        PasswordResetEntity reset = passwordResetRepository.findByTokenAndUsadoFalse(tokenHash)
             .orElseThrow(() -> new BusinessException(HttpStatus.BAD_REQUEST, "Token invalido o expirado"));
 
         if (reset.getExpiraEn().isBefore(OffsetDateTime.now())) {
@@ -196,12 +197,13 @@ public class AuthService {
         if (Boolean.TRUE.equals(user.getHas2fa())) {
             throw new BusinessException(HttpStatus.BAD_REQUEST, "2FA ya esta activado");
         }
-        TwoFactorCodeEntity twoFactor = securityEntityFactory.newTwoFactorCode(user, 10);
+        SecurityEntityFactory.GeneratedTwoFactorCode generatedTwoFactor = securityEntityFactory.newTwoFactorCode(user, 10);
+        TwoFactorCodeEntity twoFactor = generatedTwoFactor.entity();
         twoFactorCodeRepository.save(twoFactor);
         emailOutboxService.enqueue(
             user,
             "Confirmación de activación de 2FA",
-            "Recibimos una solicitud para activar la autenticación en dos pasos.\nCódigo de confirmación: " + twoFactor.getCode(),
+            "Recibimos una solicitud para activar la autenticación en dos pasos.\nCódigo de confirmación: " + generatedTwoFactor.rawCode(),
             null
         );
     }
@@ -212,7 +214,7 @@ public class AuthService {
         TwoFactorCodeEntity latest = twoFactorCodeRepository.findTopByUsuarioAndUsadoFalseOrderByIdDesc(user)
             .orElseThrow(() -> new BusinessException(HttpStatus.BAD_REQUEST, "No existe c\u00f3digo 2FA"));
 
-        if (latest.getExpiraAt().isBefore(OffsetDateTime.now()) || !latest.getCode().equals(request.code())) {
+        if (latest.getExpiraAt().isBefore(OffsetDateTime.now()) || !secretHashService.matches(request.code(), latest.getCode())) {
             throw new BusinessException(HttpStatus.BAD_REQUEST, "C\u00f3digo inv\u00e1lido o expirado");
         }
 
@@ -228,12 +230,13 @@ public class AuthService {
         if (!Boolean.TRUE.equals(user.getHas2fa())) {
             throw new BusinessException(HttpStatus.BAD_REQUEST, "2FA ya est\u00e1 desactivado");
         }
-        TwoFactorCodeEntity twoFactor = securityEntityFactory.newTwoFactorCode(user, 10);
+        SecurityEntityFactory.GeneratedTwoFactorCode generatedTwoFactor = securityEntityFactory.newTwoFactorCode(user, 10);
+        TwoFactorCodeEntity twoFactor = generatedTwoFactor.entity();
         twoFactorCodeRepository.save(twoFactor);
         emailOutboxService.enqueue(
             user,
             "Confirmación de desactivación de 2FA",
-            "Recibimos una solicitud para desactivar la autenticación en dos pasos.\nCódigo de confirmación: " + twoFactor.getCode(),
+            "Recibimos una solicitud para desactivar la autenticación en dos pasos.\nCódigo de confirmación: " + generatedTwoFactor.rawCode(),
             null
         );
     }
@@ -247,7 +250,7 @@ public class AuthService {
         TwoFactorCodeEntity latest = twoFactorCodeRepository.findTopByUsuarioAndUsadoFalseOrderByIdDesc(user)
             .orElseThrow(() -> new BusinessException(HttpStatus.BAD_REQUEST, "No existe c\u00f3digo 2FA"));
 
-        if (latest.getExpiraAt().isBefore(OffsetDateTime.now()) || !latest.getCode().equals(request.code())) {
+        if (latest.getExpiraAt().isBefore(OffsetDateTime.now()) || !secretHashService.matches(request.code(), latest.getCode())) {
             throw new BusinessException(HttpStatus.BAD_REQUEST, "C\u00f3digo inv\u00e1lido o expirado");
         }
 

@@ -52,10 +52,14 @@ public class AdminController {
     public PageResponse<UserResponse> listUsers(
         @RequestParam(defaultValue = "0") int page,
         @RequestParam(defaultValue = "10") int size,
-        @RequestParam(required = false) String query
+        @RequestParam(required = false) String query,
+        @RequestParam(required = false) String year,
+        @RequestParam(required = false) String status,
+        @RequestParam(defaultValue = "id") String sortBy,
+        @RequestParam(defaultValue = "asc") String sortDir
     ) {
         accessGuard.requireAdmin();
-        return userService.listUsers(page, size, query);
+        return userService.listUsers(page, size, query, year, status, sortBy, sortDir);
     }
 
     @PatchMapping("/admin/users/{userId}/estado")

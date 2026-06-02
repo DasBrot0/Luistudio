@@ -28,6 +28,10 @@ security:
     provisional-expiration-minutes: ${JWT_PROVISIONAL_EXP_MINUTES:10}
 
 app:
+  auth:
+    cookie-name: ${AUTH_COOKIE_NAME:luistudio_session}
+    cookie-secure: ${AUTH_COOKIE_SECURE:false}
+    cookie-same-site: ${AUTH_COOKIE_SAME_SITE:Lax}
   cors:
     origins: ${CORS_ORIGINS:http://localhost:5173}
   frontend:

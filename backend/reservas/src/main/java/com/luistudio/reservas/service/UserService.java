@@ -14,6 +14,7 @@ import com.luistudio.reservas.repository.UserRepository;
 import java.time.OffsetDateTime;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -69,8 +70,18 @@ public class UserService {
     }
 
     @Transactional(readOnly = true)
-    public PageResponse<UserResponse> listUsers(int page, int size, String query) {
-        Page<UserEntity> users = userRepository.searchUsers(query, PageRequest.of(page, size));
+    public PageResponse<UserResponse> listUsers(
+        int page,
+        int size,
+        String query,
+        String year,
+        String status,
+        String sortBy,
+        String sortDir
+    ) {
+        UserStatus userStatus = parseOptionalStatus(status);
+        PageRequest pageRequest = PageRequest.of(page, size, buildUserSort(sortBy, sortDir));
+        Page<UserEntity> users = userRepository.searchUsers(query, year, userStatus, pageRequest);
         return new PageResponse<>(
             users.getContent().stream().map(dtoMapper::toUser).toList(),
             users.getNumber(),
@@ -78,6 +89,30 @@ public class UserService {
             users.getTotalElements(),
             users.getTotalPages()
         );
+    }
+
+    private UserStatus parseOptionalStatus(String status) {
+        if (status == null || status.isBlank()) {
+            return null;
+        }
+
+        try {
+            return UserStatus.valueOf(status.trim().toUpperCase());
+        } catch (IllegalArgumentException ex) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST, "Estado invalido");
+        }
+    }
+
+    private Sort buildUserSort(String sortBy, String sortDir) {
+        Sort.Direction direction = "desc".equalsIgnoreCase(sortDir) ? Sort.Direction.DESC : Sort.Direction.ASC;
+        String property = switch (sortBy == null ? "" : sortBy) {
+            case "firstName" -> "nombres";
+            case "lastName" -> "apellidos";
+            case "code" -> "codigo";
+            case "status" -> "estado";
+            default -> "id";
+        };
+        return Sort.by(direction, property).and(Sort.by(Sort.Direction.ASC, "id"));
     }
 
     @Transactional

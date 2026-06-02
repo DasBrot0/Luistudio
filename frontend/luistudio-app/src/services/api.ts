@@ -118,12 +118,12 @@ export interface ApiPreferences {
   loginLandingView: 'STUDENT_MY_BOOKINGS' | 'STUDENT_RESERVE' | 'ADMIN_ROOMS' | 'ADMIN_BOOKINGS'
 }
 
-async function http<T>(path: string, options: RequestInit = {}, token?: string): Promise<T> {
+async function http<T>(path: string, options: RequestInit = {}, _token?: string): Promise<T> {
   const response = await fetch(`${API_BASE}${path}`, {
     ...options,
+    credentials: 'include',
     headers: {
       'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...(options.headers ?? {}),
     },
   })
@@ -147,22 +147,26 @@ async function http<T>(path: string, options: RequestInit = {}, token?: string):
 }
 
 export const api = {
-  login(email: string, password: string) {
+  login(email: string, password: string, rememberMe: boolean) {
     return http<ApiLoginResponse>('/auth/login', {
       method: 'POST',
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({ email, password, rememberMe }),
     })
   },
 
-  verify2fa(provisionalToken: string, code: string) {
+  verify2fa(code: string, rememberMe: boolean) {
     return http<ApiLoginResponse>('/auth/2fa/verify', {
       method: 'POST',
-      body: JSON.stringify({ provisionalToken, code }),
+      body: JSON.stringify({ code, rememberMe }),
     })
   },
 
-  me(token: string) {
+  me(token?: string) {
     return http<ApiAuthUser>('/auth/me', {}, token)
+  },
+
+  logout() {
+    return http<{ message: string }>('/auth/logout', { method: 'POST' })
   },
 
   requestReset(email: string) {
@@ -343,12 +347,28 @@ export const api = {
     )
   },
 
-  getUsers(token: string, page: number, query: string) {
+  getUsers(
+    token: string,
+    page: number,
+    filters: {
+      query: string
+      year: string
+      status: string
+      sortBy: string
+      sortDir: string
+    },
+  ) {
     const params = new URLSearchParams({
       page: String(Math.max(page - 1, 0)),
       size: '10',
+      sortBy: filters.sortBy,
+      sortDir: filters.sortDir,
     })
-    if (query) params.set('query', query)
+    if (filters.query) params.set('query', filters.query)
+    if (filters.year) params.set('year', filters.year)
+    if (filters.status && filters.status !== 'Todos') {
+      params.set('status', filters.status === 'Habilitado' ? 'HABILITADO' : 'DESHABILITADO')
+    }
     return http<ApiPage<ApiUser>>(`/admin/users?${params.toString()}`, {}, token)
   },
 

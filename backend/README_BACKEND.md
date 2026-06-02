@@ -4,7 +4,7 @@
 
 - Java 21
 - Spring Boot 3.x
-- Spring Security + JWT custom
+- Spring Security + token cifrado custom
 - Spring Data JPA + Hibernate
 - PostgreSQL (o H2 en memoria para desarrollo rapido)
 
@@ -19,6 +19,8 @@
    - `DB_DRIVER` (por defecto H2)
    - `JWT_SECRET`
    - `CORS_ORIGINS`
+   - `AUTH_COOKIE_SECURE` (`false` en local, `true` en despliegue HTTPS)
+   - `AUTH_COOKIE_SAME_SITE` (`Lax` por defecto)
    - `EMAIL_PROVIDER` (`log` por defecto, `resend` para envio real por API HTTP)
    - `EMAIL_FROM` (ej. `Luistudio <no-reply@tu-dominio.com>`)
    - `RESEND_API_KEY` (requerida si `EMAIL_PROVIDER=resend`)
@@ -48,6 +50,7 @@ Sugerencias de configuracion en Render:
   - `DB_DRIVER=org.postgresql.Driver`
   - `JWT_SECRET`
   - `CORS_ORIGINS`
+  - `AUTH_COOKIE_SECURE=true`
 
 Memoria (500 MB):
 - El Dockerfile ya incluye ajustes JVM para memoria limitada (`MaxRAMPercentage=70`, `SerialGC`).
@@ -59,6 +62,7 @@ Memoria (500 MB):
 ### Auth y seguridad
 
 - `POST /api/auth/login`
+- `POST /api/auth/logout`
 - `GET /api/auth/me`
 - `POST /api/auth/reset-request`
 - `POST /api/auth/reset-confirm`
@@ -92,6 +96,7 @@ Memoria (500 MB):
 ### Administracion
 
 - `GET /api/admin/users`
+  - Soporta `query` por codigo/correo/nombres/apellidos, `year`, `status`, `sortBy` (`firstName`, `lastName`, `code`, `status`) y `sortDir`.
 - `PATCH /api/admin/users/{id}/estado`
 - `GET /api/admin/config`
 - `PUT /api/admin/config`
@@ -115,6 +120,9 @@ Memoria (500 MB):
 
 - Se implementa bloqueo temporal tras intentos fallidos de login.
 - Se implementa 2FA por código temporal.
+- Los tokens de sesion y tokens provisionales viajan cifrados y se entregan en cookie `HttpOnly`.
+- Los tokens de recuperacion y codigos 2FA se almacenan hasheados; no se persisten en texto plano.
+- Para bases existentes, aplicar `database/006_harden_auth_secrets.sql` antes de desplegar este refuerzo.
 - `email_outbox` se procesa por scheduler (reintentos automaticos).
 - En local, sin `RESEND_API_KEY`, el envio de correos cae en modo log (no SMTP).
 - Para despliegue en Render, usar `EMAIL_PROVIDER=resend` + `RESEND_API_KEY` (salida por HTTPS/443).
@@ -179,9 +187,9 @@ Configura estas variables de entorno para usar Gmail como proveedor de correo:
 
 Si falta alguna credencial, el sistema hace fallback a `log` y deja warning en logs.
 - Correos de reservas (confirmacion, edicion, cancelacion) se generan en HTML con estilo Luistudio e incluyen: sala, campus, recinto, ubicacion, fecha, horario, personas e integrantes.
-- La duraci�n m�xima de reserva se valida por bloque configurado del campus de la sala (no por un l�mite global �nico).
-- El admin puede cambiar la duraci�n por campus, pero el sistema bloquea el cambio si existen reservas futuras activas en ese campus para evitar conflictos.
-- Los endpoints de escritura validan longitudes y formatos de entrada alineados con los tama�os de columna (ej. estado VARCHAR(20), observaciones/motivos VARCHAR(255), textos de sala VARCHAR(120/160)), para evitar errores SQL por datos demasiado largos.
+- La duración máxima de reserva se valida por bloque configurado del campus de la sala (no por un límite global único).
+- El admin puede cambiar la duración por campus, pero el sistema bloquea el cambio si existen reservas futuras activas en ese campus para evitar conflictos.
+- Los endpoints de escritura validan longitudes y formatos de entrada alineados con los tamaños de columna (ej. estado VARCHAR(20), observaciones/motivos VARCHAR(255), textos de sala VARCHAR(120/160)), para evitar errores SQL por datos demasiado largos.
 
 - 2FA opcional configurable por usuario desde Configuracion: activar/desactivar requiere codigo de confirmacion enviado por correo.
 - Los correos salientes se renderizan con plantilla HTML unificada (resumen, detalles clave, enlaces y codigos), para mantener formato consistente e informativo en todos los eventos.

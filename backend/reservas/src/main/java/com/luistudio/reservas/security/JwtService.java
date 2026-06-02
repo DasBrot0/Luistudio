@@ -1,10 +1,13 @@
 package com.luistudio.reservas.security;
 
 import com.luistudio.reservas.exception.BusinessException;
+import java.security.MessageDigest;
+import java.security.SecureRandom;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Base64;
-import javax.crypto.Mac;
+import javax.crypto.Cipher;
+import javax.crypto.spec.GCMParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
@@ -13,9 +16,14 @@ import org.springframework.stereotype.Component;
 @Component
 public class JwtService {
 
-    private static final String HMAC_SHA256 = "HmacSHA256";
+    private static final String AES = "AES";
+    private static final String AES_GCM = "AES/GCM/NoPadding";
+    private static final int GCM_TAG_BITS = 128;
+    private static final int IV_LENGTH_BYTES = 12;
+    private static final String TOKEN_VERSION = "v1";
+    private static final SecureRandom RANDOM = new SecureRandom();
 
-    private final String secret;
+    private final SecretKeySpec encryptionKey;
     private final long expirationSeconds;
     private final long provisionalExpirationSeconds;
 
@@ -24,48 +32,44 @@ public class JwtService {
         @Value("${security.jwt.expiration-minutes}") long expirationMinutes,
         @Value("${security.jwt.provisional-expiration-minutes}") long provisionalExpirationMinutes
     ) {
-        this.secret = secret;
+        this.encryptionKey = buildKey(secret);
         this.expirationSeconds = expirationMinutes * 60;
         this.provisionalExpirationSeconds = provisionalExpirationMinutes * 60;
     }
 
-    public String generateToken(Long userId, String email, String role) {
-        return generate(userId, email, role, false, expirationSeconds);
+    public String generateToken(Long userId, String role) {
+        return generate(userId, role, false, expirationSeconds);
     }
 
-    public String generateProvisionalToken(Long userId, String email, String role) {
-        return generate(userId, email, role, true, provisionalExpirationSeconds);
+    public String generateProvisionalToken(Long userId, String role) {
+        return generate(userId, role, true, provisionalExpirationSeconds);
     }
 
     public ParsedToken validate(String token) {
         try {
             String[] parts = token.split("\\.");
-            if (parts.length != 2) {
+            if (parts.length != 3 || !TOKEN_VERSION.equals(parts[0])) {
                 throw new BusinessException(HttpStatus.UNAUTHORIZED, "Token invalido");
             }
 
-            String payload = new String(Base64.getUrlDecoder().decode(parts[0]), StandardCharsets.UTF_8);
-            String expected = sign(parts[0]);
-            if (!expected.equals(parts[1])) {
-                throw new BusinessException(HttpStatus.UNAUTHORIZED, "Token invalido");
-            }
-
+            byte[] iv = Base64.getUrlDecoder().decode(parts[1]);
+            byte[] encryptedPayload = Base64.getUrlDecoder().decode(parts[2]);
+            String payload = decrypt(iv, encryptedPayload);
             String[] values = payload.split("\\|");
-            if (values.length != 5) {
+            if (values.length != 4) {
                 throw new BusinessException(HttpStatus.UNAUTHORIZED, "Token invalido");
             }
 
             Long userId = Long.parseLong(values[0]);
-            String email = values[1];
-            String role = values[2];
-            boolean provisional = Boolean.parseBoolean(values[3]);
-            long exp = Long.parseLong(values[4]);
+            String role = values[1];
+            boolean provisional = Boolean.parseBoolean(values[2]);
+            long exp = Long.parseLong(values[3]);
 
             if (Instant.now().getEpochSecond() > exp) {
                 throw new BusinessException(HttpStatus.UNAUTHORIZED, "Token expirado");
             }
 
-            return new ParsedToken(userId, email, role, provisional);
+            return new ParsedToken(userId, role, provisional);
         } catch (BusinessException ex) {
             throw ex;
         } catch (Exception ex) {
@@ -73,26 +77,48 @@ public class JwtService {
         }
     }
 
-    private String generate(Long userId, String email, String role, boolean provisional, long ttlSeconds) {
+    private String generate(Long userId, String role, boolean provisional, long ttlSeconds) {
         long exp = Instant.now().getEpochSecond() + ttlSeconds;
-        String payload = userId + "|" + email + "|" + role + "|" + provisional + "|" + exp;
-        String payloadB64 = Base64.getUrlEncoder().withoutPadding()
-            .encodeToString(payload.getBytes(StandardCharsets.UTF_8));
-        return payloadB64 + "." + sign(payloadB64);
+        String payload = userId + "|" + role + "|" + provisional + "|" + exp;
+        byte[] iv = new byte[IV_LENGTH_BYTES];
+        RANDOM.nextBytes(iv);
+        byte[] encryptedPayload = encrypt(payload, iv);
+        return TOKEN_VERSION + "."
+            + Base64.getUrlEncoder().withoutPadding().encodeToString(iv)
+            + "."
+            + Base64.getUrlEncoder().withoutPadding().encodeToString(encryptedPayload);
     }
 
-    private String sign(String data) {
+    private SecretKeySpec buildKey(String secret) {
         try {
-            Mac hmac = Mac.getInstance(HMAC_SHA256);
-            SecretKeySpec key = new SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), HMAC_SHA256);
-            hmac.init(key);
-            byte[] hash = hmac.doFinal(data.getBytes(StandardCharsets.UTF_8));
-            return Base64.getUrlEncoder().withoutPadding().encodeToString(hash);
+            byte[] digest = MessageDigest.getInstance("SHA-256").digest(secret.getBytes(StandardCharsets.UTF_8));
+            return new SecretKeySpec(digest, AES);
         } catch (Exception ex) {
-            throw new IllegalStateException("No se pudo firmar token", ex);
+            throw new IllegalStateException("No se pudo preparar la clave del token", ex);
         }
     }
 
-    public record ParsedToken(Long userId, String email, String role, boolean provisional) {
+    private byte[] encrypt(String payload, byte[] iv) {
+        try {
+            Cipher cipher = Cipher.getInstance(AES_GCM);
+            cipher.init(Cipher.ENCRYPT_MODE, encryptionKey, new GCMParameterSpec(GCM_TAG_BITS, iv));
+            return cipher.doFinal(payload.getBytes(StandardCharsets.UTF_8));
+        } catch (Exception ex) {
+            throw new IllegalStateException("No se pudo cifrar token", ex);
+        }
+    }
+
+    private String decrypt(byte[] iv, byte[] encryptedPayload) {
+        try {
+            Cipher cipher = Cipher.getInstance(AES_GCM);
+            cipher.init(Cipher.DECRYPT_MODE, encryptionKey, new GCMParameterSpec(GCM_TAG_BITS, iv));
+            byte[] payload = cipher.doFinal(encryptedPayload);
+            return new String(payload, StandardCharsets.UTF_8);
+        } catch (Exception ex) {
+            throw new BusinessException(HttpStatus.UNAUTHORIZED, "Token invalido");
+        }
+    }
+
+    public record ParsedToken(Long userId, String role, boolean provisional) {
     }
 }

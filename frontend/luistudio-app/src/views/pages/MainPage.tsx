@@ -51,9 +51,30 @@ type LoginLandingViewCode =
 const LOCAL_STORAGE_THEME_KEY = 'luistudio_dark_mode'
 const LOCAL_STORAGE_FONT_SCALE_KEY = 'luistudio_font_scale'
 const LOCAL_STORAGE_LANDING_KEY = 'luistudio_login_landing_route'
+const LOCAL_STORAGE_SESSION_HINT_KEY = 'luistudio_session_hint'
+const SESSION_STORAGE_SESSION_HINT_KEY = 'luistudio_session_hint'
 const SESSION_STORAGE_NOTIFICATIONS_KEY = 'luistudio_notifications'
 
 const clampFontScale = (value: number) => Math.min(1.3, Math.max(0.85, Number.isFinite(value) ? value : 1))
+
+const getStoredSessionHint = () =>
+  localStorage.getItem(LOCAL_STORAGE_SESSION_HINT_KEY) === '1' ||
+  sessionStorage.getItem(SESSION_STORAGE_SESSION_HINT_KEY) === '1'
+
+const persistSessionHint = (rememberMe: boolean) => {
+  localStorage.removeItem(LOCAL_STORAGE_SESSION_HINT_KEY)
+  sessionStorage.removeItem(SESSION_STORAGE_SESSION_HINT_KEY)
+  if (rememberMe) {
+    localStorage.setItem(LOCAL_STORAGE_SESSION_HINT_KEY, '1')
+    return
+  }
+  sessionStorage.setItem(SESSION_STORAGE_SESSION_HINT_KEY, '1')
+}
+
+const clearSessionHint = () => {
+  localStorage.removeItem(LOCAL_STORAGE_SESSION_HINT_KEY)
+  sessionStorage.removeItem(SESSION_STORAGE_SESSION_HINT_KEY)
+}
 
 const getInitialDarkMode = () => {
   const saved = localStorage.getItem(LOCAL_STORAGE_THEME_KEY)
@@ -261,6 +282,19 @@ const getInitialNotifications = (): NotificationItem[] => {
   }
 }
 
+function AuthRestoreScreen() {
+  return (
+    <main className="page auth-page auth-loading-page" aria-busy="true" aria-live="polite">
+      <section className="auth-card auth-loading-card" aria-label="Restaurando sesion">
+        <div className="auth-loading-spinner" aria-hidden="true" />
+        <p className="auth-loading-eyebrow">Sesion en curso</p>
+        <h1>Restaurando sesion</h1>
+        <p>Estamos validando tu sesion para devolverte a la vista en la que estabas.</p>
+      </section>
+    </main>
+  )
+}
+
 export function MainPage() {
   const location = useLocation()
   const navigate = useNavigate()
@@ -269,6 +303,7 @@ export function MainPage() {
   const [token, setToken] = useState('')
   const [authenticatedUser, setAuthenticatedUser] = useState<AuthUser | null>(null)
   const [authHydrated, setAuthHydrated] = useState(false)
+  const [hasStoredSession, setHasStoredSession] = useState(() => getStoredSessionHint())
 
   const [loginEmail, setLoginEmail] = useState('')
   const [loginPassword, setLoginPassword] = useState('')
@@ -276,7 +311,6 @@ export function MainPage() {
   const [loginError, setLoginError] = useState('')
   const [twoFactorError, setTwoFactorError] = useState('')
   const [showTwoFactorModal, setShowTwoFactorModal] = useState(false)
-  const [provisionalToken, setProvisionalToken] = useState('')
   const [twoFactorCode, setTwoFactorCode] = useState('')
 
   const [showForgotModal, setShowForgotModal] = useState(false)
@@ -349,10 +383,15 @@ export function MainPage() {
   const [pendingDeleteRoomId, setPendingDeleteRoomId] = useState<string | null>(null)
 
   const [profilesPage, setProfilesPage] = useState(1)
+  const [profilesTotalPages, setProfilesTotalPages] = useState(1)
   const [adminStatusFilter, setAdminStatusFilter] = useState<'Todos' | BookingStatus>('Todos')
   const [adminDateFilter, setAdminDateFilter] = useState('')
   const [adminPage, setAdminPage] = useState(1)
   const [profilesQuery, setProfilesQuery] = useState('')
+  const [profilesYearFilter, setProfilesYearFilter] = useState('')
+  const [profilesStatusFilter, setProfilesStatusFilter] = useState<'Todos' | 'Habilitado' | 'Deshabilitado'>('Todos')
+  const [profilesSortBy, setProfilesSortBy] = useState('firstName')
+  const [profilesSortDir, setProfilesSortDir] = useState<'asc' | 'desc'>('asc')
 
   const [toastMessage, setToastMessage] = useState('')
   const [modalMessage, setModalMessage] = useState<{ title: string; message: string; variant: 'error' | 'success' } | null>(null)
@@ -427,12 +466,8 @@ export function MainPage() {
       (room) => room.venueLabel === roomFilterLocation || room.campusLabel === roomFilterLocation,
     )
   }, [activeRooms, roomFilterLocation])
-  const profilesPerPage = 10
-  const totalProfilePages = Math.max(1, Math.ceil(profiles.length / profilesPerPage))
-  const paginatedProfiles = profiles.slice(
-    (profilesPage - 1) * profilesPerPage,
-    profilesPage * profilesPerPage,
-  )
+  const totalProfilePages = profilesTotalPages
+  const paginatedProfiles = profiles
   const selectedReservationRoom = useMemo(
     () => activeRooms.find((room) => room.id === reservationForm.roomId) ?? null,
     [activeRooms, reservationForm.roomId],
@@ -553,8 +588,15 @@ export function MainPage() {
   }
 
   const loadProfiles = async (authToken: string) => {
-    const result = await api.getUsers(authToken, profilesPage, profilesQuery)
+    const result = await api.getUsers(authToken, profilesPage, {
+      query: profilesQuery,
+      year: profilesYearFilter,
+      status: profilesStatusFilter,
+      sortBy: profilesSortBy,
+      sortDir: profilesSortDir,
+    })
     setProfiles(result.content.map(toProfile))
+    setProfilesTotalPages(Math.max(1, result.totalPages))
   }
 
   const toIsoDate = (date: Date) =>
@@ -698,26 +740,31 @@ export function MainPage() {
   }, [token, authenticatedUser, preferencesLoaded, notificationPrefs, isDarkMode, fontScale, loginLandingRoute])
 
   useEffect(() => {
-    const stored = localStorage.getItem('luistudio_token')
     if (authenticatedUser) {
       setAuthHydrated(true)
       return
     }
-    if (!stored) {
+    if (!hasStoredSession) {
+      setHasStoredSession(false)
       setAuthHydrated(true)
       return
     }
     api
-      .me(stored)
+      .me()
       .then((me) => {
         const user = toUiUser(me)
         setAuthenticatedUser(user)
-        setToken(stored)
-        bootstrap(stored, user).catch(() => undefined)
+        setToken('session')
+        setHasStoredSession(true)
+        bootstrap('session', user).catch(() => undefined)
       })
-      .catch(() => localStorage.removeItem('luistudio_token'))
+      .catch(() => {
+        clearSessionHint()
+        setHasStoredSession(false)
+        setToken('')
+      })
       .finally(() => setAuthHydrated(true))
-  }, [authenticatedUser])
+  }, [authenticatedUser, hasStoredSession])
 
   useEffect(() => {
     if (!token || authenticatedUser?.role !== 'admin') return
@@ -727,7 +774,16 @@ export function MainPage() {
   useEffect(() => {
     if (!token || authenticatedUser?.role !== 'admin') return
     loadProfiles(token).catch(() => undefined)
-  }, [profilesPage, profilesQuery, token, authenticatedUser])
+  }, [
+    profilesPage,
+    profilesQuery,
+    profilesYearFilter,
+    profilesStatusFilter,
+    profilesSortBy,
+    profilesSortDir,
+    token,
+    authenticatedUser,
+  ])
 
   useEffect(() => {
     if (!token || authenticatedUser?.role !== 'student') return
@@ -762,17 +818,18 @@ export function MainPage() {
   }
 
   const logout = () => {
+    api.logout().catch(() => undefined)
     clearMessages()
     setAuthenticatedUser(null)
     setToken('')
     setPreferencesLoaded(false)
     setShowTwoFactorModal(false)
     setTwoFactorCode('')
-    setProvisionalToken('')
     setLoginLandingRoute(null)
     setNotifications([])
     sessionStorage.removeItem(SESSION_STORAGE_NOTIFICATIONS_KEY)
-    localStorage.removeItem('luistudio_token')
+    clearSessionHint()
+    setHasStoredSession(false)
     setAuthHydrated(true)
     navigateToRoute('login')
   }
@@ -781,20 +838,19 @@ export function MainPage() {
     event.preventDefault()
     clearMessages()
     try {
-      const response = await api.login(loginEmail.trim(), loginPassword)
-      if (response.twoFactorRequired && response.provisionalToken) {
-        setProvisionalToken(response.provisionalToken)
+      const response = await api.login(loginEmail.trim(), loginPassword, rememberMe)
+      if (response.twoFactorRequired) {
         setTwoFactorCode('')
         setTwoFactorError('')
         setShowTwoFactorModal(true)
         return
       }
-      if (!response.token) return
       const user = toUiUser(response.user)
       setAuthenticatedUser(user)
-      setToken(response.token)
-      localStorage.setItem('luistudio_token', response.token)
-      const landingRoute = await bootstrap(response.token, user)
+      setToken('session')
+      persistSessionHint(rememberMe)
+      setHasStoredSession(true)
+      const landingRoute = await bootstrap('session', user)
       navigateToRoute(landingRoute)
     } catch (error) {
       setLoginError(error instanceof Error ? error.message : 'Error al iniciar sesión')
@@ -848,24 +904,15 @@ export function MainPage() {
         return
       }
 
-      if (!provisionalToken) {
-        setTwoFactorError('No se encontró un token provisional. Inicia sesión nuevamente.')
-        return
-      }
-
-      const verification = await api.verify2fa(provisionalToken, code)
-      if (!verification.token) {
-        setTwoFactorError('No se recibió token de sesión.')
-        return
-      }
+      const verification = await api.verify2fa(code, rememberMe)
       const user = toUiUser(verification.user)
       setAuthenticatedUser(user)
-      setToken(verification.token)
-      localStorage.setItem('luistudio_token', verification.token)
+      setToken('session')
+      persistSessionHint(rememberMe)
+      setHasStoredSession(true)
       setShowTwoFactorModal(false)
       setTwoFactorCode('')
-      setProvisionalToken('')
-      const landingRoute = await bootstrap(verification.token, user)
+      const landingRoute = await bootstrap('session', user)
       navigateToRoute(landingRoute)
     } catch (error) {
       setTwoFactorError(error instanceof Error ? error.message : 'No se pudo verificar el código 2FA.')
@@ -1350,154 +1397,181 @@ export function MainPage() {
       : 'md:pl-64'
     : ''
   const mobileNavPaddingClass = showGlobalTopbar ? 'pt-16 md:pt-0 pb-20 md:pb-0' : ''
+  const shouldShowAuthRestoreScreen = hasStoredSession && !authHydrated && route !== 'reset-password'
 
   return (
     <>
-      {showGlobalTopbar && authenticatedUser && (
-        <GlobalTopbar
-          role={authenticatedUser.role}
-          activeRoute={effectiveRoute}
-          notifications={notifications}
-          isSidebarCollapsed={isSidebarCollapsed}
-          onNavigate={(nextRoute) => {
-            setIsNotificationsModalOpen(false)
-            setIsSettingsModalOpen(false)
-            navigateToRoute(nextRoute)
-          }}
-          onToggleSidebar={() => setIsSidebarCollapsed((current) => !current)}
-          onOpenNotifications={() => setIsNotificationsModalOpen(true)}
-          onOpenSettings={() => setIsSettingsModalOpen(true)}
-        />
-      )}
+      {shouldShowAuthRestoreScreen ? (
+        <AuthRestoreScreen />
+      ) : (
+        <>
+          {showGlobalTopbar && authenticatedUser && (
+            <GlobalTopbar
+              role={authenticatedUser.role}
+              activeRoute={effectiveRoute}
+              notifications={notifications}
+              isSidebarCollapsed={isSidebarCollapsed}
+              onNavigate={(nextRoute) => {
+                setIsNotificationsModalOpen(false)
+                setIsSettingsModalOpen(false)
+                navigateToRoute(nextRoute)
+              }}
+              onToggleSidebar={() => setIsSidebarCollapsed((current) => !current)}
+              onOpenNotifications={() => setIsNotificationsModalOpen(true)}
+              onOpenSettings={() => setIsSettingsModalOpen(true)}
+            />
+          )}
 
-      <div className={`${contentOffsetClass} ${mobileNavPaddingClass} min-h-screen`}>
-        {effectiveRoute === 'login' && (
-          <LoginPage
-            loginEmail={loginEmail}
-            loginPassword={loginPassword}
-            rememberMe={rememberMe}
-            loginError={loginError}
-            onLoginEmailChange={setLoginEmail}
-            onLoginPasswordChange={setLoginPassword}
-            onRememberMeChange={setRememberMe}
-            onOpenForgotModal={() => {
-              setForgotEmail(loginEmail)
-              setShowForgotModal(true)
-              setResetError('')
-            }}
-            onSubmitLogin={handleLoginSubmit}
-          />
-        )}
-        {effectiveRoute === 'reset-password' && (
-          <ResetPasswordPage
-            resetPassword={resetPassword}
-            resetPasswordConfirm={resetPasswordConfirm}
-            resetError={resetError}
-            showResetSuccess={showResetSuccess}
-            onResetPasswordChange={setResetPassword}
-            onResetPasswordConfirmChange={setResetPasswordConfirm}
-            onSubmitResetPassword={handleResetPasswordSubmit}
-            onBackToLogin={() => navigateToRoute('login')}
-          />
-        )}
-        {effectiveRoute === 'reservas' && (
-          <ReservasPage
-            reservationForm={reservationForm}
-            reservationError={reservationError}
-            campusOptions={campusOptions}
-            locationOptionsByCampus={locationOptionsByCampus}
-            activeRooms={activeRooms}
-            selectedRoomCapacity={selectedReservationRoom?.capacity ?? null}
-            roomBookings={roomBookingsForSelectedRoom}
-            weekOffset={reservationWeekOffset}
-            onReservationChange={handleReservationChange}
-            onAddCompanion={handleAddReservationCompanion}
-            currentUser={authenticatedUser}
-            companions={reservationCompanions}
-            companionCodeInput={reservationCompanionCodeInput}
-            onCompanionCodeInputChange={setReservationCompanionCodeInput}
-            onRemoveCompanion={handleRemoveReservationCompanion}
-            onWeekOffsetChange={setReservationWeekOffset}
-            onClearReservationForm={() => {
-              setReservationForm(getDefaultReservationForm(activeRooms))
-              setReservationCompanions([])
-              setReservationCompanionCodeInput('')
-            }}
-            onSubmitReservation={handleCreateReservation}
-          />
-        )}
-        {effectiveRoute === 'misreservas' && (
-          <MisReservasPage
-            myBookings={myBookings}
-            activeRooms={activeRooms}
-            onEditBooking={openEditBooking}
-            onCancelBooking={(bookingId) => cancelBooking(bookingId, 'student')}
-            onCreateFirstReservation={() => navigateToRoute('reservas')}
-          />
-        )}
-        {effectiveRoute === 'salas' && (
-          <SalasPage
-            filteredRooms={filteredRooms}
-            campusOptions={campusOptions}
-            locationOptions={locationOptions}
-            roomFilterLocation={roomFilterLocation}
-            roomNotice={roomNotice}
-            onRoomFilterChange={setRoomFilterLocation}
-            onOpenAddRoom={openAddRoom}
-            onOpenEditRoom={openEditRoom}
-            onAskDeleteRoom={setPendingDeleteRoomId}
-          />
-        )}
-        {effectiveRoute === 'perfiles' && (
-          <PerfilesPage
-            paginatedProfiles={paginatedProfiles}
-            profilesPage={profilesPage}
-            totalProfilePages={totalProfilePages}
-            searchQuery={profilesQuery}
-            onSearchQueryChange={(value) => {
-              setProfilesPage(1)
-              setProfilesQuery(value)
-            }}
-            onToggleProfileStatus={toggleProfileStatus}
-            onPrevPage={() => setProfilesPage((current) => Math.max(1, current - 1))}
-            onNextPage={() => setProfilesPage((current) => Math.min(totalProfilePages, current + 1))}
-          />
-        )}
-        {effectiveRoute === 'admin-reservas' && (
-          <AdminReservasPage
-            bookings={adminBookingsPage}
-            users={[]}
-            adminStatusFilter={adminStatusFilter}
-            adminDateFilter={adminDateFilter}
-            adminPage={adminPage}
-            totalAdminPages={totalAdminPages}
-            config={config}
-            configDraft={configDraft}
-            configNotice={configNotice}
-            campusSchedules={campusSchedules}
-            onStatusFilterChange={(value) => {
-              setAdminStatusFilter(value)
-              setAdminPage(1)
-            }}
-            onDateFilterChange={(value) => {
-              setAdminDateFilter(value)
-              setAdminPage(1)
-            }}
-            onPrevPage={() => setAdminPage((current) => current - 1)}
-            onNextPage={() => setAdminPage((current) => current + 1)}
-            onEditBooking={openEditBooking}
-            onCancelBooking={(bookingId) => cancelBooking(bookingId, 'admin')}
-            onConfigDraftChange={setConfigDraft}
-            onSaveConfig={saveAdminConfig}
-            onCampusScheduleChange={(nextCampus) =>
-              setCampusSchedules((current) =>
-                current.map((item) => (item.campus === nextCampus.campus ? nextCampus : item)),
-              )
-            }
-            onSaveCampusSchedule={saveCampusSchedule}
-          />
-        )}
-      </div>
+          <div className={`${contentOffsetClass} ${mobileNavPaddingClass} min-h-screen`}>
+            {effectiveRoute === 'login' && (
+              <LoginPage
+                loginEmail={loginEmail}
+                loginPassword={loginPassword}
+                rememberMe={rememberMe}
+                loginError={loginError}
+                onLoginEmailChange={setLoginEmail}
+                onLoginPasswordChange={setLoginPassword}
+                onRememberMeChange={setRememberMe}
+                onOpenForgotModal={() => {
+                  setForgotEmail(loginEmail)
+                  setShowForgotModal(true)
+                  setResetError('')
+                }}
+                onSubmitLogin={handleLoginSubmit}
+              />
+            )}
+            {effectiveRoute === 'reset-password' && (
+              <ResetPasswordPage
+                resetPassword={resetPassword}
+                resetPasswordConfirm={resetPasswordConfirm}
+                resetError={resetError}
+                showResetSuccess={showResetSuccess}
+                onResetPasswordChange={setResetPassword}
+                onResetPasswordConfirmChange={setResetPasswordConfirm}
+                onSubmitResetPassword={handleResetPasswordSubmit}
+                onBackToLogin={() => navigateToRoute('login')}
+              />
+            )}
+            {effectiveRoute === 'reservas' && (
+              <ReservasPage
+                reservationForm={reservationForm}
+                reservationError={reservationError}
+                campusOptions={campusOptions}
+                locationOptionsByCampus={locationOptionsByCampus}
+                activeRooms={activeRooms}
+                selectedRoomCapacity={selectedReservationRoom?.capacity ?? null}
+                roomBookings={roomBookingsForSelectedRoom}
+                weekOffset={reservationWeekOffset}
+                onReservationChange={handleReservationChange}
+                onAddCompanion={handleAddReservationCompanion}
+                currentUser={authenticatedUser}
+                companions={reservationCompanions}
+                companionCodeInput={reservationCompanionCodeInput}
+                onCompanionCodeInputChange={setReservationCompanionCodeInput}
+                onRemoveCompanion={handleRemoveReservationCompanion}
+                onWeekOffsetChange={setReservationWeekOffset}
+                onClearReservationForm={() => {
+                  setReservationForm(getDefaultReservationForm(activeRooms))
+                  setReservationCompanions([])
+                  setReservationCompanionCodeInput('')
+                }}
+                onSubmitReservation={handleCreateReservation}
+              />
+            )}
+            {effectiveRoute === 'misreservas' && (
+              <MisReservasPage
+                myBookings={myBookings}
+                activeRooms={activeRooms}
+                onEditBooking={openEditBooking}
+                onCancelBooking={(bookingId) => cancelBooking(bookingId, 'student')}
+                onCreateFirstReservation={() => navigateToRoute('reservas')}
+              />
+            )}
+            {effectiveRoute === 'salas' && (
+              <SalasPage
+                filteredRooms={filteredRooms}
+                campusOptions={campusOptions}
+                locationOptions={locationOptions}
+                roomFilterLocation={roomFilterLocation}
+                roomNotice={roomNotice}
+                onRoomFilterChange={setRoomFilterLocation}
+                onOpenAddRoom={openAddRoom}
+                onOpenEditRoom={openEditRoom}
+                onAskDeleteRoom={setPendingDeleteRoomId}
+              />
+            )}
+            {effectiveRoute === 'perfiles' && (
+              <PerfilesPage
+                paginatedProfiles={paginatedProfiles}
+                profilesPage={profilesPage}
+                totalProfilePages={totalProfilePages}
+                searchQuery={profilesQuery}
+                yearFilter={profilesYearFilter}
+                statusFilter={profilesStatusFilter}
+                sortBy={profilesSortBy}
+                sortDir={profilesSortDir}
+                onSearchQueryChange={(value) => {
+                  setProfilesPage(1)
+                  setProfilesQuery(value)
+                }}
+                onYearFilterChange={(value) => {
+                  setProfilesPage(1)
+                  setProfilesYearFilter(value.replace(/\D/g, '').slice(0, 4))
+                }}
+                onStatusFilterChange={(value) => {
+                  setProfilesPage(1)
+                  setProfilesStatusFilter(value)
+                }}
+                onSortChange={(value) => {
+                  setProfilesPage(1)
+                  setProfilesSortBy(value)
+                }}
+                onSortDirectionToggle={() => {
+                  setProfilesPage(1)
+                  setProfilesSortDir((current) => (current === 'asc' ? 'desc' : 'asc'))
+                }}
+                onToggleProfileStatus={toggleProfileStatus}
+                onPrevPage={() => setProfilesPage((current) => Math.max(1, current - 1))}
+                onNextPage={() => setProfilesPage((current) => Math.min(totalProfilePages, current + 1))}
+              />
+            )}
+            {effectiveRoute === 'admin-reservas' && (
+              <AdminReservasPage
+                bookings={adminBookingsPage}
+                users={[]}
+                adminStatusFilter={adminStatusFilter}
+                adminDateFilter={adminDateFilter}
+                adminPage={adminPage}
+                totalAdminPages={totalAdminPages}
+                config={config}
+                configDraft={configDraft}
+                configNotice={configNotice}
+                campusSchedules={campusSchedules}
+                onStatusFilterChange={(value) => {
+                  setAdminStatusFilter(value)
+                  setAdminPage(1)
+                }}
+                onDateFilterChange={(value) => {
+                  setAdminDateFilter(value)
+                  setAdminPage(1)
+                }}
+                onPrevPage={() => setAdminPage((current) => current - 1)}
+                onNextPage={() => setAdminPage((current) => current + 1)}
+                onEditBooking={openEditBooking}
+                onCancelBooking={(bookingId) => cancelBooking(bookingId, 'admin')}
+                onConfigDraftChange={setConfigDraft}
+                onSaveConfig={saveAdminConfig}
+                onCampusScheduleChange={(nextCampus) =>
+                  setCampusSchedules((current) =>
+                    current.map((item) => (item.campus === nextCampus.campus ? nextCampus : item)),
+                  )
+                }
+                onSaveCampusSchedule={saveCampusSchedule}
+              />
+            )}
+          </div>
+        </>
+      )}
 
       {showBookingSuccess && (
         <BookingSuccessModal
@@ -1579,7 +1653,6 @@ export function MainPage() {
           onCancel={() => {
             setShowTwoFactorModal(false)
             setTwoFactorCode('')
-            setProvisionalToken('')
             setTwoFactorError('')
             setTwoFactorAction('none')
           }}

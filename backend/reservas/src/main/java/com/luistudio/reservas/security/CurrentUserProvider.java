@@ -24,6 +24,13 @@ public class CurrentUserProvider {
         }
     }
 
+    public void requireProvisionalToken() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !Boolean.TRUE.equals(authentication.getDetails())) {
+            throw new BusinessException(HttpStatus.FORBIDDEN, "Se requiere un token provisional valido");
+        }
+    }
+
     public boolean isAdmin(AuthPrincipal principal) {
         return "ADMIN".equalsIgnoreCase(principal.role());
     }

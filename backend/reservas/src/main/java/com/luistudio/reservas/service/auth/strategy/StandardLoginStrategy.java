@@ -26,7 +26,7 @@ public class StandardLoginStrategy implements LoginStrategy {
 
     @Override
     public LoginResponse buildResponse(UserEntity user) {
-        String token = jwtService.generateToken(user.getId(), user.getCorreo(), user.getRol().getNombre());
+        String token = jwtService.generateToken(user.getId(), user.getRol().getNombre());
         return new LoginResponse(token, null, false, dtoMapper.toAuthUser(user), "Login correcto");
     }
 }

@@ -21,10 +21,17 @@ public interface UserRepository extends JpaRepository<UserEntity, Long> {
         SELECT u FROM UserEntity u
         WHERE (:query IS NULL OR :query = ''
           OR LOWER(u.codigo) LIKE LOWER(CONCAT('%', :query, '%'))
-          OR LOWER(u.correo) LIKE LOWER(CONCAT('%', :query, '%')))
-        ORDER BY
-          CASE WHEN LOWER(u.codigo) = LOWER(:query) OR LOWER(u.correo) = LOWER(:query) THEN 0 ELSE 1 END,
-          u.id ASC
+          OR LOWER(u.correo) LIKE LOWER(CONCAT('%', :query, '%'))
+          OR LOWER(u.nombres) LIKE LOWER(CONCAT('%', :query, '%'))
+          OR LOWER(u.apellidos) LIKE LOWER(CONCAT('%', :query, '%'))
+          OR LOWER(CONCAT(u.nombres, ' ', u.apellidos)) LIKE LOWER(CONCAT('%', :query, '%')))
+          AND (:year IS NULL OR :year = '' OR u.codigo LIKE CONCAT(:year, '%'))
+          AND (:status IS NULL OR u.estado = :status)
     """)
-    Page<UserEntity> searchUsers(@Param("query") String query, Pageable pageable);
+    Page<UserEntity> searchUsers(
+        @Param("query") String query,
+        @Param("year") String year,
+        @Param("status") UserStatus status,
+        Pageable pageable
+    );
 }
