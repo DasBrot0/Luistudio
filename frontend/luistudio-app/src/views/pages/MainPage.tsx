@@ -1613,8 +1613,8 @@ export function MainPage() {
         slotMinutes: campus.slotMinutes,
         days: campus.days.map((day) => ({
           dayOfWeek: day.dayOfWeek,
-          openTime: day.openTime,
-          closeTime: day.closeTime,
+          openTime: day.closed ? null : day.openTime,
+          closeTime: day.closed ? null : day.closeTime,
           closed: day.closed,
         })),
       })

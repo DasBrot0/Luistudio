@@ -102,6 +102,7 @@ Memoria (500 MB):
 - `PUT /api/admin/config`
 - `GET /api/admin/campus-schedules`
 - `PUT /api/admin/campus-schedules`
+  - En dias cerrados (`closed=true`), `openTime` y `closeTime` pueden enviarse como `null`.
 - `GET /api/campus/map`
 
 ### Preferencias
