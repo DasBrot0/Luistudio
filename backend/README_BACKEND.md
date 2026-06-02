@@ -124,12 +124,14 @@ Memoria (500 MB):
 - Se implementa 2FA por código temporal.
 - Los tokens de sesion y tokens provisionales viajan cifrados y se entregan en cookie `HttpOnly`.
 - Los tokens de recuperacion y codigos 2FA se almacenan hasheados; no se persisten en texto plano.
+- Las entidades de recuperacion y 2FA mapean el estado usado/no usado a la columna SQL `used`.
 - Para bases existentes, aplicar `database/006_harden_auth_secrets.sql` antes de desplegar este refuerzo.
 - `email_outbox` se procesa por scheduler (reintentos automaticos).
 - En local, sin `RESEND_API_KEY`, el envio de correos cae en modo log (no SMTP).
 - Para despliegue en Render, usar `EMAIL_PROVIDER=resend` + `RESEND_API_KEY` (salida por HTTPS/443).
 - Se generan enlaces Google Calendar y descarga `.ics` por reserva.
 - El esquema SQL base (`database/001_init.sql` y `database/002_seed_release01.sql`) define tablas y columnas para instalaciones desde cero.
+- Los tests de backend incluyen un contrato que compara entidades JPA contra `database/001_init.sql` para detectar tablas/columnas desalineadas antes de desplegar.
 - Para bases existentes, aplicar los scripts incrementales disponibles en `/database` antes de levantar el backend.
 - Las salas almacenan data de catalogo en espanol (`code`, `name`, `campus`, `venue`, `location`).
 - Se agregan horarios por campus (`campus_schedules`) y override por sala (`room_schedules`) para validar reservas por dia/hora.

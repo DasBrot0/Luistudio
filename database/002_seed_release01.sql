@@ -155,6 +155,8 @@ JOIN roles r ON r.id = u.role_id
 ON CONFLICT (user_id) DO NOTHING;
 
 -- Seed bookings for base student user (idempotente por note)
+-- Las fechas se calculan evitando domingos y los horarios respetan los bloques
+-- configurados por campus: Monterrico usa slots de 60 minutos.
 -- 1) Limpia duplicados historicos de seed, conservando el mas reciente por note.
 WITH seed_user AS (
   SELECT id
@@ -184,9 +186,14 @@ WHERE b.user_id = u.id
 -- 2) Reubica/actualiza seeds existentes segun fecha relativa actual.
 UPDATE bookings b
 SET room_id = r.id,
-    booking_date = CURRENT_DATE + 1,
-    start_time = TIME '16:30',
-    end_time = TIME '17:30',
+    booking_date = CURRENT_DATE + CASE EXTRACT(ISODOW FROM CURRENT_DATE)::INTEGER
+      WHEN 5 THEN 3
+      WHEN 6 THEN 2
+      WHEN 7 THEN 1
+      ELSE 1
+    END,
+    start_time = TIME '16:00',
+    end_time = TIME '17:00',
     status = 'ACTIVA',
     people_count = 2
 FROM users u
@@ -197,7 +204,13 @@ WHERE b.user_id = u.id
 
 UPDATE bookings b
 SET room_id = r.id,
-    booking_date = CURRENT_DATE + 2,
+    booking_date = CURRENT_DATE + CASE EXTRACT(ISODOW FROM CURRENT_DATE)::INTEGER
+      WHEN 4 THEN 4
+      WHEN 5 THEN 4
+      WHEN 6 THEN 3
+      WHEN 7 THEN 2
+      ELSE 2
+    END,
     start_time = TIME '10:00',
     end_time = TIME '11:00',
     status = 'ACTIVA',
@@ -210,7 +223,11 @@ WHERE b.user_id = u.id
 
 UPDATE bookings b
 SET room_id = r.id,
-    booking_date = CURRENT_DATE - 1,
+    booking_date = CURRENT_DATE - CASE EXTRACT(ISODOW FROM CURRENT_DATE)::INTEGER
+      WHEN 1 THEN 3
+      WHEN 7 THEN 2
+      ELSE 1
+    END,
     start_time = TIME '12:00',
     end_time = TIME '13:00',
     status = 'CANCELADA',
@@ -223,7 +240,20 @@ WHERE b.user_id = u.id
 
 -- 3) Inserta seed faltante (si no existe por note).
 INSERT INTO bookings (user_id, room_id, booking_date, start_time, end_time, status, people_count, note)
-SELECT u.id, r.id, CURRENT_DATE + 1, TIME '16:30', TIME '17:30', 'ACTIVA', 2, 'Seed R01: bookings activa'
+SELECT
+  u.id,
+  r.id,
+  CURRENT_DATE + CASE EXTRACT(ISODOW FROM CURRENT_DATE)::INTEGER
+    WHEN 5 THEN 3
+    WHEN 6 THEN 2
+    WHEN 7 THEN 1
+    ELSE 1
+  END,
+  TIME '16:00',
+  TIME '17:00',
+  'ACTIVA',
+  2,
+  'Seed R01: bookings activa'
 FROM users u
 JOIN rooms r ON r.code = 'MON-CBU-CUBICULOS'
 WHERE LOWER(u.email) = LOWER('20224692@aloe.ulima.edu.pe')
@@ -234,7 +264,21 @@ WHERE LOWER(u.email) = LOWER('20224692@aloe.ulima.edu.pe')
   );
 
 INSERT INTO bookings (user_id, room_id, booking_date, start_time, end_time, status, people_count, note)
-SELECT u.id, r.id, CURRENT_DATE + 2, TIME '10:00', TIME '11:00', 'ACTIVA', 1, 'Seed R01: bookings activa 2'
+SELECT
+  u.id,
+  r.id,
+  CURRENT_DATE + CASE EXTRACT(ISODOW FROM CURRENT_DATE)::INTEGER
+    WHEN 4 THEN 4
+    WHEN 5 THEN 4
+    WHEN 6 THEN 3
+    WHEN 7 THEN 2
+    ELSE 2
+  END,
+  TIME '10:00',
+  TIME '11:00',
+  'ACTIVA',
+  1,
+  'Seed R01: bookings activa 2'
 FROM users u
 JOIN rooms r ON r.code = 'MON-CBU-SAL-VISION'
 WHERE LOWER(u.email) = LOWER('20224692@aloe.ulima.edu.pe')
@@ -245,7 +289,19 @@ WHERE LOWER(u.email) = LOWER('20224692@aloe.ulima.edu.pe')
   );
 
 INSERT INTO bookings (user_id, room_id, booking_date, start_time, end_time, status, people_count, note)
-SELECT u.id, r.id, CURRENT_DATE - 1, TIME '12:00', TIME '13:00', 'CANCELADA', 2, 'Seed R01: historica cancelada'
+SELECT
+  u.id,
+  r.id,
+  CURRENT_DATE - CASE EXTRACT(ISODOW FROM CURRENT_DATE)::INTEGER
+    WHEN 1 THEN 3
+    WHEN 7 THEN 2
+    ELSE 1
+  END,
+  TIME '12:00',
+  TIME '13:00',
+  'CANCELADA',
+  2,
+  'Seed R01: historica cancelada'
 FROM users u
 JOIN rooms r ON r.code = 'MAY-CDM-BAS-COMP'
 WHERE LOWER(u.email) = LOWER('20224692@aloe.ulima.edu.pe')

@@ -33,7 +33,7 @@ public class PasswordResetEntity {
     @Column(name = "expires_at", nullable = false)
     private OffsetDateTime expiraEn;
 
-    @Column(nullable = false)
+    @Column(name = "used", nullable = false)
     private Boolean usado = false;
 
     @Column(name = "created_at", nullable = false)

@@ -33,6 +33,6 @@ public class TwoFactorCodeEntity {
     @Column(name = "expires_at", nullable = false)
     private OffsetDateTime expiraAt;
 
-    @Column(nullable = false)
+    @Column(name = "used", nullable = false)
     private Boolean usado = false;
 }
