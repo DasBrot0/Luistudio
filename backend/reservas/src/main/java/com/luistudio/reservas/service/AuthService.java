@@ -118,8 +118,10 @@ public class AuthService {
         }
 
         registerAttempt(user, true, ipAddress);
-        user.setLockedUntil(null);
-        userRepository.save(user);
+        if (user.getLockedUntil() != null) {
+            user.setLockedUntil(null);
+            userRepository.save(user);
+        }
 
         return resolveLoginStrategy(user).buildResponse(user);
     }
@@ -280,7 +282,7 @@ public class AuthService {
 
     private void registerAttempt(UserEntity user, boolean success, String ipAddress) {
         LoginAttemptEntity attempt = securityEntityFactory.newLoginAttempt(user, success, ipAddress);
-        loginAttemptRepository.saveAndFlush(attempt);
+        loginAttemptRepository.save(attempt);
     }
 
     private LoginStrategy resolveLoginStrategy(UserEntity user) {

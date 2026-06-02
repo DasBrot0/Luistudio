@@ -120,6 +120,8 @@ Memoria (500 MB):
 ## Notas de implementacion
 
 - Se implementa bloqueo temporal tras intentos fallidos de login.
+- El login usa busqueda por correo con indice funcional `LOWER(email)` y evita escrituras/flushes innecesarios en el flujo exitoso.
+- Para bases existentes, aplicar `database/004_optimize_auth_indexes.sql` para crear los indices de autenticacion.
 - El listado administrativo de usuarios expone si una cuenta sigue bloqueada temporalmente y permite desbloquearla al volver a `HABILITADO`.
 - Se implementa 2FA por código temporal.
 - Los tokens de sesion y tokens provisionales viajan cifrados y se entregan en cookie `HttpOnly`.

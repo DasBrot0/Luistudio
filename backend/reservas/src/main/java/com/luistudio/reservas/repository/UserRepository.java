@@ -5,12 +5,18 @@ import com.luistudio.reservas.model.UserStatus;
 import java.util.Optional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface UserRepository extends JpaRepository<UserEntity, Long> {
-    Optional<UserEntity> findByCorreoIgnoreCase(String correo);
+    @EntityGraph(attributePaths = "rol")
+    @Query("""
+        SELECT u FROM UserEntity u
+        WHERE LOWER(u.correo) = LOWER(:correo)
+    """)
+    Optional<UserEntity> findByCorreoIgnoreCase(@Param("correo") String correo);
 
     Optional<UserEntity> findByCodigo(String codigo);
     Optional<UserEntity> findByCodigoIgnoreCase(String codigo);
