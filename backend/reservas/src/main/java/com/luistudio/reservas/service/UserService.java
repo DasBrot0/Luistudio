@@ -100,7 +100,7 @@ public class UserService {
         try {
             return UserStatus.valueOf(status.trim().toUpperCase());
         } catch (IllegalArgumentException ex) {
-            throw new BusinessException(HttpStatus.BAD_REQUEST, "Estado invalido");
+            throw new BusinessException(HttpStatus.BAD_REQUEST, "Estado inválido");
         }
     }
 
@@ -123,7 +123,7 @@ public class UserService {
         try {
             status = UserStatus.valueOf(request.status().toUpperCase());
         } catch (IllegalArgumentException ex) {
-            throw new BusinessException(HttpStatus.BAD_REQUEST, "Estado invalido");
+            throw new BusinessException(HttpStatus.BAD_REQUEST, "Estado inválido");
         }
 
         if (userId.equals(actorUserId) && status == UserStatus.DESHABILITADO) {
@@ -131,7 +131,7 @@ public class UserService {
         }
         if (status == UserStatus.DESHABILITADO && isAdmin(user)
             && userRepository.countByEstadoAndRoleName(UserStatus.HABILITADO, "ADMIN") <= 1) {
-            throw new BusinessException(HttpStatus.BAD_REQUEST, "No se puede deshabilitar al ultimo administrador habilitado.");
+            throw new BusinessException(HttpStatus.BAD_REQUEST, "No se puede deshabilitar al último administrador habilitado.");
         }
 
         user.setEstado(status);

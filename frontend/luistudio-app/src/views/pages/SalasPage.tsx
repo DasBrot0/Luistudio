@@ -101,8 +101,8 @@ export function SalasPage({
                 onChange: onRoomFilterLocationChange,
                 disabled: roomFilterCampus === 'Todos',
                 options: [
-                  { value: 'Todas', label: 'Ubicacion: Todas' },
-                  ...locationOptions.map((location) => ({ value: location, label: `Ubicacion: ${location}` })),
+                  { value: 'Todas', label: 'Ubicación: Todas' },
+                  ...locationOptions.map((location) => ({ value: location, label: `Ubicación: ${location}` })),
                 ],
               },
             ]}
@@ -114,8 +114,8 @@ export function SalasPage({
                 options: [
                   { value: 'name:asc', label: 'Nombre A-Z' },
                   { value: 'name:desc', label: 'Nombre Z-A' },
-                  { value: 'code:asc', label: 'Codigo ↑' },
-                  { value: 'code:desc', label: 'Codigo ↓' },
+                  { value: 'code:asc', label: 'Código ↑' },
+                  { value: 'code:desc', label: 'Código ↓' },
                 ],
               },
             ]}

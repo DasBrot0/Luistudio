@@ -76,6 +76,9 @@ const LOCAL_STORAGE_LANDING_KEY = 'luistudio_login_landing_route'
 const LOCAL_STORAGE_SESSION_HINT_KEY = 'luistudio_session_hint'
 const SESSION_STORAGE_SESSION_HINT_KEY = 'luistudio_session_hint'
 const SESSION_STORAGE_NOTIFICATIONS_KEY = 'luistudio_notifications'
+const TOAST_DISMISS_MS = 3500
+const MODAL_MESSAGE_DISMISS_MS = 4500
+const INLINE_MESSAGE_DISMISS_MS = 5000
 
 const clampFontScale = (value: number) => Math.min(1.3, Math.max(0.85, Number.isFinite(value) ? value : 1))
 
@@ -358,7 +361,7 @@ const landingViewCodeToRoute = (role: Role, code: LoginLandingViewCode): RouteKe
 
 const notificationPreferenceOptions = (role: Role): NotificationPreferenceOption[] => {
   const studentOptions: NotificationPreferenceOption[] = [
-    { key: 'BOOKING_CONFIRMATION', group: 'Reservas', label: 'Confirmacion de reserva', app: true, email: true },
+    { key: 'BOOKING_CONFIRMATION', group: 'Reservas', label: 'Confirmación de reserva', app: true, email: true },
     { key: 'BOOKING_UPDATE', group: 'Reservas', label: 'Modificacion de reserva', app: true, email: true },
     { key: 'BOOKING_CANCELLATION', group: 'Reservas', label: 'Cancelacion de reserva', app: true, email: true },
     { key: 'BOOKING_REMINDER', group: 'Reservas', label: 'Recordatorio de reserva', app: true, email: true },
@@ -421,11 +424,11 @@ const getInitialNotifications = (): NotificationItem[] => {
 function AuthRestoreScreen() {
   return (
     <main className="page auth-page auth-loading-page" aria-busy="true" aria-live="polite">
-      <section className="auth-card auth-loading-card" aria-label="Restaurando sesion">
+      <section className="auth-card auth-loading-card" aria-label="Restaurando sesión">
         <div className="auth-loading-spinner" aria-hidden="true" />
-        <p className="auth-loading-eyebrow">Sesion en curso</p>
-        <h1>Restaurando sesion</h1>
-        <p>Estamos validando tu sesion para devolverte a la vista en la que estabas.</p>
+        <p className="auth-loading-eyebrow">Sesión en curso</p>
+        <h1>Restaurando sesión</h1>
+        <p>Estamos validando tu sesión para devolverte a la vista en la que estabas.</p>
       </section>
     </main>
   )
@@ -955,9 +958,63 @@ export function MainPage() {
 
   useEffect(() => {
     if (!toastMessage) return
-    const timeout = window.setTimeout(() => setToastMessage(''), 3500)
+    const timeout = window.setTimeout(() => setToastMessage(''), TOAST_DISMISS_MS)
     return () => window.clearTimeout(timeout)
   }, [toastMessage])
+
+  useEffect(() => {
+    if (!modalMessage) return
+    const timeout = window.setTimeout(() => setModalMessage(null), MODAL_MESSAGE_DISMISS_MS)
+    return () => window.clearTimeout(timeout)
+  }, [modalMessage])
+
+  useEffect(() => {
+    if (!loginError) return
+    const timeout = window.setTimeout(() => setLoginError(''), INLINE_MESSAGE_DISMISS_MS)
+    return () => window.clearTimeout(timeout)
+  }, [loginError])
+
+  useEffect(() => {
+    if (!twoFactorError) return
+    const timeout = window.setTimeout(() => setTwoFactorError(''), INLINE_MESSAGE_DISMISS_MS)
+    return () => window.clearTimeout(timeout)
+  }, [twoFactorError])
+
+  useEffect(() => {
+    if (!resetError) return
+    const timeout = window.setTimeout(() => setResetError(''), INLINE_MESSAGE_DISMISS_MS)
+    return () => window.clearTimeout(timeout)
+  }, [resetError])
+
+  useEffect(() => {
+    if (!reservationError) return
+    const timeout = window.setTimeout(() => setReservationError(''), INLINE_MESSAGE_DISMISS_MS)
+    return () => window.clearTimeout(timeout)
+  }, [reservationError])
+
+  useEffect(() => {
+    if (!roomNotice) return
+    const timeout = window.setTimeout(() => setRoomNotice(''), INLINE_MESSAGE_DISMISS_MS)
+    return () => window.clearTimeout(timeout)
+  }, [roomNotice])
+
+  useEffect(() => {
+    if (!configNotice) return
+    const timeout = window.setTimeout(() => setConfigNotice(''), INLINE_MESSAGE_DISMISS_MS)
+    return () => window.clearTimeout(timeout)
+  }, [configNotice])
+
+  useEffect(() => {
+    if (!showBookingSuccess) return
+    const timeout = window.setTimeout(() => setShowBookingSuccess(false), MODAL_MESSAGE_DISMISS_MS)
+    return () => window.clearTimeout(timeout)
+  }, [showBookingSuccess])
+
+  useEffect(() => {
+    if (!roomSuccessId) return
+    const timeout = window.setTimeout(() => setRoomSuccessId(''), MODAL_MESSAGE_DISMISS_MS)
+    return () => window.clearTimeout(timeout)
+  }, [roomSuccessId])
 
   useEffect(() => {
     sessionStorage.setItem(SESSION_STORAGE_NOTIFICATIONS_KEY, JSON.stringify(notifications))

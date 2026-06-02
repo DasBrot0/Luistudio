@@ -14,9 +14,9 @@ import com.luistudio.reservas.service.booking.rule.BookingRuleContext;
 import com.luistudio.reservas.service.booking.rule.BookingValidationRule;
 import com.luistudio.reservas.service.email.EmailTemplateService;
 import com.luistudio.reservas.service.factory.ReservationFactory;
+import com.luistudio.reservas.util.AppTime;
 import com.luistudio.reservas.util.CalendarUtils;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.util.List;
 import org.springframework.data.domain.Page;
@@ -135,8 +135,7 @@ public class BookingService {
         if (booking.getEstado() == ReservationStatus.CANCELADA) {
             return dtoMapper.toBooking(booking);
         }
-        LocalDateTime bookingEnd = booking.getFecha().atTime(booking.getHoraFin());
-        if (!bookingEnd.isAfter(LocalDateTime.now())) {
+        if (!booking.getFecha().atTime(booking.getHoraFin()).isAfter(AppTime.nowDateTime())) {
             throw new BusinessException(HttpStatus.BAD_REQUEST, "No se puede cancelar una reserva que ya finalizo");
         }
 
@@ -167,10 +166,10 @@ public class BookingService {
     @Transactional(readOnly = true)
     public List<BookingResponse> listRoomBookings(Long roomId, LocalDate fromDate, LocalDate toDate) {
         RoomEntity room = roomService.getRoomEntity(roomId);
-        LocalDate start = fromDate == null ? LocalDate.now() : fromDate;
+        LocalDate start = fromDate == null ? AppTime.today() : fromDate;
         LocalDate end = toDate == null ? start : toDate;
         if (end.isBefore(start)) {
-            throw new BusinessException(HttpStatus.BAD_REQUEST, "Rango de fechas invalido para listar reservas");
+            throw new BusinessException(HttpStatus.BAD_REQUEST, "Rango de fechas inválido para listar reservas");
         }
 
         return reservationRepository.findActiveByRoomAndDateRange(room, start, end)

@@ -2,6 +2,7 @@ package com.luistudio.reservas.service.booking.rule;
 
 import com.luistudio.reservas.exception.BusinessException;
 import com.luistudio.reservas.service.RoomScheduleService;
+import com.luistudio.reservas.util.AppTime;
 import java.time.DayOfWeek;
 import java.time.Duration;
 import java.time.LocalDate;
@@ -23,7 +24,7 @@ public class BookingWindowAndSlotRule implements BookingValidationRule {
 
     @Override
     public void validate(BookingRuleContext context) {
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = AppTime.nowDateTime();
         LocalDate today = now.toLocalDate();
         LocalDate requestDate = context.request().date();
 
@@ -65,7 +66,7 @@ public class BookingWindowAndSlotRule implements BookingValidationRule {
         LocalTime start = context.request().start();
         LocalTime end = context.request().end();
         if (start.isBefore(schedule.openTime()) || end.isAfter(schedule.closeTime())) {
-            throw new BusinessException(HttpStatus.BAD_REQUEST, "El horario no esta dentro del rango disponible de la sala");
+            throw new BusinessException(HttpStatus.BAD_REQUEST, "El horario no está dentro del rango disponible de la sala");
         }
 
         long fromOpenToStart = Duration.between(schedule.openTime(), start).toMinutes();
@@ -73,7 +74,7 @@ public class BookingWindowAndSlotRule implements BookingValidationRule {
         if (fromOpenToStart < 0 || fromOpenToEnd < 0 || fromOpenToStart % slotMinutes != 0 || fromOpenToEnd % slotMinutes != 0) {
             throw new BusinessException(
                 HttpStatus.BAD_REQUEST,
-                "El horario debe alinearse con bloques de " + slotMinutes + " minutos desde la apertura del dia"
+                "El horario debe alinearse con bloques de " + slotMinutes + " minutos desde la apertura del día"
             );
         }
     }

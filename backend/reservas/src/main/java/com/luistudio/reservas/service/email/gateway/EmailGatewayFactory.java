@@ -51,7 +51,7 @@ public class EmailGatewayFactory {
         }
 
         if ("resend".equalsIgnoreCase(emailProvider) && !StringUtils.hasText(resendApiKey)) {
-            log.warn("[OUTBOX] EMAIL_PROVIDER=resend pero RESEND_API_KEY no esta configurada. Usando fallback a log.");
+            log.warn("[OUTBOX] EMAIL_PROVIDER=resend pero RESEND_API_KEY no está configurada. Usando fallback a log.");
         }
 
         if ("gmail".equalsIgnoreCase(emailProvider)

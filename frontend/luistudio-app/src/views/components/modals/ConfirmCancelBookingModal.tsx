@@ -21,8 +21,8 @@ export function ConfirmCancelBookingModal({
 }: ConfirmCancelBookingModalProps) {
   const notice =
     actor === 'admin'
-      ? 'Se enviara una notificacion automatica al estudiante.'
-      : 'La cancelacion se registrara de inmediato.'
+      ? 'Se enviará una notificación automática al estudiante.'
+      : 'La cancelación se registrará de inmediato.'
 
   return (
     <section className="modal-layer" role="dialog" aria-modal="true" aria-labelledby="cancel-booking-title">
@@ -36,7 +36,7 @@ export function ConfirmCancelBookingModal({
               <dd>{roomLabel}</dd>
             </div>
             <div>
-              <dt>Ubicacion</dt>
+              <dt>Ubicación</dt>
               <dd>{location}</dd>
             </div>
             <div>

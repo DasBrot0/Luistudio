@@ -35,7 +35,7 @@ public class EmailTemplateService {
         details.add(new Detail("Sala", room.getNombre()));
         details.add(new Detail("Campus", room.getCampus()));
         details.add(new Detail("Recinto", room.getVenue()));
-        details.add(new Detail("Ubicacion", room.getUbicacion()));
+        details.add(new Detail("Ubicación", room.getUbicacion()));
         details.add(new Detail("Fecha", String.valueOf(booking.getFecha())));
         details.add(new Detail("Horario", booking.getHoraInicio() + " - " + booking.getHoraFin()));
         details.add(new Detail("Personas", String.valueOf(booking.getCantidadPersonas())));
@@ -53,7 +53,7 @@ public class EmailTemplateService {
             new Detail("Sala", room.getNombre()),
             new Detail("Campus", room.getCampus()),
             new Detail("Recinto", room.getVenue()),
-            new Detail("Ubicacion", room.getUbicacion()),
+            new Detail("Ubicación", room.getUbicacion()),
             new Detail("Fecha", String.valueOf(booking.getFecha())),
             new Detail("Horario", booking.getHoraInicio() + " - " + booking.getHoraFin())
         );
@@ -68,9 +68,9 @@ public class EmailTemplateService {
         String code,
         String ctaUrl
     ) {
-        String safeSubject = escapeHtml(subject == null || subject.isBlank() ? "Notificacion Luistudio" : subject);
+        String safeSubject = escapeHtml(subject == null || subject.isBlank() ? "Notificación Luistudio" : subject);
         String safeSummary = escapeHtml(summary == null || summary.isBlank()
-            ? "Tienes una nueva notificacion en Luistudio."
+            ? "Tienes una nueva notificación en Luistudio."
             : summary);
 
         StringBuilder detailsHtml = new StringBuilder();
@@ -106,7 +106,7 @@ public class EmailTemplateService {
         String codeHtml = "";
         if (code != null && !code.isBlank()) {
             codeHtml = "<div style=\"margin-top:14px;padding:12px;border:1px dashed #93c5fd;border-radius:10px;background:#eff6ff;text-align:center;\">"
-                + "<div style=\"font-size:12px;color:#1e3a8a;margin-bottom:4px;\">Codigo de verificacion</div>"
+                + "<div style=\"font-size:12px;color:#1e3a8a;margin-bottom:4px;\">Código de verificación</div>"
                 + "<div style=\"font-size:28px;letter-spacing:4px;color:#1d4ed8;font-weight:800;\">"
                 + escapeHtml(code)
                 + "</div></div>";
@@ -128,7 +128,7 @@ public class EmailTemplateService {
             + "<table role=\"presentation\" width=\"100%\" cellspacing=\"0\" cellpadding=\"0\" style=\"max-width:620px;background:#ffffff;border-radius:16px;overflow:hidden;border:1px solid #dbe6f3;\">"
             + "<tr><td style=\"background:linear-gradient(120deg,#1e3a8a,#2563eb);padding:22px 24px;color:#ffffff;\">"
             + "<h1 style=\"margin:0;font-size:24px;font-weight:800;\">Luistudio</h1>"
-            + "<p style=\"margin:6px 0 0;font-size:15px;opacity:.95;\">Actualizacion de tu cuenta y reservas</p>"
+            + "<p style=\"margin:6px 0 0;font-size:15px;opacity:.95;\">Actualización de tu cuenta y reservas</p>"
             + "</td></tr>"
             + "<tr><td style=\"padding:22px 24px;\">"
             + "<h2 style=\"margin:0 0 12px;color:#1e3a8a;font-size:20px;\">" + safeSubject + "</h2>"
@@ -139,7 +139,7 @@ public class EmailTemplateService {
             + codeHtml
             + actionHtml
             + "</div>"
-            + "<p style=\"margin:16px 0 0;color:#64748b;font-size:12px;\">Este correo fue generado automaticamente por Luistudio.</p>"
+            + "<p style=\"margin:16px 0 0;color:#64748b;font-size:12px;\">Este correo fue generado automáticamente por Luistudio.</p>"
             + "</td></tr></table></td></tr></table></body></html>";
     }
 

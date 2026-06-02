@@ -16,6 +16,7 @@ import com.luistudio.reservas.repository.ReservationRepository;
 import com.luistudio.reservas.repository.RoomRepository;
 import com.luistudio.reservas.service.factory.MaintenanceFactory;
 import com.luistudio.reservas.service.factory.RoomFactory;
+import com.luistudio.reservas.util.AppTime;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.OffsetDateTime;
@@ -27,7 +28,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class RoomService {
     private static final String ROOM_HAS_ACTIVE_RESERVATION_MESSAGE =
-        "En esta sala hay reserva activa asi que no se puede eliminar";
+        "En esta sala hay reserva activa, así que no se puede eliminar";
 
     private final RoomRepository roomRepository;
     private final PabellonRepository pabellonRepository;
@@ -160,8 +161,8 @@ public class RoomService {
             return false;
         }
 
-        OffsetDateTime from = date.atTime(start).atOffset(OffsetDateTime.now().getOffset());
-        OffsetDateTime to = date.atTime(end).atOffset(OffsetDateTime.now().getOffset());
+        OffsetDateTime from = date.atTime(start).atZone(AppTime.ZONE).toOffsetDateTime();
+        OffsetDateTime to = date.atTime(end).atZone(AppTime.ZONE).toOffsetDateTime();
 
         boolean overlapsBooking = reservationRepository.existsOverlapping(room, date, start, end, excludeBookingId);
         boolean overlapsMaintenance = !maintenanceRepository.findOverlapping(room, from, to).isEmpty();
@@ -219,7 +220,7 @@ public class RoomService {
     }
 
     private void ensureRoomCanBeInactivated(RoomEntity room) {
-        boolean hasFuture = reservationRepository.existsFutureActiveReservations(room, LocalDate.now(), LocalTime.now());
+        boolean hasFuture = reservationRepository.existsFutureActiveReservations(room, AppTime.today(), AppTime.nowTime());
         if (hasFuture) {
             throw new BusinessException(HttpStatus.BAD_REQUEST, ROOM_HAS_ACTIVE_RESERVATION_MESSAGE);
         }
@@ -228,19 +229,19 @@ public class RoomService {
     private void validatePeopleConstraints(int capacity, Integer minPeople, boolean minRequired, int maxPeople) {
         int normalizedMin = minPeople == null ? 1 : minPeople;
         if (normalizedMin <= 0) {
-            throw new BusinessException(HttpStatus.BAD_REQUEST, "El minimo de personas debe ser mayor que cero");
+            throw new BusinessException(HttpStatus.BAD_REQUEST, "El mínimo de personas debe ser mayor que cero");
         }
         if (maxPeople <= 0) {
-            throw new BusinessException(HttpStatus.BAD_REQUEST, "El maximo de personas debe ser mayor que cero");
+            throw new BusinessException(HttpStatus.BAD_REQUEST, "El máximo de personas debe ser mayor que cero");
         }
         if (maxPeople > capacity) {
-            throw new BusinessException(HttpStatus.BAD_REQUEST, "El maximo de personas no puede superar la capacidad de la sala");
+            throw new BusinessException(HttpStatus.BAD_REQUEST, "El máximo de personas no puede superar la capacidad de la sala");
         }
         if (normalizedMin > maxPeople) {
-            throw new BusinessException(HttpStatus.BAD_REQUEST, "El minimo de personas no puede superar el maximo");
+            throw new BusinessException(HttpStatus.BAD_REQUEST, "El mínimo de personas no puede superar el máximo");
         }
         if (minRequired && normalizedMin < 1) {
-            throw new BusinessException(HttpStatus.BAD_REQUEST, "El minimo obligatorio de personas es invalido");
+            throw new BusinessException(HttpStatus.BAD_REQUEST, "El mínimo obligatorio de personas es inválido");
         }
     }
 }

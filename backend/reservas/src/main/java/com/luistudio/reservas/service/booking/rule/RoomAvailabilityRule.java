@@ -26,7 +26,7 @@ public class RoomAvailabilityRule implements BookingValidationRule {
             context.excludeBookingId()
         );
         if (!available) {
-            throw new BusinessException(HttpStatus.BAD_REQUEST, "La sala no esta disponible para el horario seleccionado");
+            throw new BusinessException(HttpStatus.BAD_REQUEST, "La sala no está disponible para el horario seleccionado");
         }
     }
 }

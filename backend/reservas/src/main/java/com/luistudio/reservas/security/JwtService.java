@@ -49,7 +49,7 @@ public class JwtService {
         try {
             String[] parts = token.split("\\.");
             if (parts.length != 3 || !TOKEN_VERSION.equals(parts[0])) {
-                throw new BusinessException(HttpStatus.UNAUTHORIZED, "Token invalido");
+                throw new BusinessException(HttpStatus.UNAUTHORIZED, "Token inválido");
             }
 
             byte[] iv = Base64.getUrlDecoder().decode(parts[1]);
@@ -57,7 +57,7 @@ public class JwtService {
             String payload = decrypt(iv, encryptedPayload);
             String[] values = payload.split("\\|");
             if (values.length != 4) {
-                throw new BusinessException(HttpStatus.UNAUTHORIZED, "Token invalido");
+                throw new BusinessException(HttpStatus.UNAUTHORIZED, "Token inválido");
             }
 
             Long userId = Long.parseLong(values[0]);
@@ -73,7 +73,7 @@ public class JwtService {
         } catch (BusinessException ex) {
             throw ex;
         } catch (Exception ex) {
-            throw new BusinessException(HttpStatus.UNAUTHORIZED, "Token invalido");
+            throw new BusinessException(HttpStatus.UNAUTHORIZED, "Token inválido");
         }
     }
 
@@ -115,7 +115,7 @@ public class JwtService {
             byte[] payload = cipher.doFinal(encryptedPayload);
             return new String(payload, StandardCharsets.UTF_8);
         } catch (Exception ex) {
-            throw new BusinessException(HttpStatus.UNAUTHORIZED, "Token invalido");
+            throw new BusinessException(HttpStatus.UNAUTHORIZED, "Token inválido");
         }
     }
 

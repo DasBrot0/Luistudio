@@ -9,6 +9,7 @@ import com.luistudio.reservas.repository.MaintenanceRepository;
 import com.luistudio.reservas.repository.PabellonRepository;
 import com.luistudio.reservas.repository.ReservationRepository;
 import com.luistudio.reservas.repository.RoomRepository;
+import com.luistudio.reservas.util.AppTime;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.OffsetDateTime;
@@ -38,8 +39,8 @@ public class CampusMapService {
 
     @Transactional(readOnly = true)
     public CampusMapResponse getCampusMap() {
-        LocalDate today = LocalDate.now();
-        LocalTime now = LocalTime.now();
+        LocalDate today = AppTime.today();
+        LocalTime now = AppTime.nowTime();
 
         List<ReservationEntity> activeNow = reservationRepository.findActiveAt(today, now);
         List<MaintenanceEntity> activeMaintenances = maintenanceRepository.findActiveAt(OffsetDateTime.now());

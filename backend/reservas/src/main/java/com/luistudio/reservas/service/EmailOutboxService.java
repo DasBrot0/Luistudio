@@ -122,7 +122,7 @@ public class EmailOutboxService {
                 }
                 emailOutboxRepository.save(email);
                 log.warn(
-                    "[EMAIL_OUTBOX] Fallo envio a {} | Subject: {} | intento={} | estado={} | error={}",
+                    "[EMAIL_OUTBOX] Fallo envío a {} | Subject: {} | intento={} | estado={} | error={}",
                     email.getDestinatario(),
                     email.getAsunto(),
                     email.getIntentos(),

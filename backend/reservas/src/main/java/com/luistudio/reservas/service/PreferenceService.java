@@ -117,7 +117,7 @@ public class PreferenceService {
         try {
             return objectMapper.writeValueAsString(settings);
         } catch (Exception ex) {
-            throw new BusinessException(HttpStatus.INTERNAL_SERVER_ERROR, "No se pudieron guardar las preferencias de notificacion.");
+            throw new BusinessException(HttpStatus.INTERNAL_SERVER_ERROR, "No se pudieron guardar las preferencias de notificación.");
         }
     }
 
@@ -173,7 +173,7 @@ public class PreferenceService {
     private String parseThemeMode(String value) {
         String normalized = value.trim().toUpperCase();
         if (!"LIGHT".equals(normalized) && !"DARK".equals(normalized)) {
-            throw new BusinessException(HttpStatus.BAD_REQUEST, "Tema invalido. Usa LIGHT o DARK.");
+            throw new BusinessException(HttpStatus.BAD_REQUEST, "Tema inválido. Usa LIGHT o DARK.");
         }
         return normalized;
     }

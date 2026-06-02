@@ -4,6 +4,7 @@ import com.luistudio.reservas.model.ReservationEntity;
 import com.luistudio.reservas.repository.ReservationRepository;
 import com.luistudio.reservas.service.EmailOutboxService;
 import com.luistudio.reservas.service.email.EmailTemplateService;
+import com.luistudio.reservas.util.AppTime;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
@@ -30,8 +31,8 @@ public class SendEndingSoonReservationReminderCommand implements BookingReminder
     @Override
     @Transactional
     public void execute() {
-        LocalDate date = LocalDate.now();
-        LocalTime now = LocalTime.now();
+        LocalDate date = AppTime.today();
+        LocalTime now = AppTime.nowTime();
         LocalTime min = now.minusMinutes(15);
 
         List<ReservationEntity> endingSoon = reservationRepository.findEndingSoon(date, now.plusMinutes(15), min);

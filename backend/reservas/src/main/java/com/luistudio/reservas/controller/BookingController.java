@@ -86,6 +86,6 @@ public class BookingController {
     public MessageResponse sendConfirmation(@RequestParam Long bookingId) {
         accessGuard.requireAdmin();
         String ics = bookingService.getIcsContent(bookingId);
-        return new MessageResponse("Confirmacion generada para reserva " + bookingId + " (ICS length=" + ics.length() + ")");
+        return new MessageResponse("Confirmación generada para reserva " + bookingId + " (ICS length=" + ics.length() + ")");
     }
 }

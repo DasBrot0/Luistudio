@@ -16,6 +16,7 @@ import com.luistudio.reservas.repository.CampusScheduleRepository;
 import com.luistudio.reservas.repository.ReservationRepository;
 import com.luistudio.reservas.repository.RoomRepository;
 import com.luistudio.reservas.repository.RoomScheduleRepository;
+import com.luistudio.reservas.util.AppTime;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -94,7 +95,7 @@ public class RoomScheduleService {
         validateScheduleInputs(request.days(), request.slotMinutes());
         int currentSlot = systemConfigService.getCampusSlotMinutes(campus);
         if (currentSlot != request.slotMinutes()
-            && reservationRepository.existsFutureActiveReservationsByCampus(campus, LocalDate.now(), LocalTime.now())) {
+            && reservationRepository.existsFutureActiveReservationsByCampus(campus, AppTime.today(), AppTime.nowTime())) {
             throw new BusinessException(
                 HttpStatus.BAD_REQUEST,
                 "No se puede cambiar la duración por reserva del campus porque existen reservas futuras activas"
@@ -245,21 +246,21 @@ public class RoomScheduleService {
             for (RoomScheduleEntity override : overrides) {
                 CampusScheduleEntity campusDay = campusByDay.get(override.getDiaSemana());
                 if (campusDay == null) {
-                    warnings.add("La sala " + room.getCodigo() + " tiene override sin horario general para dia " + override.getDiaSemana());
+                    warnings.add("La sala " + room.getCodigo() + " tiene override sin horario general para día " + override.getDiaSemana());
                     continue;
                 }
                 if (override.getCerrado()) {
                     continue;
                 }
                 if (campusDay.getCerrado()) {
-                    warnings.add("La sala " + room.getCodigo() + " abre en un dia que el campus esta cerrado (dia " + override.getDiaSemana() + ")");
+                    warnings.add("La sala " + room.getCodigo() + " abre en un día que el campus está cerrado (día " + override.getDiaSemana() + ")");
                     continue;
                 }
                 if (override.getHoraApertura() != null
                     && override.getHoraCierre() != null
                     && (override.getHoraApertura().isBefore(campusDay.getHoraApertura())
                         || override.getHoraCierre().isAfter(campusDay.getHoraCierre()))) {
-                    warnings.add("La sala " + room.getCodigo() + " tiene horario fuera del rango general del campus (dia " + override.getDiaSemana() + ")");
+                    warnings.add("La sala " + room.getCodigo() + " tiene horario fuera del rango general del campus (día " + override.getDiaSemana() + ")");
                 }
             }
         }
@@ -273,13 +274,13 @@ public class RoomScheduleService {
                 continue;
             }
             if (day.openTime() == null || day.closeTime() == null || !day.closeTime().isAfter(day.openTime())) {
-                throw new BusinessException(HttpStatus.BAD_REQUEST, "Horario general invalido para el dia " + day.dayOfWeek());
+                throw new BusinessException(HttpStatus.BAD_REQUEST, "Horario general inválido para el día " + day.dayOfWeek());
             }
             if (!isAlignedToSlot(day.openTime(), slotMinutes) || !isAlignedToSlot(day.closeTime(), slotMinutes)) {
                 throw new BusinessException(
                     HttpStatus.BAD_REQUEST,
-                    "La apertura y cierre del dia " + day.dayOfWeek()
-                        + " deben alinearse con la duracion por reserva de " + slotMinutes + " minutos"
+                    "La apertura y cierre del día " + day.dayOfWeek()
+                        + " deben alinearse con la duración por reserva de " + slotMinutes + " minutos"
                 );
             }
         }
@@ -292,14 +293,14 @@ public class RoomScheduleService {
                 continue;
             }
             if (day.openTime() == null || day.closeTime() == null || !day.closeTime().isAfter(day.openTime())) {
-                throw new BusinessException(HttpStatus.BAD_REQUEST, "Horario de sala invalido para el dia " + day.dayOfWeek());
+                throw new BusinessException(HttpStatus.BAD_REQUEST, "Horario de sala inválido para el día " + day.dayOfWeek());
             }
         }
     }
 
     private void validateDay(int day) {
         if (day < DayOfWeek.MONDAY.getValue() || day > DayOfWeek.SUNDAY.getValue()) {
-            throw new BusinessException(HttpStatus.BAD_REQUEST, "Dia de semana invalido: " + day);
+            throw new BusinessException(HttpStatus.BAD_REQUEST, "Día de semana inválido: " + day);
         }
     }
 

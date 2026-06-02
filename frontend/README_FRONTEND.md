@@ -30,7 +30,7 @@ npm run dev
 ## Funcionalidades conectadas a backend
 
 - Login con roles (admin/estudiante) y flujo 2FA.
-- Restauracion de sesion con pantalla de carga breve para evitar el flash del login al recargar una ruta protegida.
+- Restauración de sesión con pantalla de carga breve para evitar el flash del login al recargar una ruta protegida.
 - Verificación 2FA mediante modal propio (sin depender de `window.prompt`).
 - Solicitud y confirmación de restablecimiento de contraseña.
 - Reserva, edición y cancelación de reservas.
@@ -48,7 +48,7 @@ npm run dev
 - CRUD de salas (admin).
 - Edición completa de sala (campus, ubicación, recurso, capacidad, min/max personas y horario semanal por sala).
 - Los guardados de salas y horarios normalizan días cerrados con horas `null` y validan datos básicos antes de llamar al backend.
-- Filtro por boton, busqueda por codigo/correo/nombres/apellidos, ordenamiento y cambio de estado de perfiles (admin).
+- Filtro por botón, búsqueda por código/correo/nombres/apellidos, ordenamiento y cambio de estado de perfiles (admin).
 - Configuración de límites de reservas (admin).
 - Configuración de horario general por campus (admin), con advertencias si entra en conflicto con overrides de salas.
 - Configuración de duración por reserva por campus (30/45/60/120 min); las horas de apertura/cierre del horario general se validan contra ese múltiplo.
@@ -65,25 +65,25 @@ npm run dev
 Notas recientes:
 
 - `FilterBar` reutilizable para Salas, Reservas registradas y Perfiles, con comportamiento consistente entre modulos.
-- Salas consume filtros de backend por campus, recinto, ubicacion y texto en `GET /api/rooms`.
+- Salas consume filtros de backend por campus, recinto, ubicación y texto en `GET /api/rooms`.
 - Perfiles muestra apellidos completos, distingue cuentas bloqueadas temporalmente y permite desbloqueo manual.
-- Cancelar una reserva ahora solicita confirmacion previa mostrando el detalle y el aviso de notificacion automatica.
+- Cancelar una reserva ahora solicita confirmación previa mostrando el detalle y el aviso de notificación automática.
 
 ## Capa API
 
 - Archivo principal: `src/services/api.ts`
-- La sesion autenticada se consume por cookie `HttpOnly`; el frontend no persiste tokens de acceso en `localStorage`.
-- Solo se guarda una marca no sensible para restaurar sesion y decidir si mostrar la pantalla breve de carga al recargar.
+- La sesión autenticada se consume por cookie `HttpOnly`; el frontend no persiste tokens de acceso en `localStorage`.
+- Solo se guarda una marca no sensible para restaurar sesión y decidir si mostrar la pantalla breve de carga al recargar.
 
 ## Deploy en Vercel (SPA)
 
 - Este frontend usa React Router, por lo que rutas como `/reservas` o `/salas` deben reescribirse a `index.html` en produccion.
 - El archivo `frontend/luistudio-app/vercel.json` ya incluye el rewrite global para evitar `404 NOT_FOUND` al recargar con `F5`.
 
-- Notificaciones de reserva: ahora incluyen detalle legible de recurso, ubicacion, fecha y horario.
-- Para evitar duplicados visuales, el cliente conserva solo la ultima accion por reserva logica (usuario + recurso + ubicacion + fecha + horario), ignorando diferencias de cantidad de personas.
-- Configuracion incluye switch de 2FA por usuario con confirmacion por codigo enviado al correo (activar y desactivar).
-- Al presionar `Activar 2FA` o `Desactivar 2FA` desde Configuracion, se cierra ese modal y se abre el modal de confirmacion de 2FA.
+- Notificaciones de reserva: ahora incluyen detalle legible de recurso, ubicación, fecha y horario.
+- Para evitar duplicados visuales, el cliente conserva solo la última acción por reserva lógica (usuario + recurso + ubicación + fecha + horario), ignorando diferencias de cantidad de personas.
+- Configuración incluye switch de 2FA por usuario con confirmación por código enviado al correo (activar y desactivar).
+- Al presionar `Activar 2FA` o `Desactivar 2FA` desde Configuración, se cierra ese modal y se abre el modal de confirmación de 2FA.
 - El modal de salas permite marcar una sala como disponible, en mantenimiento o inactiva; los bloqueos por reserva activa se muestran en modal.
 - Configuracion permite elegir Salas, Perfiles o Reservas como vista inicial para administradores.
 - La sección Notificaciones muestra reservas para estudiantes y mantenimiento/perfiles para administradores; desactivar App evita el toast/centro local y desactivar Email se sincroniza con backend.

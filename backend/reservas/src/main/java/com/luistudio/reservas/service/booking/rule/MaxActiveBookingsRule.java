@@ -3,8 +3,7 @@ package com.luistudio.reservas.service.booking.rule;
 import com.luistudio.reservas.exception.BusinessException;
 import com.luistudio.reservas.repository.ReservationRepository;
 import com.luistudio.reservas.service.SystemConfigService;
-import java.time.LocalDate;
-import java.time.LocalTime;
+import com.luistudio.reservas.util.AppTime;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
@@ -31,11 +30,11 @@ public class MaxActiveBookingsRule implements BookingValidationRule {
         }
 
         int maxAllowed = systemConfigService.getMaxActiveBookings();
-        long activeCount = reservationRepository.countCurrentActiveForUser(context.user(), LocalDate.now(), LocalTime.now());
+        long activeCount = reservationRepository.countCurrentActiveForUser(context.user(), AppTime.today(), AppTime.nowTime());
         if (activeCount >= maxAllowed) {
             throw new BusinessException(
                 HttpStatus.BAD_REQUEST,
-                "Alcanzaste el limite de reservas activas (" + maxAllowed + ")"
+                "Alcanzaste el límite de reservas activas (" + maxAllowed + ")"
             );
         }
     }

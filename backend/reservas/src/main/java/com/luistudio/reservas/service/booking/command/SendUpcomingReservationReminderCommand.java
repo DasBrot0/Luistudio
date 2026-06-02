@@ -4,10 +4,10 @@ import com.luistudio.reservas.model.ReservationEntity;
 import com.luistudio.reservas.repository.ReservationRepository;
 import com.luistudio.reservas.service.EmailOutboxService;
 import com.luistudio.reservas.service.email.EmailTemplateService;
+import com.luistudio.reservas.util.AppTime;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
 import java.util.List;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -32,9 +32,9 @@ public class SendUpcomingReservationReminderCommand implements BookingReminderCo
     @Override
     @Transactional
     public void execute() {
-        LocalDate today = LocalDate.now();
-        LocalTime now = LocalTime.now();
-        OffsetDateTime nextHour = OffsetDateTime.now(ZoneOffset.ofHours(-5)).plusMinutes(60);
+        LocalDate today = AppTime.today();
+        LocalTime now = AppTime.nowTime();
+        OffsetDateTime nextHour = AppTime.nowDateTime().atZone(AppTime.ZONE).toOffsetDateTime().plusMinutes(60);
 
         List<ReservationEntity> upcoming = reservationRepository.findUpcomingWindow(
             today,

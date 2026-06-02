@@ -18,7 +18,7 @@ public class CapacityRule implements BookingValidationRule {
         boolean minRequired = Boolean.TRUE.equals(context.room().getMinimoPersonasObligatorio());
 
         if (people > roomCapacity || people > roomMax) {
-            throw new BusinessException(HttpStatus.BAD_REQUEST, "La cantidad de personas supera el maximo permitido para la sala");
+            throw new BusinessException(HttpStatus.BAD_REQUEST, "La cantidad de personas supera el máximo permitido para la sala");
         }
         if (minRequired && people < roomMin) {
             throw new BusinessException(HttpStatus.BAD_REQUEST, "La reserva requiere al menos " + roomMin + " personas para esta sala");

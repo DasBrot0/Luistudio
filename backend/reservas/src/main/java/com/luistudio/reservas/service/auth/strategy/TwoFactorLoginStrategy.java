@@ -52,10 +52,10 @@ public class TwoFactorLoginStrategy implements LoginStrategy {
 
         emailOutboxService.enqueue(
             user,
-            "Codigo de verificacion 2FA",
+            "Código de verificación 2FA",
             emailTemplateService.securityCode(
-                "Codigo de verificacion 2FA",
-                "Usa este codigo para completar tu inicio de sesion.",
+                "Código de verificación 2FA",
+                "Usa este código para completar tu inicio de sesión.",
                 generatedTwoFactor.rawCode()
             ),
             null

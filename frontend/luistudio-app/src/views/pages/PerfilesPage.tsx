@@ -108,8 +108,8 @@ export function PerfilesPage({
                   { value: 'firstName:desc', label: 'Nombre Z-A' },
                   { value: 'lastName:asc', label: 'Apellidos A-Z' },
                   { value: 'lastName:desc', label: 'Apellidos Z-A' },
-                  { value: 'code:asc', label: 'Codigo ↑' },
-                  { value: 'code:desc', label: 'Codigo ↓' },
+                  { value: 'code:asc', label: 'Código ↑' },
+                  { value: 'code:desc', label: 'Código ↓' },
                 ],
               },
             ]}
@@ -123,8 +123,8 @@ export function PerfilesPage({
                   { value: 'firstName:desc', label: 'Nombre Z-A' },
                   { value: 'lastName:asc', label: 'Apellidos A-Z' },
                   { value: 'lastName:desc', label: 'Apellidos Z-A' },
-                  { value: 'code:asc', label: 'Codigo ↑' },
-                  { value: 'code:desc', label: 'Codigo ↓' },
+                  { value: 'code:asc', label: 'Código ↑' },
+                  { value: 'code:desc', label: 'Código ↓' },
                 ],
               },
             ]}
@@ -149,8 +149,8 @@ export function PerfilesPage({
               <option value="firstName:desc">Nombre Z-A</option>
               <option value="lastName:asc">Apellidos A-Z</option>
               <option value="lastName:desc">Apellidos Z-A</option>
-              <option value="code:asc">Codigo ascendente</option>
-              <option value="code:desc">Codigo descendente</option>
+              <option value="code:asc">Código ascendente</option>
+              <option value="code:desc">Código descendente</option>
               <option value="status:asc">Estado A-Z</option>
               <option value="status:desc">Estado Z-A</option>
             </select>

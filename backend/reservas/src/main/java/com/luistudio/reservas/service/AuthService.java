@@ -168,10 +168,10 @@ public class AuthService {
 
             emailOutboxService.enqueue(
                 user,
-                "Recuperacion de contrasena",
+                "Recuperación de contraseña",
                 emailTemplateService.callToAction(
-                    "Recuperacion de contrasena",
-                    "Recibimos una solicitud para restablecer tu contrasena.",
+                    "Recuperación de contraseña",
+                    "Recibimos una solicitud para restablecer tu contraseña.",
                     resetLink
                 ),
                 null
@@ -185,7 +185,7 @@ public class AuthService {
 
         String tokenHash = secretHashService.hash(request.token());
         PasswordResetEntity reset = passwordResetRepository.findByTokenAndUsadoFalse(tokenHash)
-            .orElseThrow(() -> new BusinessException(HttpStatus.BAD_REQUEST, "Token invalido o expirado"));
+            .orElseThrow(() -> new BusinessException(HttpStatus.BAD_REQUEST, "Token inválido o expirado"));
 
         if (reset.getExpiraEn().isBefore(OffsetDateTime.now())) {
             throw new BusinessException(HttpStatus.BAD_REQUEST, "Token expirado");
@@ -207,17 +207,17 @@ public class AuthService {
     public void enroll2fa(Long userId) {
         UserEntity user = userRepository.findById(userId).orElseThrow(() -> new NotFoundException("Usuario no encontrado"));
         if (Boolean.TRUE.equals(user.getHas2fa())) {
-            throw new BusinessException(HttpStatus.BAD_REQUEST, "2FA ya esta activado");
+            throw new BusinessException(HttpStatus.BAD_REQUEST, "2FA ya está activado");
         }
         SecurityEntityFactory.GeneratedTwoFactorCode generatedTwoFactor = securityEntityFactory.newTwoFactorCode(user, 10);
         TwoFactorCodeEntity twoFactor = generatedTwoFactor.entity();
         twoFactorCodeRepository.save(twoFactor);
         emailOutboxService.enqueue(
             user,
-            "Confirmacion de activacion de 2FA",
+            "Confirmación de activación de 2FA",
             emailTemplateService.securityCode(
-                "Confirmacion de activacion de 2FA",
-                "Recibimos una solicitud para activar la autenticacion en dos pasos.",
+                "Confirmación de activación de 2FA",
+                "Recibimos una solicitud para activar la autenticación en dos pasos.",
                 generatedTwoFactor.rawCode()
             ),
             null
@@ -251,10 +251,10 @@ public class AuthService {
         twoFactorCodeRepository.save(twoFactor);
         emailOutboxService.enqueue(
             user,
-            "Confirmacion de desactivacion de 2FA",
+            "Confirmación de desactivación de 2FA",
             emailTemplateService.securityCode(
-                "Confirmacion de desactivacion de 2FA",
-                "Recibimos una solicitud para desactivar la autenticacion en dos pasos.",
+                "Confirmación de desactivación de 2FA",
+                "Recibimos una solicitud para desactivar la autenticación en dos pasos.",
                 generatedTwoFactor.rawCode()
             ),
             null

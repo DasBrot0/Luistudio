@@ -22,9 +22,9 @@ export function TwoFactorModal({
   onSubmit,
 }: TwoFactorModalProps) {
   return (
-    <section className="modal-layer" role="dialog" aria-modal="true" aria-label="Verificacion de dos factores">
+    <section className="modal-layer" role="dialog" aria-modal="true" aria-label="Verificación de dos factores">
       <div className="modal-card slim-modal">
-        <h2>{title ?? 'Verificar inicio de sesion'}</h2>
+        <h2>{title ?? 'Verificar inicio de sesión'}</h2>
         <p className="modal-copy">{description ?? 'Ingresa el código 2FA enviado a tu correo.'}</p>
         <form onSubmit={onSubmit} className="stack">
           <label htmlFor="two-factor-code">Código 2FA</label>

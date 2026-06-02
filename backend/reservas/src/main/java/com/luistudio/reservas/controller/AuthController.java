@@ -117,7 +117,7 @@ public class AuthController {
     @PostMapping("/logout")
     public ResponseEntity<MessageResponse> logout(HttpServletResponse httpServletResponse) {
         httpServletResponse.addHeader("Set-Cookie", authCookieService.clearCookie().toString());
-        return ResponseEntity.ok(new MessageResponse("Sesion cerrada"));
+        return ResponseEntity.ok(new MessageResponse("Sesión cerrada"));
     }
 
     private void attachAuthCookie(LoginResponse response, boolean rememberMe, HttpServletResponse httpServletResponse) {

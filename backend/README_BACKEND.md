@@ -21,7 +21,7 @@
    - `CORS_ORIGINS`
    - `AUTH_COOKIE_SECURE` (`false` en local, `true` en despliegue HTTPS)
    - `AUTH_COOKIE_SAME_SITE` (`Lax` por defecto)
-   - `EMAIL_PROVIDER` (`log` por defecto, `resend` para envio real por API HTTP)
+   - `EMAIL_PROVIDER` (`log` por defecto, `resend` para envío real por API HTTP)
    - `EMAIL_FROM` (ej. `Luistudio <no-reply@tu-dominio.com>`)
    - `RESEND_API_KEY` (requerida si `EMAIL_PROVIDER=resend`)
 4. Ejecuta:
@@ -30,7 +30,7 @@
 ./mvnw spring-boot:run
 ```
 
-Si usas el script `scripts/start-backend.ps1`, este carga variables automaticamente desde:
+Si usas el script `scripts/start-backend.ps1`, este carga variables automáticamente desde:
 - `/.env` (raiz del proyecto), o
 - `/backend/reservas/.env` (si no existe el de raiz).
 
@@ -96,15 +96,15 @@ Memoria (500 MB):
 ### Administracion
 
 - `GET /api/admin/users`
-  - Soporta `query` por codigo/correo/nombres/apellidos, `year`, `status` (`HABILITADO`, `DESHABILITADO`, `BLOQUEADO`), `sortBy` (`firstName`, `lastName`, `code`, `status`) y `sortDir`.
+  - Soporta `query` por código/correo/nombres/apellidos, `year`, `status` (`HABILITADO`, `DESHABILITADO`, `BLOQUEADO`), `sortBy` (`firstName`, `lastName`, `code`, `status`) y `sortDir`.
 - `PATCH /api/admin/users/{id}/estado`
   - No permite que un administrador se deshabilite a si mismo ni deshabilitar al ultimo administrador habilitado.
 - `GET /api/admin/config`
 - `PUT /api/admin/config`
 - `GET /api/admin/campus-schedules`
 - `PUT /api/admin/campus-schedules`
-  - En dias cerrados (`closed=true`), `openTime` y `closeTime` pueden enviarse como `null`.
-  - En dias abiertos, `openTime` y `closeTime` deben alinearse con la duracion por reserva del campus (30/45/60/120 min).
+  - En días cerrados (`closed=true`), `openTime` y `closeTime` pueden enviarse como `null`.
+  - En días abiertos, `openTime` y `closeTime` deben alinearse con la duración por reserva del campus (30/45/60/120 min).
   - Los errores de validacion incluyen el campo que fallo.
 - `GET /api/campus/map`
 
@@ -119,21 +119,21 @@ Memoria (500 MB):
 
 - `GET /api/users/lookup?code=...`
   - Requiere usuario autenticado.
-  - Devuelve codigo y nombre completo para validar participantes de una reserva.
+  - Devuelve código y nombre completo para validar participantes de una reserva.
 
 ## Notas de implementacion
 
 - Se implementa bloqueo temporal tras intentos fallidos de login.
 - El login usa busqueda por correo con indice funcional `LOWER(email)` y evita escrituras/flushes innecesarios en el flujo exitoso.
-- Para bases existentes, aplicar `database/004_optimize_auth_indexes.sql` para crear los indices de autenticacion.
+- Para bases existentes, aplicar `database/004_optimize_auth_indexes.sql` para crear los índices de autenticación.
 - El listado administrativo de usuarios expone si una cuenta sigue bloqueada temporalmente y permite desbloquearla al volver a `HABILITADO`.
 - Se implementa 2FA por código temporal.
-- Los tokens de sesion y tokens provisionales viajan cifrados y se entregan en cookie `HttpOnly`.
-- Los tokens de recuperacion y codigos 2FA se almacenan hasheados; no se persisten en texto plano.
-- Las entidades de recuperacion y 2FA mapean el estado usado/no usado a la columna SQL `used`.
+- Los tokens de sesión y tokens provisionales viajan cifrados y se entregan en cookie `HttpOnly`.
+- Los tokens de recuperación y códigos 2FA se almacenan hasheados; no se persisten en texto plano.
+- Las entidades de recuperación y 2FA mapean el estado usado/no usado a la columna SQL `used`.
 - Para bases existentes, aplicar `database/006_harden_auth_secrets.sql` antes de desplegar este refuerzo.
-- `email_outbox` se procesa por scheduler (reintentos automaticos).
-- En local, sin `RESEND_API_KEY`, el envio de correos cae en modo log (no SMTP).
+- `email_outbox` se procesa por scheduler (reintentos automáticos).
+- En local, sin `RESEND_API_KEY`, el envío de correos cae en modo log (no SMTP).
 - Para despliegue en Render, usar `EMAIL_PROVIDER=resend` + `RESEND_API_KEY` (salida por HTTPS/443).
 - Se generan enlaces Google Calendar y descarga `.ics` por reserva.
 - El esquema SQL base (`database/001_init.sql` y `database/002_seed_release01.sql`) define tablas y columnas para instalaciones desde cero.
@@ -142,11 +142,12 @@ Memoria (500 MB):
 - Las salas almacenan data de catalogo en espanol (`code`, `name`, `campus`, `venue`, `location`).
 - Se agregan horarios por campus (`campus_schedules`) y override por sala (`room_schedules`) para validar reservas por dia/hora.
 - Se agregan reglas por sala de personas: `minPeople`, `minPeopleRequired`, `maxPeople`.
-- Se agrega configuracion de duracion por reserva por campus (Monterrico 60 min, Mayorazgo 45 min por defecto).
-- Las reservas solo aceptan fechas/horas dentro de la ventana permitida (semana actual; fin de semana habilita tambien la siguiente semana) y siempre en horas futuras del dia actual.
+- Se agrega configuración de duración por reserva por campus (Monterrico 60 min, Mayorazgo 45 min por defecto).
+- Las reservas solo aceptan fechas/horas dentro de la ventana permitida (semana actual; fin de semana habilita también la siguiente semana) y siempre en horas futuras del día actual.
+- Las reglas de negocio de reservas usan la zona `America/Lima` para comparar fecha/hora actual en produccion.
 - No se permite cancelar reservas que ya finalizaron (validacion en backend).
-- La cancelacion administrativa reutiliza `PATCH /api/bookings/{id}/cancel`; el frontend ahora agrega confirmacion previa y el backend mantiene el envio de correo automatico.
-- Se agrega preferencia por usuario `login_landing_view` para definir la vista inicial al iniciar sesion (validada por rol).
+- La cancelación administrativa reutiliza `PATCH /api/bookings/{id}/cancel`; el frontend ahora agrega confirmación previa y el backend mantiene el envío de correo automático.
+- Se agrega preferencia por usuario `login_landing_view` para definir la vista inicial al iniciar sesión (validada por rol).
 - Para bases ya existentes, aplicar `database/004_add_login_landing_view.sql`.
 - Para convertir data previa de salas (ingles -> espanol en `code/name/campus/venue/location`), aplicar `database/005_rooms_data_to_spanish.sql`.
 
@@ -159,8 +160,8 @@ Si despliegas en Render y quieres evitar que el backend entre en reposo por inac
    - En este proyecto:
      - Actuator esta habilitado.
      - Solo se expone `health`.
-     - `GET /actuator/health` y `HEAD /actuator/health` estan permitidos sin autenticacion.
-2. Crea cuenta gratuita en UptimeRobot (hasta 50 monitores, intervalo minimo 5 min).
+     - `GET /actuator/health` y `HEAD /actuator/health` están permitidos sin autenticación.
+2. Crea cuenta gratuita en UptimeRobot (hasta 50 monitores, intervalo mínimo 5 min).
 3. Crea monitor:
    - `Monitor Type`: `HTTP(s)`
    - `Friendly Name`: `Luistudio Backend`
@@ -169,7 +170,7 @@ Si despliegas en Render y quieres evitar que el backend entre en reposo por inac
 4. Guarda el monitor y valida que reciba `200 OK`.
 
 Nota:
-- No uses `GET /api/rooms` para keep-alive si no mandas token, porque ese endpoint requiere autenticacion.
+- No uses `GET /api/rooms` para keep-alive si no mandas token, porque ese endpoint requiere autenticación.
 
 ## Patrones aplicados
 
@@ -180,13 +181,13 @@ Nota:
   - Recordatorios de reservas (`service/booking/command/*`).
 - `Factory Method`:
   - Creacion de entidades de reservas/salas/mantenimiento/seguridad (`service/factory/*`).
-  - Seleccion de proveedor de envio de correo (`service/email/gateway/EmailGatewayFactory`).
+  - Selección de proveedor de envío de correo (`service/email/gateway/EmailGatewayFactory`).
 - `Adapter`:
   - Adaptacion de proveedor de correo (`service/email/gateway/*Gateway`).
 
 - Regla de no duplicacion de reservas: si el usuario vuelve a reservar exactamente el mismo recurso, fecha y horario (misma identidad logica), se reutiliza el mismo registro en BD y se actualiza su estado/datos; no se crea una fila adicional. La cantidad de personas no define identidad para esta regla.
 
-## Envio de correo por Gmail API (sin SMTP)
+## Envío de correo por Gmail API (sin SMTP)
 
 Configura estas variables de entorno para usar Gmail como proveedor de correo:
 
@@ -197,15 +198,15 @@ Configura estas variables de entorno para usar Gmail como proveedor de correo:
 - GMAIL_REFRESH_TOKEN=...
 
 Si falta alguna credencial, el sistema hace fallback a `log` y deja warning en logs.
-- Correos de reservas (confirmacion, edicion, cancelacion) se generan en HTML con estilo Luistudio e incluyen: sala, campus, recinto, ubicacion, fecha, horario, personas e integrantes.
+- Correos de reservas (confirmación, edición, cancelación) se generan en HTML con estilo Luistudio e incluyen: sala, campus, recinto, ubicación, fecha, horario, personas e integrantes.
 - La duración máxima de reserva se valida por bloque configurado del campus de la sala (no por un límite global único).
 - El admin puede cambiar la duración por campus, pero el sistema bloquea el cambio si existen reservas futuras activas en ese campus para evitar conflictos.
 - Los endpoints de escritura validan longitudes y formatos de entrada alineados con los tamaños de columna (ej. estado VARCHAR(20), observaciones/motivos VARCHAR(255), textos de sala VARCHAR(120/160)), para evitar errores SQL por datos demasiado largos.
 
-- 2FA opcional configurable por usuario desde Configuracion: activar/desactivar requiere codigo de confirmacion enviado por correo.
-- Los correos salientes se renderizan con `EmailTemplateService`, una plantilla HTML unificada para alertas, recuperacion de contrasena, 2FA, reservas y recordatorios; no hay layouts HTML duplicados en los servicios de negocio.
-- Correos de 2FA (activacion, desactivacion e inicio de sesion) ajustados con tildes correctas y render de codigo sin duplicados en plantilla HTML.
-- Para desarrollo, el backend incluye spring-boot-devtools (runtime) para reinicio automatico al detectar cambios mientras se ejecuta ./mvnw spring-boot:run.
+- 2FA opcional configurable por usuario desde Configuración: activar/desactivar requiere código de confirmación enviado por correo.
+- Los correos salientes se renderizan con `EmailTemplateService`, una plantilla HTML unificada para alertas, recuperación de contraseña, 2FA, reservas y recordatorios; no hay layouts HTML duplicados en los servicios de negocio.
+- Correos de 2FA (activación, desactivación e inicio de sesión) ajustados con tildes correctas y render de código sin duplicados en plantilla HTML.
+- Para desarrollo, el backend incluye spring-boot-devtools (runtime) para reinicio automático al detectar cambios mientras se ejecuta ./mvnw spring-boot:run.
 - El admin puede cambiar salas a disponible, mantenimiento o inactiva; inactivar/eliminar una sala se bloquea si tiene reservas activas en curso o futuras.
 - La preferencia de vista inicial para administradores acepta Salas, Perfiles y Reservas.
-- Las preferencias de notificacion por usuario se guardan en `notification_preferences.notification_settings`; los correos de reservas y recordatorios respetan el canal Email configurado.
+- Las preferencias de notificación por usuario se guardan en `notification_preferences.notification_settings`; los correos de reservas y recordatorios respetan el canal Email configurado.
