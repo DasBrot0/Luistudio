@@ -47,10 +47,11 @@ npm run dev
 - Vistas separadas por componente para desktop/móvil en listados principales (Mis reservas, Reservas registradas, Salas y Perfiles), evitando mezcla de estilos al redimensionar.
 - CRUD de salas (admin).
 - Edición completa de sala (campus, ubicación, recurso, capacidad, min/max personas y horario semanal por sala).
+- Los guardados de salas y horarios normalizan días cerrados con horas `null` y validan datos básicos antes de llamar al backend.
 - Filtro por boton, busqueda por codigo/correo/nombres/apellidos, ordenamiento y cambio de estado de perfiles (admin).
 - Configuración de límites de reservas (admin).
 - Configuración de horario general por campus (admin), con advertencias si entra en conflicto con overrides de salas.
-- Configuración de duración por bloque de reserva por campus (30/45/60/120 min).
+- Configuración de duración por reserva por campus (30/45/60/120 min); las horas de apertura/cierre del horario general se validan contra ese múltiplo.
 - Navegación por rol y centro de notificaciones en UI.
 - Modo oscuro con persistencia (`localStorage`) y paleta tonal completa para cards, modales, tablas, botones, textos y selectores.
 - Favicon configurado con el icono de Luistudio desde `public/favicon.svg`.

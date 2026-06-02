@@ -67,8 +67,8 @@ public class AdminController {
         @PathVariable Long userId,
         @Valid @RequestBody UserStatusUpdateRequest request
     ) {
-        accessGuard.requireAdmin();
-        return userService.updateStatus(userId, request);
+        var principal = accessGuard.requireAdmin();
+        return userService.updateStatus(userId, principal.userId(), request);
     }
 
     @GetMapping("/admin/config")

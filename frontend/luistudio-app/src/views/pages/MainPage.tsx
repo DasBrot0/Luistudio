@@ -188,6 +188,44 @@ const toUiCampusSchedule = (schedule: ApiCampusSchedule): CampusSchedule => ({
   warnings: schedule.warnings,
 })
 
+const defaultWeeklySchedule: ScheduleDay[] = [
+  { dayOfWeek: 1, openTime: '06:00', closeTime: '22:00', closed: false },
+  { dayOfWeek: 2, openTime: '06:00', closeTime: '22:00', closed: false },
+  { dayOfWeek: 3, openTime: '06:00', closeTime: '22:00', closed: false },
+  { dayOfWeek: 4, openTime: '06:00', closeTime: '22:00', closed: false },
+  { dayOfWeek: 5, openTime: '06:00', closeTime: '22:00', closed: false },
+  { dayOfWeek: 6, openTime: '06:00', closeTime: '12:00', closed: false },
+  { dayOfWeek: 7, openTime: null, closeTime: null, closed: true },
+]
+
+const normalizeScheduleDays = (days: ScheduleDay[]) =>
+  days.map((day) => ({
+    dayOfWeek: day.dayOfWeek,
+    openTime: day.closed ? null : day.openTime,
+    closeTime: day.closed ? null : day.closeTime,
+    closed: day.closed,
+  }))
+
+const dayLabels = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom']
+
+const timeToMinutes = (value: string | null) => {
+  if (!value) return Number.NaN
+  const [hours, minutes] = value.split(':').map(Number)
+  if (!Number.isFinite(hours) || !Number.isFinite(minutes)) return Number.NaN
+  return hours * 60 + minutes
+}
+
+const findInvalidScheduleDay = (days: ScheduleDay[]) =>
+  days.find((day) => !day.closed && (!day.openTime || !day.closeTime || day.closeTime <= day.openTime))
+
+const findUnalignedScheduleDay = (days: ScheduleDay[], slotMinutes: number) =>
+  days.find((day) => {
+    if (day.closed) return false
+    const open = timeToMinutes(day.openTime)
+    const close = timeToMinutes(day.closeTime)
+    return !Number.isFinite(open) || !Number.isFinite(close) || open % slotMinutes !== 0 || close % slotMinutes !== 0
+  })
+
 const toHourMinute = (value: string) => value.split(':').slice(0, 2).join(':')
 
 const toUiBooking = (booking: {
@@ -460,6 +498,7 @@ export function MainPage() {
     start: '16:30',
     end: '17:30',
   })
+  const [editBookingOwner, setEditBookingOwner] = useState<ReservationCompanion | null>(null)
   const [editBookingCompanions, setEditBookingCompanions] = useState<ReservationCompanion[]>([])
   const [editCompanionCodeInput, setEditCompanionCodeInput] = useState('')
 
@@ -505,6 +544,7 @@ export function MainPage() {
   const [toastMessage, setToastMessage] = useState('')
   const [modalMessage, setModalMessage] = useState<{ title: string; message: string; variant: 'error' | 'success' } | null>(null)
   const [pendingCancelBooking, setPendingCancelBooking] = useState<{ bookingId: string; actor: Role } | null>(null)
+  const [pendingProfileAction, setPendingProfileAction] = useState<{ profileId: string; action: 'status' | 'unlock' } | null>(null)
   const [notifications, setNotifications] = useState<NotificationItem[]>(getInitialNotifications)
   const [isNotificationsModalOpen, setIsNotificationsModalOpen] = useState(false)
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false)
@@ -513,6 +553,7 @@ export function MainPage() {
   const [fontScale, setFontScale] = useState<number>(getInitialFontScale)
   const [twoFactorAction, setTwoFactorAction] = useState<'none' | 'enable' | 'disable'>('none')
   const [preferencesLoaded, setPreferencesLoaded] = useState(false)
+  const [lastPreferencesSignature, setLastPreferencesSignature] = useState('')
   const [notificationPrefs, setNotificationPrefs] = useState<Pick<ApiPreferences, 'emailEnabled' | 'reminderEnabled' | 'bookingChangesEnabled' | 'notificationSettings'>>({
     emailEnabled: true,
     reminderEnabled: true,
@@ -632,10 +673,28 @@ export function MainPage() {
     const room = activeRooms.find((item) => item.id === booking.roomId)
     return { booking, room, actor: pendingCancelBooking.actor }
   }, [activeRooms, bookings, pendingCancelBooking])
+  const pendingProfileTarget = useMemo(() => {
+    if (!pendingProfileAction) return null
+    const profile = profiles.find((item) => item.id === pendingProfileAction.profileId)
+    if (!profile) return null
+    const nextStatus = profile.status === 'Habilitado' ? 'Deshabilitado' : 'Habilitado'
+    return { profile, action: pendingProfileAction.action, nextStatus }
+  }, [pendingProfileAction, profiles])
   const selectedReservationRoom = useMemo(
     () => activeRooms.find((room) => room.id === reservationForm.roomId) ?? null,
     [activeRooms, reservationForm.roomId],
   )
+  const editBookingOwnerUser: AuthUser | null = editBookingOwner
+    ? {
+        id: 0,
+        role: 'student',
+        code: editBookingOwner.code,
+        firstName: editBookingOwner.fullName,
+        lastName: '',
+        email: '',
+        has2fa: false,
+      }
+    : authenticatedUser
 
   const pushNotification = (message: string, type: NotificationPreferenceKey = 'BOOKING_CONFIRMATION') => {
     const preference = notificationPrefs.notificationSettings[type]
@@ -926,20 +985,42 @@ export function MainPage() {
 
   useEffect(() => {
     if (!token || !authenticatedUser || !preferencesLoaded) return
+    const payload: ApiPreferences = {
+      ...notificationPrefs,
+      themeMode: isDarkMode ? 'DARK' : 'LIGHT',
+      fontScale: clampFontScale(fontScale),
+      loginLandingView: routeToLandingViewCode(
+        authenticatedUser.role,
+        loginLandingRoute ?? defaultLandingRoute(authenticatedUser.role),
+      ),
+    }
+    const signature = JSON.stringify(payload)
+    if (!lastPreferencesSignature) {
+      setLastPreferencesSignature(signature)
+      return
+    }
+    if (signature === lastPreferencesSignature) return
+    setLastPreferencesSignature(signature)
     const timeout = window.setTimeout(() => {
-      const payload: ApiPreferences = {
-        ...notificationPrefs,
-        themeMode: isDarkMode ? 'DARK' : 'LIGHT',
-        fontScale: clampFontScale(fontScale),
-        loginLandingView: routeToLandingViewCode(
-          authenticatedUser.role,
-          loginLandingRoute ?? defaultLandingRoute(authenticatedUser.role),
-        ),
-      }
-      api.updatePreferences(token, payload).catch(() => undefined)
+      api
+        .updatePreferences(token, payload)
+        .then(() => setToastMessage('Preferencias guardadas.'))
+        .catch((error) => {
+          const message = error instanceof Error ? error.message : 'No se pudieron guardar tus preferencias.'
+          setToastMessage(message)
+        })
     }, 300)
     return () => window.clearTimeout(timeout)
-  }, [token, authenticatedUser, preferencesLoaded, notificationPrefs, isDarkMode, fontScale, loginLandingRoute])
+  }, [
+    token,
+    authenticatedUser,
+    preferencesLoaded,
+    notificationPrefs,
+    isDarkMode,
+    fontScale,
+    loginLandingRoute,
+    lastPreferencesSignature,
+  ])
 
   useEffect(() => {
     if (authenticatedUser) {
@@ -970,17 +1051,26 @@ export function MainPage() {
 
   useEffect(() => {
     if (!token || authenticatedUser?.role !== 'admin') return
-    loadAdminBookings(token).catch(() => undefined)
+    loadAdminBookings(token).catch((error) => {
+      const message = error instanceof Error ? error.message : 'No se pudieron cargar las reservas registradas.'
+      setToastMessage(message)
+    })
   }, [adminPage, adminCampusFilter, adminSearchQuery, adminStatusFilter, adminDateFilter, token, authenticatedUser])
 
   useEffect(() => {
     if (!token || authenticatedUser?.role !== 'admin') return
-    loadRoomDirectory(token).catch(() => undefined)
+    loadRoomDirectory(token).catch((error) => {
+      const message = error instanceof Error ? error.message : 'No se pudo cargar el directorio de salas.'
+      setToastMessage(message)
+    })
   }, [authenticatedUser, token])
 
   useEffect(() => {
     if (!token || authenticatedUser?.role !== 'admin') return
-    loadProfiles(token).catch(() => undefined)
+    loadProfiles(token).catch((error) => {
+      const message = error instanceof Error ? error.message : 'No se pudieron cargar los perfiles.'
+      setToastMessage(message)
+    })
   }, [
     profilesPage,
     profilesQuery,
@@ -1030,6 +1120,7 @@ export function MainPage() {
     setAuthenticatedUser(null)
     setToken('')
     setPreferencesLoaded(false)
+    setLastPreferencesSignature('')
     setShowTwoFactorModal(false)
     setTwoFactorCode('')
     setLoginLandingRoute(null)
@@ -1159,7 +1250,8 @@ export function MainPage() {
         variant: 'success',
       })
     } catch (error) {
-      setResetError(error instanceof Error ? error.message : 'No se pudo procesar la solicitud')
+      const message = error instanceof Error ? error.message : 'No se pudo procesar la solicitud'
+      setModalMessage({ title: 'No se pudo enviar el enlace', message, variant: 'error' })
     }
   }
 
@@ -1266,10 +1358,26 @@ export function MainPage() {
   const openEditBooking = (booking: Booking) => {
     const room = activeRooms.find((item) => item.id === booking.roomId)
     const participants = parseParticipantsFromObservation(booking.observation)
-    const companions = participants.filter(
-      (item) => item.code.toLowerCase() !== authenticatedUser?.code.toLowerCase(),
-    )
+    const fallbackOwner = {
+      code: `USER-${booking.userId}`,
+      fullName: booking.userEmail ?? 'Usuario de la reserva',
+    }
+    const currentUserOwner = authenticatedUser
+      ? {
+          code: authenticatedUser.code,
+          fullName: `${authenticatedUser.firstName} ${authenticatedUser.lastName}`.trim(),
+        }
+      : null
+    const owner =
+      authenticatedUser?.role === 'admin'
+        ? participants[0] ?? fallbackOwner
+        : currentUserOwner ?? participants.find((item) => item.code.toLowerCase() === authenticatedUser?.code.toLowerCase()) ?? fallbackOwner
+    const companions =
+      authenticatedUser?.role === 'admin'
+        ? participants.slice(1)
+        : participants.filter((item) => item.code.toLowerCase() !== owner.code.toLowerCase())
     setEditingBookingId(booking.id)
+    setEditBookingOwner(owner)
     setReservationError('')
     setEditBookingForm({
       campus: room?.campusLabel ?? '',
@@ -1285,7 +1393,7 @@ export function MainPage() {
   }
 
   const handleAddEditCompanion = async () => {
-    if (!token || !authenticatedUser) return
+    if (!token || !editBookingOwner) return
     const selectedRoom = getRoomById(editBookingForm.roomId)
     if (!selectedRoom) return
     const code = editCompanionCodeInput.trim()
@@ -1308,10 +1416,10 @@ export function MainPage() {
     }
     try {
       const found = await api.lookupUserByCode(token, code)
-      if (found.code.toLowerCase() === authenticatedUser.code.toLowerCase()) {
+      if (found.code.toLowerCase() === editBookingOwner.code.toLowerCase()) {
         setModalMessage({
           title: 'Código duplicado',
-          message: 'Tu código ya cuenta como la persona 1 de la reserva.',
+          message: 'Ese código ya corresponde a la persona titular de la reserva.',
           variant: 'error',
         })
         return
@@ -1371,7 +1479,7 @@ export function MainPage() {
       })
       return
     }
-    const allCodes = [authenticatedUser?.code ?? '', ...editBookingCompanions.map((item) => item.code.trim())]
+    const allCodes = [editBookingOwner?.code ?? '', ...editBookingCompanions.map((item) => item.code.trim())]
       .map((code) => code.toLowerCase())
       .filter(Boolean)
     if (new Set(allCodes).size !== allCodes.length) {
@@ -1391,12 +1499,8 @@ export function MainPage() {
       return
     }
     try {
-      const ownerName = authenticatedUser
-        ? `${authenticatedUser.firstName} ${authenticatedUser.lastName}`.trim()
-        : target.userEmail ?? 'Usuario'
-      const ownerCode = authenticatedUser?.code ?? 'SIN-CODIGO'
       const participants = [
-        { code: ownerCode, fullName: ownerName },
+        editBookingOwner ?? { code: `USER-${target.userId}`, fullName: target.userEmail ?? 'Usuario de la reserva' },
         ...editBookingCompanions,
       ]
       const observation = buildParticipantsObservation(participants)
@@ -1412,6 +1516,7 @@ export function MainPage() {
       const next = toUiBooking(updated)
       setBookings((current) => current.map((booking) => (booking.id === editingBookingId ? next : booking)))
       setEditingBookingId(null)
+      setEditBookingOwner(null)
       setEditBookingCompanions([])
       setEditCompanionCodeInput('')
       pushNotification(
@@ -1450,6 +1555,7 @@ export function MainPage() {
           : `Reserva cancelada: ${targetRoomLabel} (${target.location}), ${formatDisplayDate(target.date)} ${target.start}-${target.end}.`,
         'BOOKING_CANCELLATION',
       )
+      setModalMessage({ title: 'Reserva cancelada', message: 'La cancelación se registró correctamente.', variant: 'success' })
       setPendingCancelBooking(null)
     } catch (error) {
       const message = error instanceof Error ? error.message : 'No se pudo cancelar la reserva'
@@ -1523,15 +1629,43 @@ export function MainPage() {
   const handleSaveRoom = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     if (!token) return
+    const effectiveSchedule = roomDraft.schedule.length > 0 ? roomDraft.schedule : defaultWeeklySchedule
+    const invalidScheduleDay = findInvalidScheduleDay(effectiveSchedule)
+    if (!roomDraft.name.trim() || !roomDraft.campus.trim() || !roomDraft.location.trim()) {
+      const message = 'Completa nombre, campus y ubicación de la sala.'
+      setRoomNotice(message)
+      setModalMessage({ title: 'Datos incompletos', message, variant: 'error' })
+      return
+    }
+    if (
+      !Number.isFinite(roomDraft.capacity) ||
+      !Number.isFinite(roomDraft.minPeople) ||
+      !Number.isFinite(roomDraft.maxPeople) ||
+      roomDraft.capacity < 1 ||
+      roomDraft.minPeople < 1 ||
+      roomDraft.maxPeople < 1 ||
+      roomDraft.maxPeople > roomDraft.capacity ||
+      roomDraft.minPeople > roomDraft.maxPeople
+    ) {
+      const message = 'Revisa capacidad, mínimo y máximo de personas antes de guardar.'
+      setRoomNotice(message)
+      setModalMessage({ title: 'Cantidad de personas inválida', message, variant: 'error' })
+      return
+    }
+    if (invalidScheduleDay) {
+      const message = `El horario del día ${invalidScheduleDay.dayOfWeek} debe tener apertura y cierre válidos.`
+      setRoomNotice(message)
+      setModalMessage({ title: 'Horario inválido', message, variant: 'error' })
+      return
+    }
     const payload = {
       ...roomDraft,
+      name: roomDraft.name.trim(),
+      campus: roomDraft.campus.trim(),
+      location: roomDraft.location.trim(),
+      pabellonCode: roomDraft.pabellonCode.trim(),
       status: toApiRoomStatus(roomDraft.status),
-      schedule: roomDraft.schedule.map((day) => ({
-        dayOfWeek: day.dayOfWeek,
-        openTime: day.openTime,
-        closeTime: day.closeTime,
-        closed: day.closed,
-      })),
+      schedule: normalizeScheduleDays(effectiveSchedule),
     }
     try {
       if (roomModalMode === 'add') {
@@ -1543,6 +1677,7 @@ export function MainPage() {
         if (!target) return
         const updated = await api.updateRoom(token, target.backendId, payload)
         setRooms((current) => current.map((room) => (room.id === roomModalTargetId ? toUiRoom(updated) : room)))
+        pushNotification(`Sala actualizada: ${updated.resourceLabel}.`, 'ROOM_MAINTENANCE')
       }
       await loadRoomDirectory(token)
       setRoomModalMode('none')
@@ -1574,26 +1709,78 @@ export function MainPage() {
     }
   }
 
-  const toggleProfileStatus = async (profileId: string) => {
-    if (!token) return
+  const requestProfileStatusChange = (profileId: string) => {
     const target = profiles.find((profile) => profile.id === profileId)
-    if (!target) return
-    const nextStatus = target.status === 'Habilitado' ? 'Deshabilitado' : 'Habilitado'
-    await api.updateUserStatus(token, Number(profileId), nextStatus)
-    await loadProfiles(token)
+    const nextStatus = target?.status === 'Habilitado' ? 'Deshabilitado' : 'Habilitado'
+    if (authenticatedUser?.id === Number(profileId) && nextStatus === 'Deshabilitado') {
+      setModalMessage({
+        title: 'Acción no permitida',
+        message: 'No puedes deshabilitar tu propia cuenta mientras estás administrando el sistema.',
+        variant: 'error',
+      })
+      return
+    }
+    setPendingProfileAction({ profileId, action: 'status' })
   }
 
-  const unlockProfile = async (profileId: string) => {
-    if (!token) return
-    await api.unlockUser(token, Number(profileId))
-    await loadProfiles(token)
+  const requestProfileUnlock = (profileId: string) => {
+    setPendingProfileAction({ profileId, action: 'unlock' })
+  }
+
+  const confirmProfileAction = async () => {
+    if (!token || !pendingProfileAction) return
+    const target = profiles.find((profile) => profile.id === pendingProfileAction.profileId)
+    if (!target) {
+      setPendingProfileAction(null)
+      return
+    }
+    const nextStatus = target.status === 'Habilitado' ? 'Deshabilitado' : 'Habilitado'
+    try {
+      if (pendingProfileAction.action === 'unlock') {
+        await api.unlockUser(token, Number(target.id))
+        setToastMessage('Perfil desbloqueado correctamente.')
+      } else {
+        if (authenticatedUser?.id === Number(target.id) && nextStatus === 'Deshabilitado') {
+          setModalMessage({
+            title: 'Acción no permitida',
+            message: 'No puedes deshabilitar tu propia cuenta mientras estás administrando el sistema.',
+            variant: 'error',
+          })
+          return
+        }
+        await api.updateUserStatus(token, Number(target.id), nextStatus)
+        setToastMessage(`Perfil ${nextStatus.toLowerCase()} correctamente.`)
+      }
+      await loadProfiles(token)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'No se pudo actualizar el perfil'
+      setModalMessage({ title: 'Error al actualizar perfil', message, variant: 'error' })
+    } finally {
+      setPendingProfileAction(null)
+    }
   }
 
   const saveAdminConfig = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     if (!token) return
+    if (
+      !Number.isInteger(configDraft.maxActiveBookings) ||
+      !Number.isInteger(configDraft.maxDurationMinutes) ||
+      configDraft.maxActiveBookings < 1 ||
+      configDraft.maxDurationMinutes < 30
+    ) {
+      setModalMessage({
+        title: 'Configuración inválida',
+        message: 'Revisa el máximo de reservas activas y la duración máxima antes de guardar.',
+        variant: 'error',
+      })
+      return
+    }
     try {
-      const updated = await api.updateAdminConfig(token, configDraft)
+      const updated = await api.updateAdminConfig(token, {
+        maxActiveBookings: configDraft.maxActiveBookings,
+        maxDurationMinutes: configDraft.maxDurationMinutes,
+      })
       setConfig({
         maxActiveBookings: updated.maxActiveBookings,
         maxDurationMinutes: updated.maxDurationMinutes,
@@ -1607,16 +1794,37 @@ export function MainPage() {
 
   const saveCampusSchedule = async (campus: CampusSchedule) => {
     if (!token) return
+    const invalidScheduleDay = findInvalidScheduleDay(campus.days)
+    const unalignedScheduleDay = findUnalignedScheduleDay(campus.days, campus.slotMinutes)
+    if (!campus.campus.trim() || !Number.isInteger(campus.slotMinutes) || campus.slotMinutes < 5) {
+      setModalMessage({
+        title: 'Horario inválido',
+        message: 'Revisa el campus y la duración por reserva antes de guardar.',
+        variant: 'error',
+      })
+      return
+    }
+    if (invalidScheduleDay) {
+      setModalMessage({
+        title: 'Horario inválido',
+        message: `El horario del día ${invalidScheduleDay.dayOfWeek} debe tener apertura y cierre válidos.`,
+        variant: 'error',
+      })
+      return
+    }
+    if (unalignedScheduleDay) {
+      setModalMessage({
+        title: 'Horario inválido',
+        message: `En ${dayLabels[unalignedScheduleDay.dayOfWeek - 1]}, la apertura y el cierre deben ser múltiplos de ${campus.slotMinutes} minutos. Ajusta las horas antes de guardar.`,
+        variant: 'error',
+      })
+      return
+    }
     try {
       const updated = await api.updateCampusSchedule(token, {
-        campus: campus.campus,
+        campus: campus.campus.trim(),
         slotMinutes: campus.slotMinutes,
-        days: campus.days.map((day) => ({
-          dayOfWeek: day.dayOfWeek,
-          openTime: day.closed ? null : day.openTime,
-          closeTime: day.closed ? null : day.closeTime,
-          closed: day.closed,
-        })),
+        days: normalizeScheduleDays(campus.days),
       })
       setCampusSchedules((current) =>
         current.map((item) => (item.campus === updated.campus ? toUiCampusSchedule(updated) : item)),
@@ -1831,8 +2039,8 @@ export function MainPage() {
                   setProfilesSortBy('firstName')
                   setProfilesSortDir('asc')
                 }}
-                onToggleProfileStatus={toggleProfileStatus}
-                onUnlockProfile={unlockProfile}
+                onToggleProfileStatus={requestProfileStatusChange}
+                onUnlockProfile={requestProfileUnlock}
                 onPrevPage={() => setProfilesPage((current) => Math.max(1, current - 1))}
                 onNextPage={() => setProfilesPage((current) => Math.min(totalProfilePages, current + 1))}
               />
@@ -1926,7 +2134,7 @@ export function MainPage() {
           campusOptions={campusOptions}
           locationOptionsByCampus={locationOptionsByCampus}
           activeRooms={activeRooms}
-          currentUser={authenticatedUser}
+          currentUser={editBookingOwnerUser}
           companions={editBookingCompanions}
           companionCodeInput={editCompanionCodeInput}
           errorMessage={reservationError}
@@ -1936,6 +2144,7 @@ export function MainPage() {
           onRemoveCompanion={handleRemoveEditCompanion}
           onCancel={() => {
             setEditingBookingId(null)
+            setEditBookingOwner(null)
             setEditBookingCompanions([])
             setEditCompanionCodeInput('')
           }}
@@ -2229,6 +2438,38 @@ export function MainPage() {
           onConfirm={cancelBooking}
           onClose={() => setPendingCancelBooking(null)}
         />
+      )}
+      {pendingProfileTarget && (
+        <section className="modal-layer" role="dialog" aria-modal="true" aria-labelledby="profile-action-title">
+          <div className="modal-card slim-modal text-left">
+            <h2 id="profile-action-title">
+              {pendingProfileTarget.action === 'unlock'
+                ? 'Confirmar desbloqueo'
+                : `Confirmar ${pendingProfileTarget.nextStatus.toLowerCase()}`}
+            </h2>
+            <p className="modal-copy">
+              {pendingProfileTarget.action === 'unlock'
+                ? `Vas a desbloquear la cuenta de ${pendingProfileTarget.profile.email}.`
+                : `Vas a cambiar el estado de ${pendingProfileTarget.profile.email} a ${pendingProfileTarget.nextStatus}.`}
+            </p>
+            <div className="modal-actions">
+              <button
+                type="button"
+                className="ghost-btn"
+                onClick={() => setPendingProfileAction(null)}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                className={pendingProfileTarget.nextStatus === 'Deshabilitado' ? 'danger-btn' : 'primary-btn'}
+                onClick={confirmProfileAction}
+              >
+                Confirmar
+              </button>
+            </div>
+          </div>
+        </section>
       )}
       {toastMessage && <div className="toast">{toastMessage}</div>}
     </>

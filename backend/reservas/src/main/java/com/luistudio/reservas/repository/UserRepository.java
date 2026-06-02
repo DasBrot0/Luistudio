@@ -24,6 +24,13 @@ public interface UserRepository extends JpaRepository<UserEntity, Long> {
     long countByEstado(UserStatus estado);
 
     @Query("""
+        SELECT COUNT(u) FROM UserEntity u
+        JOIN u.rol r
+        WHERE u.estado = :status AND UPPER(r.nombre) = UPPER(:roleName)
+    """)
+    long countByEstadoAndRoleName(@Param("status") UserStatus status, @Param("roleName") String roleName);
+
+    @Query("""
         SELECT u FROM UserEntity u
         WHERE (:query IS NULL OR :query = ''
           OR LOWER(u.codigo) LIKE LOWER(CONCAT('%', :query, '%'))

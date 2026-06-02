@@ -68,7 +68,7 @@ public class SystemConfigService {
         if (slotMinutes != 30 && slotMinutes != 45 && slotMinutes != 60 && slotMinutes != 120) {
             throw new com.luistudio.reservas.exception.BusinessException(
                 org.springframework.http.HttpStatus.BAD_REQUEST,
-                "El intervalo por campus debe ser 30, 45, 60 o 120 minutos"
+                "La duracion por reserva debe ser 30, 45, 60 o 120 minutos"
             );
         }
     }

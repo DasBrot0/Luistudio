@@ -89,15 +89,15 @@ public class RoomScheduleService {
 
     @Transactional
     public CampusScheduleResponse updateCampusSchedule(CampusScheduleUpdateRequest request) {
-        validateScheduleInputs(request.days());
         String campus = request.campus().trim();
         systemConfigService.validateCampusSlotMinutes(request.slotMinutes());
+        validateScheduleInputs(request.days(), request.slotMinutes());
         int currentSlot = systemConfigService.getCampusSlotMinutes(campus);
         if (currentSlot != request.slotMinutes()
             && reservationRepository.existsFutureActiveReservationsByCampus(campus, LocalDate.now(), LocalTime.now())) {
             throw new BusinessException(
                 HttpStatus.BAD_REQUEST,
-                "No se puede cambiar la duración por bloque del campus porque existen reservas futuras activas"
+                "No se puede cambiar la duración por reserva del campus porque existen reservas futuras activas"
             );
         }
         systemConfigService.setCampusSlotMinutes(campus, request.slotMinutes());
@@ -266,7 +266,7 @@ public class RoomScheduleService {
         return warnings;
     }
 
-    private void validateScheduleInputs(List<CampusScheduleDayInput> days) {
+    private void validateScheduleInputs(List<CampusScheduleDayInput> days, int slotMinutes) {
         for (CampusScheduleDayInput day : days) {
             validateDay(day.dayOfWeek());
             if (day.closed()) {
@@ -274,6 +274,13 @@ public class RoomScheduleService {
             }
             if (day.openTime() == null || day.closeTime() == null || !day.closeTime().isAfter(day.openTime())) {
                 throw new BusinessException(HttpStatus.BAD_REQUEST, "Horario general invalido para el dia " + day.dayOfWeek());
+            }
+            if (!isAlignedToSlot(day.openTime(), slotMinutes) || !isAlignedToSlot(day.closeTime(), slotMinutes)) {
+                throw new BusinessException(
+                    HttpStatus.BAD_REQUEST,
+                    "La apertura y cierre del dia " + day.dayOfWeek()
+                        + " deben alinearse con la duracion por reserva de " + slotMinutes + " minutos"
+                );
             }
         }
     }
@@ -294,5 +301,9 @@ public class RoomScheduleService {
         if (day < DayOfWeek.MONDAY.getValue() || day > DayOfWeek.SUNDAY.getValue()) {
             throw new BusinessException(HttpStatus.BAD_REQUEST, "Dia de semana invalido: " + day);
         }
+    }
+
+    private boolean isAlignedToSlot(LocalTime time, int slotMinutes) {
+        return (time.getHour() * 60 + time.getMinute()) % slotMinutes == 0;
     }
 }

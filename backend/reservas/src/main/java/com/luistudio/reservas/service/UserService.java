@@ -117,7 +117,7 @@ public class UserService {
     }
 
     @Transactional
-    public UserResponse updateStatus(Long userId, UserStatusUpdateRequest request) {
+    public UserResponse updateStatus(Long userId, Long actorUserId, UserStatusUpdateRequest request) {
         UserEntity user = getById(userId);
         UserStatus status;
         try {
@@ -126,12 +126,24 @@ public class UserService {
             throw new BusinessException(HttpStatus.BAD_REQUEST, "Estado invalido");
         }
 
+        if (userId.equals(actorUserId) && status == UserStatus.DESHABILITADO) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST, "No puedes deshabilitar tu propia cuenta de administrador.");
+        }
+        if (status == UserStatus.DESHABILITADO && isAdmin(user)
+            && userRepository.countByEstadoAndRoleName(UserStatus.HABILITADO, "ADMIN") <= 1) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST, "No se puede deshabilitar al ultimo administrador habilitado.");
+        }
+
         user.setEstado(status);
         if (status == UserStatus.HABILITADO) {
             user.setLockedUntil(null);
         }
         user.setActualizadoEn(OffsetDateTime.now());
         return dtoMapper.toUser(userRepository.save(user));
+    }
+
+    private boolean isAdmin(UserEntity user) {
+        return user.getRol() != null && "ADMIN".equalsIgnoreCase(user.getRol().getNombre());
     }
 
     @Transactional

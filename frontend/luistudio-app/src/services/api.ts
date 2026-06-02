@@ -120,6 +120,82 @@ export interface ApiPreferences {
   loginLandingView: 'STUDENT_MY_BOOKINGS' | 'STUDENT_RESERVE' | 'ADMIN_ROOMS' | 'ADMIN_PROFILES' | 'ADMIN_BOOKINGS'
 }
 
+const fieldLabels: Record<string, string> = {
+  campus: 'campus',
+  capacity: 'capacidad',
+  closeTime: 'hora de cierre',
+  date: 'fecha',
+  days: 'días del horario',
+  email: 'correo',
+  end: 'hora de fin',
+  location: 'ubicación',
+  maxActiveBookings: 'máximo de reservas activas',
+  maxDurationMinutes: 'duración máxima',
+  maxPeople: 'máximo de personas',
+  minPeople: 'mínimo de personas',
+  minPeopleRequired: 'mínimo obligatorio',
+  name: 'nombre',
+  newPassword: 'nueva contraseña',
+  openTime: 'hora de apertura',
+  password: 'contraseña',
+  people: 'cantidad de personas',
+  roomId: 'sala',
+  slotMinutes: 'duración por reserva',
+  start: 'hora de inicio',
+  status: 'estado',
+  token: 'enlace de recuperación',
+}
+
+const cleanApiMessage = (message: string) => {
+  const normalized = message.trim()
+  if (!normalized) return 'No se pudo completar la acción. Revisa los datos e intenta nuevamente.'
+
+  const parts = normalized
+    .split(';')
+    .map((part) => part.trim())
+    .filter(Boolean)
+
+  if (parts.length > 0) {
+    const friendlyParts = parts.map((part) => {
+      const [rawField, ...rest] = part.split(':')
+      const detail = rest.join(':').trim()
+      const field = rawField.trim()
+      const label = fieldLabels[field] ?? field
+
+      if (!detail) return part
+      if (detail === 'must not be null' || detail === 'no debe ser nulo') return `Completa ${label}.`
+      if (detail === 'must not be blank' || detail === 'no debe estar vacío') return `Completa ${label}.`
+      if (detail.startsWith('must be greater than or equal to') || detail.startsWith('debe ser mayor que o igual a')) {
+        const minimum = detail.match(/\d+/)?.[0]
+        return minimum ? `${label} debe ser al menos ${minimum}.` : `Revisa ${label}.`
+      }
+      if (detail.startsWith('must be less than or equal to') || detail.startsWith('debe ser menor que o igual a')) {
+        const maximum = detail.match(/\d+/)?.[0]
+        return maximum ? `${label} debe ser como máximo ${maximum}.` : `Revisa ${label}.`
+      }
+      if (detail.includes('size must be between') || detail.includes('el tamaño debe estar entre')) {
+        return `Revisa la longitud de ${label}.`
+      }
+      return `${label}: ${detail}`
+    })
+    return [...new Set(friendlyParts)].join(' ')
+  }
+
+  if (normalized.startsWith('Error ')) return 'No se pudo completar la acción. Intenta nuevamente.'
+  return normalized
+}
+
+const readErrorMessage = async (response: Response) => {
+  let message = `Error ${response.status}`
+  try {
+    const data = await response.json()
+    message = data.message ?? data.error ?? message
+  } catch {
+    // no-op
+  }
+  return cleanApiMessage(message)
+}
+
 async function http<T>(path: string, options: RequestInit = {}, _token?: string): Promise<T> {
   const response = await fetch(`${API_BASE}${path}`, {
     ...options,
@@ -131,14 +207,7 @@ async function http<T>(path: string, options: RequestInit = {}, _token?: string)
   })
 
   if (!response.ok) {
-    let message = `Error ${response.status}`
-    try {
-      const data = await response.json()
-      message = data.message ?? data.error ?? message
-    } catch {
-      // no-op
-    }
-    throw new Error(message)
+    throw new Error(await readErrorMessage(response))
   }
 
   if (response.status === 204) {
@@ -333,14 +402,7 @@ export const api = {
     })
 
     if (!response.ok) {
-      let message = `Error ${response.status}`
-      try {
-        const data = await response.json()
-        message = data.message ?? data.error ?? message
-      } catch {
-        // no-op
-      }
-      throw new Error(message)
+      throw new Error(await readErrorMessage(response))
     }
 
     return response.blob()

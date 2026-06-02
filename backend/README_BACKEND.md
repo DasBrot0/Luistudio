@@ -98,11 +98,14 @@ Memoria (500 MB):
 - `GET /api/admin/users`
   - Soporta `query` por codigo/correo/nombres/apellidos, `year`, `status` (`HABILITADO`, `DESHABILITADO`, `BLOQUEADO`), `sortBy` (`firstName`, `lastName`, `code`, `status`) y `sortDir`.
 - `PATCH /api/admin/users/{id}/estado`
+  - No permite que un administrador se deshabilite a si mismo ni deshabilitar al ultimo administrador habilitado.
 - `GET /api/admin/config`
 - `PUT /api/admin/config`
 - `GET /api/admin/campus-schedules`
 - `PUT /api/admin/campus-schedules`
   - En dias cerrados (`closed=true`), `openTime` y `closeTime` pueden enviarse como `null`.
+  - En dias abiertos, `openTime` y `closeTime` deben alinearse con la duracion por reserva del campus (30/45/60/120 min).
+  - Los errores de validacion incluyen el campo que fallo.
 - `GET /api/campus/map`
 
 ### Preferencias
@@ -139,7 +142,7 @@ Memoria (500 MB):
 - Las salas almacenan data de catalogo en espanol (`code`, `name`, `campus`, `venue`, `location`).
 - Se agregan horarios por campus (`campus_schedules`) y override por sala (`room_schedules`) para validar reservas por dia/hora.
 - Se agregan reglas por sala de personas: `minPeople`, `minPeopleRequired`, `maxPeople`.
-- Se agrega configuracion de duracion por bloque de reserva por campus (Monterrico 60 min, Mayorazgo 45 min por defecto).
+- Se agrega configuracion de duracion por reserva por campus (Monterrico 60 min, Mayorazgo 45 min por defecto).
 - Las reservas solo aceptan fechas/horas dentro de la ventana permitida (semana actual; fin de semana habilita tambien la siguiente semana) y siempre en horas futuras del dia actual.
 - No se permite cancelar reservas que ya finalizaron (validacion en backend).
 - La cancelacion administrativa reutiliza `PATCH /api/bookings/{id}/cancel`; el frontend ahora agrega confirmacion previa y el backend mantiene el envio de correo automatico.

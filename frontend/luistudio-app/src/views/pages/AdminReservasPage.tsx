@@ -295,7 +295,7 @@ export function AdminReservasPage({
               <h3>{campusSchedule.campusLabel}</h3>
               <div className="form-grid two-cols">
                 <div>
-                  <label htmlFor={`slot-${campusSchedule.campus}`}>Duración por botón</label>
+                  <label htmlFor={`slot-${campusSchedule.campus}`}>Duración por reserva</label>
                   <select
                     id={`slot-${campusSchedule.campus}`}
                     value={campusSchedule.slotMinutes}
@@ -336,6 +336,7 @@ export function AdminReservasPage({
                     </label>
                     <input
                       type="time"
+                      step={campusSchedule.slotMinutes * 60}
                       value={day.openTime ?? ''}
                       disabled={day.closed}
                       onChange={(event) =>
@@ -347,6 +348,7 @@ export function AdminReservasPage({
                     />
                     <input
                       type="time"
+                      step={campusSchedule.slotMinutes * 60}
                       value={day.closeTime ?? ''}
                       disabled={day.closed}
                       onChange={(event) =>
