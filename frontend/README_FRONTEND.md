@@ -53,6 +53,7 @@ npm run dev
 - Configuración de duración por bloque de reserva por campus (30/45/60/120 min).
 - Navegación por rol y centro de notificaciones en UI.
 - Modo oscuro con persistencia (`localStorage`) y paleta tonal completa para cards, modales, tablas, botones, textos y selectores.
+- Favicon configurado con el icono de Luistudio desde `public/favicon.svg`.
 - Tema inicial automático según modo del sistema (si no existe preferencia guardada), con persistencia en `localStorage` y sincronización en backend por usuario autenticado.
 - Configuración de accesibilidad visual en cliente: escala de texto global persistente (`luistudio_font_scale` en `localStorage`).
 - Sincronización de tema y escala de texto con backend en `GET/PUT /api/me/preferences` para usuarios autenticados.
