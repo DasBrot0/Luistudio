@@ -157,7 +157,7 @@ public class EmailOutboxService {
     private String toBrandedHtml(String subject, String body) {
         if (isHtml(body)) return body;
 
-        String safeSubject = escapeHtml(subject == null ? "Notificacion Luistudio" : subject);
+        String safeSubject = escapeHtml(subject == null ? "Notificaci\u00f3n Luistudio" : subject);
         String rawBody = body == null ? "" : body;
 
         String summary = "";
@@ -189,7 +189,17 @@ public class EmailOutboxService {
             }
         }
 
-        if (summary.isEmpty()) summary = "Tienes una nueva notificacion en Luistudio.";
+        if (summary.isEmpty()) summary = "Tienes una nueva notificaci\u00f3n en Luistudio.";
+
+        if (code != null && !code.isBlank()) {
+            summary = summary.replace(code, "").replace("  ", " ").trim();
+            if (summary.endsWith(":")) {
+                summary = summary.substring(0, summary.length() - 1).trim();
+            }
+            if (summary.isBlank()) {
+                summary = "Te enviamos un c\u00f3digo de verificaci\u00f3n para continuar.";
+            }
+        }
 
         StringBuilder detailsHtml = new StringBuilder();
         if (!details.isEmpty()) {
@@ -198,6 +208,11 @@ public class EmailOutboxService {
                 int idx = item.indexOf(':');
                 String left = idx > 0 ? item.substring(0, idx).trim() : item;
                 String right = idx > 0 ? item.substring(idx + 1).trim() : "";
+
+                if (code != null && right.equals(code)) {
+                    continue;
+                }
+
                 detailsHtml.append("<tr>")
                     .append("<td style=\"width:170px;padding:8px 10px;background:#eff6ff;border:1px solid #dbeafe;border-radius:8px;color:#1e3a8a;font-weight:700;font-size:13px;vertical-align:top;\">")
                     .append(escapeHtml(left))
@@ -222,7 +237,7 @@ public class EmailOutboxService {
         String codeHtml = "";
         if (code != null) {
             codeHtml = "<div style=\"margin-top:14px;padding:12px;border:1px dashed #93c5fd;border-radius:10px;background:#eff6ff;text-align:center;\">"
-                + "<div style=\"font-size:12px;color:#1e3a8a;margin-bottom:4px;\">Codigo de verificacion</div>"
+                + "<div style=\"font-size:12px;color:#1e3a8a;margin-bottom:4px;\">C\u00f3digo de verificaci\u00f3n</div>"
                 + "<div style=\"font-size:28px;letter-spacing:4px;color:#1d4ed8;font-weight:800;\">"
                 + escapeHtml(code)
                 + "</div></div>";
@@ -249,7 +264,7 @@ public class EmailOutboxService {
             + "<table role=\"presentation\" width=\"100%\" cellspacing=\"0\" cellpadding=\"0\" style=\"max-width:620px;background:#ffffff;border-radius:16px;overflow:hidden;border:1px solid #dbe6f3;\">"
             + "<tr><td style=\"background:linear-gradient(120deg,#1e3a8a,#2563eb);padding:22px 24px;color:#ffffff;\">"
             + "<h1 style=\"margin:0;font-size:24px;font-weight:800;\">Luistudio</h1>"
-            + "<p style=\"margin:6px 0 0;font-size:15px;opacity:.95;\">Actualizacion de tu cuenta y reservas</p>"
+            + "<p style=\"margin:6px 0 0;font-size:15px;opacity:.95;\">Actualizaci\u00f3n de tu cuenta y reservas</p>"
             + "</td></tr>"
             + "<tr><td style=\"padding:22px 24px;\">"
             + "<h2 style=\"margin:0 0 12px;color:#1e3a8a;font-size:20px;\">" + safeSubject + "</h2>"
@@ -261,7 +276,7 @@ public class EmailOutboxService {
             + actionHtml
             + fallbackHtml
             + "</div>"
-            + "<p style=\"margin:16px 0 0;color:#64748b;font-size:12px;\">Este correo fue generado automaticamente por Luistudio.</p>"
+            + "<p style=\"margin:16px 0 0;color:#64748b;font-size:12px;\">Este correo fue generado autom\u00e1ticamente por Luistudio.</p>"
             + "</td></tr></table></td></tr></table></body></html>";
     }
 
@@ -293,3 +308,4 @@ public class EmailOutboxService {
         return result.toString();
     }
 }
+

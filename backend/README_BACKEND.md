@@ -179,9 +179,11 @@ Configura estas variables de entorno para usar Gmail como proveedor de correo:
 
 Si falta alguna credencial, el sistema hace fallback a `log` y deja warning en logs.
 - Correos de reservas (confirmacion, edicion, cancelacion) se generan en HTML con estilo Luistudio e incluyen: sala, campus, recinto, ubicacion, fecha, horario, personas e integrantes.
-- La duración máxima de reserva se valida por bloque configurado del campus de la sala (no por un límite global único).
-- El admin puede cambiar la duración por campus, pero el sistema bloquea el cambio si existen reservas futuras activas en ese campus para evitar conflictos.
-- Los endpoints de escritura validan longitudes y formatos de entrada alineados con los tamaños de columna (ej. estado VARCHAR(20), observaciones/motivos VARCHAR(255), textos de sala VARCHAR(120/160)), para evitar errores SQL por datos demasiado largos.
+- La duraciï¿½n mï¿½xima de reserva se valida por bloque configurado del campus de la sala (no por un lï¿½mite global ï¿½nico).
+- El admin puede cambiar la duraciï¿½n por campus, pero el sistema bloquea el cambio si existen reservas futuras activas en ese campus para evitar conflictos.
+- Los endpoints de escritura validan longitudes y formatos de entrada alineados con los tamaï¿½os de columna (ej. estado VARCHAR(20), observaciones/motivos VARCHAR(255), textos de sala VARCHAR(120/160)), para evitar errores SQL por datos demasiado largos.
 
 - 2FA opcional configurable por usuario desde Configuracion: activar/desactivar requiere codigo de confirmacion enviado por correo.
 - Los correos salientes se renderizan con plantilla HTML unificada (resumen, detalles clave, enlaces y codigos), para mantener formato consistente e informativo en todos los eventos.
+- Correos de 2FA (activacion, desactivacion e inicio de sesion) ajustados con tildes correctas y render de codigo sin duplicados en plantilla HTML.
+- Para desarrollo, el backend incluye spring-boot-devtools (runtime) para reinicio automatico al detectar cambios mientras se ejecuta ./mvnw spring-boot:run.

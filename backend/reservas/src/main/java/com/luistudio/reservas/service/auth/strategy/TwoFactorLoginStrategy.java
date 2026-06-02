@@ -45,7 +45,12 @@ public class TwoFactorLoginStrategy implements LoginStrategy {
         TwoFactorCodeEntity twoFactor = securityEntityFactory.newTwoFactorCode(user, 10);
         twoFactorCodeRepository.save(twoFactor);
 
-        emailOutboxService.enqueue(user, "Código de verificación 2FA", "Tu código es: " + twoFactor.getCode(), null);
+        emailOutboxService.enqueue(
+            user,
+            "C\u00f3digo de verificaci\u00f3n 2FA",
+            "Usa este c\u00f3digo para completar tu inicio de sesi\u00f3n.\nC\u00f3digo de verificaci\u00f3n: " + twoFactor.getCode(),
+            null
+        );
 
         String provisionalToken = jwtService.generateProvisionalToken(
             user.getId(),
@@ -53,6 +58,7 @@ public class TwoFactorLoginStrategy implements LoginStrategy {
             user.getRol().getNombre()
         );
 
-        return new LoginResponse(null, provisionalToken, true, dtoMapper.toAuthUser(user), "Código 2FA enviado");
+        return new LoginResponse(null, provisionalToken, true, dtoMapper.toAuthUser(user), "C\u00f3digo 2FA enviado");
     }
 }
+

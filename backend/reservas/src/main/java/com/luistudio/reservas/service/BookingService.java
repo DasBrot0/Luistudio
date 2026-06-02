@@ -85,7 +85,7 @@ public class BookingService {
                 return reservationRepository.save(booking);
             });
 
-        String title = "Reserva confirmada #" + saved.getId();
+        String title = "Reserva confirmada";
         String body = buildBookingEmailBody(saved, "confirmada", null);
         String ics = getIcsContent(saved.getId());
         emailOutboxService.enqueue(user, title, body, "{\"ics\":\"" + ics.replace("\n", "\\n") + "\"}");
@@ -117,7 +117,7 @@ public class BookingService {
 
         emailOutboxService.enqueue(
             saved.getUsuario(),
-            "Reserva modificada #" + saved.getId(),
+            "Reserva modificada",
             buildBookingEmailBody(saved, "editada", "Antes: " + previous + " | Ahora: " + next),
             null
         );
@@ -134,7 +134,7 @@ public class BookingService {
         }
         LocalDateTime bookingEnd = booking.getFecha().atTime(booking.getHoraFin());
         if (!bookingEnd.isAfter(LocalDateTime.now())) {
-            throw new BusinessException(HttpStatus.BAD_REQUEST, "No se puede cancelar una reserva que ya finalizó");
+            throw new BusinessException(HttpStatus.BAD_REQUEST, "No se puede cancelar una reserva que ya finaliz\u00f3");
         }
 
         booking.setEstado(ReservationStatus.CANCELADA);
@@ -145,7 +145,7 @@ public class BookingService {
         String reason = adminCancel ? "cancelada por administrador" : "cancelada por usuario";
         emailOutboxService.enqueue(
             saved.getUsuario(),
-            "Reserva cancelada #" + saved.getId(),
+            "Reserva cancelada",
             buildBookingEmailBody(saved, "cancelada", "Estado: " + reason + ". Puedes reservar nuevamente."),
             null
         );
@@ -212,7 +212,7 @@ public class BookingService {
         ReservationEntity reservation = getBookingEntity(bookingId);
         return CalendarUtils.createIcs(
             "Reserva - " + reservation.getSala().getNombre(),
-            "Reserva Luistudio #" + reservation.getId(),
+            "Reserva Luistudio",
             reservation.getSala().getUbicacion(),
             reservation.getFecha(),
             reservation.getHoraInicio(),
@@ -231,28 +231,30 @@ public class BookingService {
         RoomEntity room = booking.getSala();
         List<String> participants = extractParticipants(booking.getObservacion());
         String participantsText = participants.isEmpty()
-            ? "- Sin integrantes registrados"
-            : participants.stream().map(item -> "- " + item).collect(java.util.stream.Collectors.joining("\n"));
+            ? "Sin integrantes registrados"
+            : String.join(" | ", participants);
         String extra = (extraInfo == null || extraInfo.isBlank()) ? "" : "\nDetalle: " + extraInfo;
 
         return "Tu reserva fue " + action + " correctamente.\n\n"
             + "Sala: " + room.getNombre() + "\n"
             + "Campus: " + room.getCampus() + "\n"
             + "Recinto: " + room.getVenue() + "\n"
-            + "Ubicación: " + room.getUbicacion() + "\n"
+            + "Ubicaci\u00f3n: " + room.getUbicacion() + "\n"
             + "Fecha: " + booking.getFecha() + "\n"
             + "Horario: " + booking.getHoraInicio() + " - " + booking.getHoraFin() + "\n"
-            + "Personas: " + booking.getCantidadPersonas() + "\n\n"
-            + "Integrantes:\n" + participantsText + extra;
+            + "Personas: " + booking.getCantidadPersonas() + "\n"
+            + "Integrantes: " + participantsText + extra;
     }
 
     private List<String> extractParticipants(String observation) {
         List<String> values = new ArrayList<>();
         if (observation == null || observation.isBlank()) return values;
-        int marker = observation.indexOf("Participantes:");
-        if (marker < 0) return values;
-        String raw = observation.substring(marker + "Participantes:".length()).trim();
+
+        String raw = extractAfterLabel(observation, "Participantes:");
+        if (raw == null) raw = extractAfterLabel(observation, "Integrantes:");
+        if (raw == null) raw = observation.trim();
         if (raw.isBlank()) return values;
+
         String[] chunks = raw.split("\\|");
         for (String chunk : chunks) {
             String cleaned = chunk == null ? "" : chunk.trim();
@@ -261,4 +263,13 @@ public class BookingService {
         return values;
     }
 
+    private String extractAfterLabel(String source, String label) {
+        String sourceLower = source.toLowerCase();
+        String labelLower = label.toLowerCase();
+        int marker = sourceLower.indexOf(labelLower);
+        if (marker < 0) return null;
+        return source.substring(marker + label.length()).trim();
+    }
+
 }
+

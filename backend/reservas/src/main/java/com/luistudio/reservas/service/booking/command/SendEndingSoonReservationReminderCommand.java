@@ -34,7 +34,7 @@ public class SendEndingSoonReservationReminderCommand implements BookingReminder
         for (ReservationEntity booking : endingSoon) {
             emailOutboxService.enqueueReminderOnce(
                 booking.getUsuario(),
-                "Tu reserva termina pronto #" + booking.getId(),
+                "Tu reserva termina pronto",
                 "Tu reserva termina en menos de 15 minutos.",
                 booking.getId(),
                 "ENDING_SOON_15M"

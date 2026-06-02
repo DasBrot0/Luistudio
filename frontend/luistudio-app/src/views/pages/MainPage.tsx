@@ -880,11 +880,13 @@ export function MainPage() {
       if (authenticatedUser.has2fa) {
         await api.disable2fa(token)
         setTwoFactorAction('disable')
+        setIsSettingsModalOpen(false)
         setShowTwoFactorModal(true)
         return
       }
       await api.enroll2fa(token)
       setTwoFactorAction('enable')
+      setIsSettingsModalOpen(false)
       setShowTwoFactorModal(true)
     } catch (error) {
       const message = error instanceof Error ? error.message : 'No se pudo iniciar la verificación de 2FA'

@@ -19,7 +19,7 @@ npm install
 VITE_API_BASE_URL=http://localhost:8080/api
 ```
 
-Nota: si defines `VITE_API_BASE_URL` sin sufijo `/api`, la app lo agrega automÃ¡ticamente.
+Nota: si defines `VITE_API_BASE_URL` sin sufijo `/api`, la app lo agrega automáticamente.
 
 3. Ejecuta:
 
@@ -69,3 +69,4 @@ npm run dev
 - Notificaciones de reserva: ahora incluyen detalle legible de recurso, ubicacion, fecha y horario.
 - Para evitar duplicados visuales, el cliente conserva solo la ultima accion por reserva logica (usuario + recurso + ubicacion + fecha + horario), ignorando diferencias de cantidad de personas.
 - Configuracion incluye switch de 2FA por usuario con confirmacion por codigo enviado al correo (activar y desactivar).
+- Al presionar `Activar 2FA` o `Desactivar 2FA` desde Configuracion, se cierra ese modal y se abre el modal de confirmacion de 2FA.

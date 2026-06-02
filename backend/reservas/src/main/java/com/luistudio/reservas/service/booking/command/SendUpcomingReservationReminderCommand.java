@@ -42,7 +42,7 @@ public class SendUpcomingReservationReminderCommand implements BookingReminderCo
         for (ReservationEntity booking : upcoming) {
             emailOutboxService.enqueueReminderOnce(
                 booking.getUsuario(),
-                "Recordatorio de reserva #" + booking.getId(),
+                "Recordatorio de reserva",
                 "Tu reserva inicia en menos de 60 minutos en sala " + booking.getSala().getNombre(),
                 booking.getId(),
                 "UPCOMING_60M"
