@@ -6,7 +6,6 @@ import com.luistudio.reservas.dto.auth.LoginResponse;
 import com.luistudio.reservas.dto.auth.ResetConfirmInput;
 import com.luistudio.reservas.dto.auth.ResetRequestInput;
 import com.luistudio.reservas.dto.auth.TwoFactorCodeInput;
-import com.luistudio.reservas.dto.auth.TwoFactorVerifyInput;
 import com.luistudio.reservas.exception.BusinessException;
 import com.luistudio.reservas.exception.NotFoundException;
 import com.luistudio.reservas.model.LoginAttemptEntity;

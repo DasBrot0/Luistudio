@@ -6,7 +6,6 @@ import com.luistudio.reservas.model.RoomEntity;
 import com.luistudio.reservas.model.UserEntity;
 import java.time.LocalDate;
 import java.time.LocalTime;
-import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.domain.Page;

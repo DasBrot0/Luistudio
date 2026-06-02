@@ -1,6 +1,5 @@
 package com.luistudio.reservas.dto.admin;
 
-import com.luistudio.reservas.dto.room.RoomResponse;
 import java.util.List;
 
 public record CampusMapResponse(List<PabellonMapItem> pabellones) {
