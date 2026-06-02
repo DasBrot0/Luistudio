@@ -27,11 +27,13 @@ public interface UserRepository extends JpaRepository<UserEntity, Long> {
           OR LOWER(CONCAT(u.nombres, ' ', u.apellidos)) LIKE LOWER(CONCAT('%', :query, '%')))
           AND (:year IS NULL OR :year = '' OR u.codigo LIKE CONCAT(:year, '%'))
           AND (:status IS NULL OR u.estado = :status)
+          AND (:blocked IS NULL OR (:blocked = true AND u.lockedUntil IS NOT NULL AND u.lockedUntil > CURRENT_TIMESTAMP))
     """)
     Page<UserEntity> searchUsers(
         @Param("query") String query,
         @Param("year") String year,
         @Param("status") UserStatus status,
+        @Param("blocked") Boolean blocked,
         Pageable pageable
     );
 }

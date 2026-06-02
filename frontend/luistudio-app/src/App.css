@@ -1237,6 +1237,61 @@ button.inline-flex {
   display: none;
 }
 
+.filter-bar {
+  display: grid;
+  gap: 0.8rem;
+  margin-bottom: 1rem;
+}
+
+.filter-bar-top {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.filter-bar-top > input {
+  flex: 1 1 18rem;
+  min-width: 0;
+}
+
+.filter-bar-actions {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.filter-bar-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+  gap: 0.75rem;
+}
+
+.filter-bar-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+}
+
+.filter-chip {
+  border: 1px solid var(--line-300);
+  background: var(--surface-000);
+  color: var(--ink-700);
+  border-radius: 999px;
+  min-height: 2rem;
+  padding: 0.35rem 0.8rem;
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.filter-chip.active {
+  border-color: var(--brand-500);
+  background: color-mix(in srgb, var(--brand-500) 12%, var(--surface-000));
+  color: var(--brand-600);
+}
+
 .table-wrap {
   overflow-x: auto;
   max-width: 100%;
@@ -1392,6 +1447,49 @@ th {
 .status-pill.cancelled {
   background: var(--danger-bg);
   color: var(--danger-ink);
+}
+
+.profiles-table {
+  table-layout: fixed;
+}
+
+.profiles-table th:nth-child(1),
+.profiles-table td:nth-child(1) {
+  width: 4.5%;
+}
+
+.profiles-table th:nth-child(2),
+.profiles-table td:nth-child(2) {
+  width: 11.5%;
+}
+
+.profiles-table th:nth-child(3),
+.profiles-table td:nth-child(3) {
+  width: 27%;
+}
+
+.profiles-table th:nth-child(4),
+.profiles-table td:nth-child(4) {
+  width: 13%;
+}
+
+.profiles-table th:nth-child(5),
+.profiles-table td:nth-child(5) {
+  width: 12%;
+}
+
+.profiles-table th:nth-child(6),
+.profiles-table td:nth-child(6) {
+  width: 15%;
+}
+
+.profiles-table th:nth-child(7),
+.profiles-table td:nth-child(7) {
+  width: 17%;
+}
+
+.profiles-last-name-cell {
+  white-space: normal;
 }
 
 .profile-card {
@@ -1917,6 +2015,130 @@ th {
   color: var(--ink-500);
 }
 
+.notification-master-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  border: 1px solid var(--line-100);
+  border-radius: var(--radius-md);
+  padding: 0.7rem 0.8rem;
+  background: color-mix(in srgb, var(--surface-025) 80%, transparent);
+}
+
+.notification-preference-list {
+  display: grid;
+  gap: 0.7rem;
+}
+
+.notification-preference-group {
+  border: 1px solid var(--line-100);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: var(--surface-025);
+}
+
+.notification-preference-group h3 {
+  margin: 0;
+  padding: 0.75rem 0.85rem;
+  border-bottom: 1px solid var(--line-100);
+  color: var(--ink-900);
+  font-size: var(--fs-sm);
+}
+
+.notification-preference-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.65rem;
+  align-items: center;
+  padding: 0.6rem 0.85rem;
+}
+
+.notification-preference-label {
+  color: var(--ink-700);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.notification-channel-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.notification-channel-badge {
+  border-radius: 999px;
+  padding: 0.14rem 0.36rem;
+  font-size: 0.68rem;
+  font-weight: 700;
+}
+
+.notification-channel-badge.app {
+  background: color-mix(in srgb, var(--brand-500) 18%, transparent);
+  color: var(--brand-700);
+}
+
+.notification-channel-badge.email {
+  background: color-mix(in srgb, #1f9d55 16%, transparent);
+  color: #15803d;
+}
+
+.settings-switch {
+  width: 2.8rem;
+  height: 1.55rem;
+  border: 0;
+  border-radius: 999px;
+  padding: 0.18rem;
+  background: color-mix(in srgb, var(--ink-500) 30%, transparent);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+}
+
+.settings-switch span {
+  width: 1.18rem;
+  height: 1.18rem;
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: 0 2px 8px rgba(12, 18, 32, 0.25);
+}
+
+.settings-switch.active {
+  justify-content: flex-end;
+  background: var(--brand-500);
+}
+
+.settings-switch.compact {
+  width: 2.35rem;
+  height: 1.35rem;
+}
+
+.settings-switch.compact span {
+  width: 1rem;
+  height: 1rem;
+}
+
+.notification-summary {
+  display: grid;
+  gap: 0.2rem;
+  margin: 0;
+  border: 1px solid var(--line-100);
+  border-radius: var(--radius-md);
+  padding: 0.65rem 0.75rem;
+  background: color-mix(in srgb, var(--surface-075) 72%, transparent);
+  color: var(--ink-500);
+  font-size: var(--fs-xxs);
+  line-height: 1.45;
+}
+
+.notification-summary strong {
+  color: var(--ink-700);
+}
+
 .settings-select {
   width: 100%;
   min-height: 2.5rem;
@@ -2029,6 +2251,44 @@ th {
   margin: 0 0 var(--space-3);
   color: var(--ink-700);
   font-size: var(--fs-sm);
+}
+
+.confirm-booking-copy {
+  display: grid;
+  gap: 0.8rem;
+}
+
+.confirm-booking-copy p {
+  margin: 0;
+}
+
+.confirm-booking-details {
+  display: grid;
+  gap: 0.55rem;
+  margin: 0;
+}
+
+.confirm-booking-details div {
+  display: grid;
+  gap: 0.12rem;
+}
+
+.confirm-booking-details dt {
+  font-size: var(--fs-xxs);
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--ink-500);
+}
+
+.confirm-booking-details dd {
+  margin: 0;
+  color: var(--ink-900);
+  font-weight: 600;
+}
+
+.confirm-booking-notice {
+  color: var(--danger-ink);
+  font-weight: 600;
 }
 
 .modal-actions {

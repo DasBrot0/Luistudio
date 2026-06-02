@@ -11,6 +11,7 @@ import com.luistudio.reservas.model.ReservationEntity;
 import com.luistudio.reservas.model.RoomEntity;
 import com.luistudio.reservas.model.UserEntity;
 import com.luistudio.reservas.util.CalendarUtils;
+import java.time.OffsetDateTime;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -89,6 +90,7 @@ public class DtoMapper {
     }
 
     public UserResponse toUser(UserEntity user) {
+        boolean blocked = user.getLockedUntil() != null && user.getLockedUntil().isAfter(OffsetDateTime.now());
         return new UserResponse(
             user.getId(),
             user.getCodigo(),
@@ -96,7 +98,8 @@ public class DtoMapper {
             user.getNombres(),
             user.getApellidos(),
             user.getEstado().name(),
-            user.getRol().getNombre()
+            user.getRol().getNombre(),
+            blocked
         );
     }
 

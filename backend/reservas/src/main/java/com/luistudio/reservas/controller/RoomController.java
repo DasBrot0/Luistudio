@@ -41,10 +41,12 @@ public class RoomController {
     @GetMapping
     public List<RoomResponse> listRooms(
         @RequestParam(required = false) String campus,
-        @RequestParam(required = false) String ubicacion
+        @RequestParam(required = false) String recinto,
+        @RequestParam(required = false) String ubicacion,
+        @RequestParam(required = false, name = "q") String query
     ) {
         accessGuard.requireUser();
-        return roomService.listRooms(campus, ubicacion);
+        return roomService.listRooms(campus, recinto, ubicacion, query);
     }
 
     @GetMapping("/available")

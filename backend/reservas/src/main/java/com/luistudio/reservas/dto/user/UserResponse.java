@@ -7,6 +7,7 @@ public record UserResponse(
     String firstName,
     String lastName,
     String status,
-    String role
+    String role,
+    boolean blocked
 ) {
 }

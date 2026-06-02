@@ -1,5 +1,6 @@
 import type { FormEvent } from 'react'
 import type { RoomDraft, ScheduleDay } from '../../../models/types'
+import { buildPabellonCode } from '../../../utils/helpers'
 
 interface RoomFormModalProps {
   mode: 'add' | 'edit'
@@ -74,7 +75,7 @@ export function RoomFormModal({
                     ...draft,
                     campus: nextCampus,
                     location: nextVenue,
-                    pabellonCode: `${nextCampus}-${nextVenue}`.replace(/[^A-Za-z0-9]/g, '-').toUpperCase(),
+                    pabellonCode: buildPabellonCode(nextCampus, nextVenue),
                   })
                 }}
               >
@@ -95,7 +96,7 @@ export function RoomFormModal({
                   onChange({
                     ...draft,
                     location: event.target.value,
-                    pabellonCode: `${draft.campus}-${event.target.value}`.replace(/[^A-Za-z0-9]/g, '-').toUpperCase(),
+                    pabellonCode: buildPabellonCode(draft.campus, event.target.value),
                   })
                 }
               >
@@ -149,6 +150,24 @@ export function RoomFormModal({
                 onChange={(event) => onChange({ ...draft, maxPeople: Number(event.target.value) })}
               />
             </div>
+          </div>
+
+          <div>
+            <label htmlFor="room-status">Estado</label>
+            <select
+              id="room-status"
+              value={draft.status}
+              onChange={(event) =>
+                onChange({
+                  ...draft,
+                  status: event.target.value as RoomDraft['status'],
+                })
+              }
+            >
+              <option value="Disponible">Disponible</option>
+              <option value="En mantenimiento">En mantenimiento</option>
+              <option value="Inactiva">Inactiva</option>
+            </select>
           </div>
 
           <label className="remember-check">

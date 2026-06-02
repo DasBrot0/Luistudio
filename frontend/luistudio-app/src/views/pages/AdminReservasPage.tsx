@@ -1,21 +1,31 @@
 import type { FormEvent } from 'react'
-import { AppHeader } from '../components/layout/AppHeader'
 import type { AuthUser, Booking, BookingStatus, CampusSchedule, ScheduleDay, SystemConfig } from '../../models/types'
 import { formatDate } from '../../utils/helpers'
+import { FilterBar } from '../components/filters/FilterBar'
+import { AppHeader } from '../components/layout/AppHeader'
 
 interface AdminReservasPageProps {
   bookings: Booking[]
   users: AuthUser[]
+  adminSearchQuery: string
   adminStatusFilter: 'Todos' | BookingStatus
+  adminCampusFilter: string
   adminDateFilter: string
+  adminDateQuickFilter: 'none' | 'today' | 'week'
   adminPage: number
   totalAdminPages: number
+  campusOptions: string[]
   config: SystemConfig
   configDraft: SystemConfig
   configNotice: string
   campusSchedules: CampusSchedule[]
+  onSearchQueryChange: (value: string) => void
   onStatusFilterChange: (value: 'Todos' | BookingStatus) => void
+  onCampusFilterChange: (value: string) => void
   onDateFilterChange: (value: string) => void
+  onTodayFilter: () => void
+  onWeekFilter: () => void
+  onClearDateFilter: () => void
   onPrevPage: () => void
   onNextPage: () => void
   onEditBooking: (booking: Booking) => void
@@ -34,16 +44,25 @@ const patchDay = (days: ScheduleDay[], dayOfWeek: number, patch: Partial<Schedul
 export function AdminReservasPage({
   bookings,
   users,
+  adminSearchQuery,
   adminStatusFilter,
+  adminCampusFilter,
   adminDateFilter,
+  adminDateQuickFilter,
   adminPage,
   totalAdminPages,
+  campusOptions,
   config,
   configDraft,
   configNotice,
   campusSchedules,
+  onSearchQueryChange,
   onStatusFilterChange,
+  onCampusFilterChange,
   onDateFilterChange,
+  onTodayFilter,
+  onWeekFilter,
+  onClearDateFilter,
   onPrevPage,
   onNextPage,
   onEditBooking,
@@ -76,16 +95,61 @@ export function AdminReservasPage({
         <article className="card">
           <div className="card-head">
             <h2>Reservas activas</h2>
-            <div className="inline-filters">
-              <select value={adminStatusFilter} onChange={(event) => onStatusFilterChange(event.target.value as 'Todos' | BookingStatus)}>
-                <option value="Todos">Todos</option>
-                <option value="Confirmado">Confirmadas</option>
-                <option value="Cancelado">Canceladas</option>
-              </select>
-
-              <input type="date" value={adminDateFilter} onChange={(event) => onDateFilterChange(event.target.value)} />
-            </div>
           </div>
+
+          <FilterBar
+            searchPlaceholder="Buscar por estudiante o sala"
+            searchValue={adminSearchQuery}
+            onSearchChange={onSearchQueryChange}
+            filters={[
+              {
+                id: 'admin-bookings-status-filter',
+                value: adminStatusFilter,
+                onChange: (value) => onStatusFilterChange(value as 'Todos' | BookingStatus),
+                options: [
+                  { value: 'Todos', label: 'Estado: Todos' },
+                  { value: 'Confirmado', label: 'Estado: Confirmado' },
+                  { value: 'Cancelado', label: 'Estado: Cancelado' },
+                ],
+              },
+              {
+                id: 'admin-bookings-campus-filter',
+                value: adminCampusFilter,
+                onChange: onCampusFilterChange,
+                options: [
+                  { value: 'Todos', label: 'Campus: Todos' },
+                  ...campusOptions.map((campus) => ({ value: campus, label: `Campus: ${campus}` })),
+                ],
+              },
+              {
+                id: 'admin-bookings-date-filter',
+                type: 'date',
+                value: adminDateFilter,
+                onChange: onDateFilterChange,
+                ariaLabel: 'Filtrar por fecha',
+              },
+            ]}
+            quickChips={[
+              {
+                id: 'admin-bookings-today',
+                label: 'Hoy',
+                active: adminDateQuickFilter === 'today',
+                onClick: onTodayFilter,
+              },
+              {
+                id: 'admin-bookings-week',
+                label: 'Esta semana',
+                active: adminDateQuickFilter === 'week',
+                onClick: onWeekFilter,
+              },
+              {
+                id: 'admin-bookings-clear-date',
+                label: 'Limpiar fecha',
+                active: adminDateQuickFilter === 'none' && adminDateFilter === '',
+                onClick: onClearDateFilter,
+              },
+            ]}
+          />
 
           <div className="table-wrap desktop-table-only">
             <table>

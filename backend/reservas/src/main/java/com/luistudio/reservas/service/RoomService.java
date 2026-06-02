@@ -26,6 +26,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class RoomService {
+    private static final String ROOM_HAS_ACTIVE_RESERVATION_MESSAGE =
+        "En esta sala hay reserva activa asi que no se puede eliminar";
 
     private final RoomRepository roomRepository;
     private final PabellonRepository pabellonRepository;
@@ -57,15 +59,8 @@ public class RoomService {
     }
 
     @Transactional(readOnly = true)
-    public List<RoomResponse> listRooms(String campus, String location) {
-        List<RoomEntity> rooms;
-        if (location != null && !location.isBlank()) {
-            rooms = roomRepository.findByUbicacionIgnoreCaseAndEstadoNot(location, RoomState.INACTIVA);
-        } else if (campus != null && !campus.isBlank()) {
-            rooms = roomRepository.findByCampusIgnoreCaseAndEstadoNot(campus, RoomState.INACTIVA);
-        } else {
-            rooms = roomRepository.findByEstadoNot(RoomState.INACTIVA);
-        }
+    public List<RoomResponse> listRooms(String campus, String venue, String location, String query) {
+        List<RoomEntity> rooms = roomRepository.searchActiveRooms(campus, venue, location, query, RoomState.INACTIVA);
         return rooms.stream().map(this::toRoomResponse).toList();
     }
 
@@ -113,6 +108,11 @@ public class RoomService {
         room.setMinimoPersonasObligatorio(request.minPeopleRequired());
         room.setMaximoPersonas(request.maxPeople());
         room.setPabellon(resolvePabellon(request.pabellonCode(), request.location()));
+        RoomState requestedStatus = request.status() == null ? room.getEstado() : request.status();
+        if (requestedStatus == RoomState.INACTIVA) {
+            ensureRoomCanBeInactivated(room);
+        }
+        room.setEstado(requestedStatus);
         RoomEntity saved = roomRepository.save(room);
         roomScheduleService.saveRoomSchedule(saved, request.schedule());
         return toRoomResponse(saved);
@@ -121,10 +121,7 @@ public class RoomService {
     @Transactional
     public void deleteRoom(Long roomId) {
         RoomEntity room = getRoomEntity(roomId);
-        boolean hasFuture = reservationRepository.existsFutureActiveReservations(room, LocalDate.now(), LocalTime.now());
-        if (hasFuture) {
-            throw new BusinessException(HttpStatus.BAD_REQUEST, "No se puede eliminar: la sala tiene reservas futuras activas");
-        }
+        ensureRoomCanBeInactivated(room);
         room.setEstado(RoomState.INACTIVA);
         roomRepository.save(room);
     }
@@ -219,6 +216,13 @@ public class RoomService {
 
     private int resolveMinPeople(Integer minPeople) {
         return minPeople == null ? 1 : minPeople;
+    }
+
+    private void ensureRoomCanBeInactivated(RoomEntity room) {
+        boolean hasFuture = reservationRepository.existsFutureActiveReservations(room, LocalDate.now(), LocalTime.now());
+        if (hasFuture) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST, ROOM_HAS_ACTIVE_RESERVATION_MESSAGE);
+        }
     }
 
     private void validatePeopleConstraints(int capacity, Integer minPeople, boolean minRequired, int maxPeople) {

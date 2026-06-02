@@ -14,7 +14,9 @@ export function formatDate(date: string): string {
   return `${day}-${month}-${year}`
 }
 
-export function getDefaultReservationForm(_rooms: Room[]): ReservationForm {
+export function getDefaultReservationForm(rooms: Room[]): ReservationForm {
+  void rooms
+
   return {
     campus: '',
     location: '',
@@ -24,4 +26,15 @@ export function getDefaultReservationForm(_rooms: Room[]): ReservationForm {
     start: '',
     end: '',
   }
+}
+
+export function buildPabellonCode(campus: string, venue: string): string {
+  const words = `${campus} ${venue}`
+    .trim()
+    .split(/[^A-Za-z0-9]+/)
+    .filter(Boolean)
+
+  const initials = words.map((word) => word[0]).join('').toUpperCase()
+  const fallback = `${campus}-${venue}`.replace(/[^A-Za-z0-9]/g, '-').toUpperCase()
+  return (initials || fallback).slice(0, 20)
 }

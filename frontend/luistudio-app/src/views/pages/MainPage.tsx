@@ -14,10 +14,11 @@ import type {
   ScheduleDay,
   Room,
   RoomDraft,
+  RoomStatus,
   RouteKey,
   SystemConfig,
 } from '../../models/types'
-import { getDefaultReservationForm, minutesBetween } from '../../utils/helpers'
+import { buildPabellonCode, getDefaultReservationForm, minutesBetween } from '../../utils/helpers'
 import { LoginPage } from './LoginPage'
 import { ResetPasswordPage } from './ResetPasswordPage'
 import { ReservasPage } from './ReservasPage'
@@ -33,6 +34,7 @@ import { DeleteRoomModal } from '../components/modals/DeleteRoomModal'
 import { ForgotPasswordModal } from '../components/modals/ForgotPasswordModal'
 import { TwoFactorModal } from '../components/modals/TwoFactorModal'
 import { MessageModal } from '../components/modals/MessageModal'
+import { ConfirmCancelBookingModal } from '../components/modals/ConfirmCancelBookingModal'
 import { GlobalTopbar } from '../components/layout/GlobalTopbar'
 import { api, type ApiCampusSchedule, type ApiPreferences } from '../../services/api'
 
@@ -42,10 +44,30 @@ interface NotificationItem {
   createdAt: string
 }
 
+type NotificationPreferenceKey =
+  | 'BOOKING_CONFIRMATION'
+  | 'BOOKING_UPDATE'
+  | 'BOOKING_CANCELLATION'
+  | 'BOOKING_REMINDER'
+  | 'ROOM_MAINTENANCE'
+  | 'PROFILE_STATUS'
+
+type NotificationChannelSettings = { app: boolean; email: boolean }
+type NotificationSettings = Record<string, NotificationChannelSettings>
+
+interface NotificationPreferenceOption {
+  key: NotificationPreferenceKey
+  group: string
+  label: string
+  app: boolean
+  email: boolean
+}
+
 type LoginLandingViewCode =
   | 'STUDENT_MY_BOOKINGS'
   | 'STUDENT_RESERVE'
   | 'ADMIN_ROOMS'
+  | 'ADMIN_PROFILES'
   | 'ADMIN_BOOKINGS'
 
 const LOCAL_STORAGE_THEME_KEY = 'luistudio_dark_mode'
@@ -144,7 +166,19 @@ const toUiRoom = (room: {
   slotMinutes: room.slotMinutes,
   schedule: room.schedule,
   active: room.status !== 'INACTIVA',
+  status:
+    room.status === 'EN_MANTENIMIENTO'
+      ? 'En mantenimiento'
+      : room.status === 'INACTIVA'
+        ? 'Inactiva'
+        : 'Disponible',
 })
+
+const toApiRoomStatus = (status: RoomStatus): 'DISPONIBLE' | 'EN_MANTENIMIENTO' | 'INACTIVA' => {
+  if (status === 'En mantenimiento') return 'EN_MANTENIMIENTO'
+  if (status === 'Inactiva') return 'INACTIVA'
+  return 'DISPONIBLE'
+}
 
 const toUiCampusSchedule = (schedule: ApiCampusSchedule): CampusSchedule => ({
   campus: schedule.campus,
@@ -189,6 +223,20 @@ const formatDisplayDate = (isoDate: string) => {
   const [year, month, day] = isoDate.split('-')
   if (!year || !month || !day) return isoDate
   return `${day}/${month}/${year}`
+}
+
+const getTodayIso = () => new Date().toISOString().slice(0, 10)
+
+const isDateInCurrentWeek = (isoDate: string) => {
+  const today = new Date()
+  const start = new Date(today)
+  const weekday = (today.getDay() + 6) % 7
+  start.setHours(0, 0, 0, 0)
+  start.setDate(today.getDate() - weekday)
+  const end = new Date(start)
+  end.setDate(start.getDate() + 7)
+  const target = new Date(`${isoDate}T00:00:00`)
+  return target >= start && target < end
 }
 
 const dedupeBookingsByIdentity = (items: Booking[]) => {
@@ -237,19 +285,22 @@ const toProfile = (user: {
   firstName: string
   lastName: string
   status: 'HABILITADO' | 'DESHABILITADO'
+  blocked: boolean
 }): Profile => ({
   id: String(user.id),
   code: user.code,
   email: user.email,
   firstName: user.firstName,
   lastName: user.lastName,
-  status: user.status === 'HABILITADO' ? 'Habilitado' : 'Deshabilitado',
+  status: user.blocked ? 'Bloqueado' : user.status === 'HABILITADO' ? 'Habilitado' : 'Deshabilitado',
+  blocked: user.blocked,
 })
 
 const defaultLandingRoute = (role: Role): RouteKey => (role === 'admin' ? 'salas' : 'misreservas')
 
 const routeToLandingViewCode = (role: Role, route: RouteKey): LoginLandingViewCode => {
   if (role === 'admin') {
+    if (route === 'perfiles') return 'ADMIN_PROFILES'
     return route === 'admin-reservas' ? 'ADMIN_BOOKINGS' : 'ADMIN_ROOMS'
   }
   return route === 'reservas' ? 'STUDENT_RESERVE' : 'STUDENT_MY_BOOKINGS'
@@ -257,10 +308,53 @@ const routeToLandingViewCode = (role: Role, route: RouteKey): LoginLandingViewCo
 
 const landingViewCodeToRoute = (role: Role, code: LoginLandingViewCode): RouteKey => {
   if (role === 'admin') {
+    if (code === 'ADMIN_PROFILES') return 'perfiles'
     return code === 'ADMIN_BOOKINGS' ? 'admin-reservas' : 'salas'
   }
   return code === 'STUDENT_RESERVE' ? 'reservas' : 'misreservas'
 }
+
+const notificationPreferenceOptions = (role: Role): NotificationPreferenceOption[] => {
+  const studentOptions: NotificationPreferenceOption[] = [
+    { key: 'BOOKING_CONFIRMATION', group: 'Reservas', label: 'Confirmacion de reserva', app: true, email: true },
+    { key: 'BOOKING_UPDATE', group: 'Reservas', label: 'Modificacion de reserva', app: true, email: true },
+    { key: 'BOOKING_CANCELLATION', group: 'Reservas', label: 'Cancelacion de reserva', app: true, email: true },
+    { key: 'BOOKING_REMINDER', group: 'Reservas', label: 'Recordatorio previo a la reserva', app: true, email: true },
+  ]
+  if (role === 'admin') {
+    return [
+      { key: 'ROOM_MAINTENANCE', group: 'Mantenimiento de salas', label: 'Sala en mantenimiento', app: true, email: true },
+      { key: 'PROFILE_STATUS', group: 'Perfiles', label: 'Cambios de estado de usuarios', app: true, email: false },
+    ]
+  }
+  return studentOptions
+}
+
+const defaultNotificationSettings = (role: Role): NotificationSettings =>
+  notificationPreferenceOptions(role).reduce<NotificationSettings>((acc, option) => {
+    acc[option.key] = { app: option.app, email: option.email }
+    return acc
+  }, {})
+
+const normalizeNotificationSettings = (
+  role: Role,
+  settings?: NotificationSettings,
+  legacy?: Pick<ApiPreferences, 'emailEnabled' | 'reminderEnabled' | 'bookingChangesEnabled'>,
+): NotificationSettings =>
+  notificationPreferenceOptions(role).reduce<NotificationSettings>((acc, option) => {
+    const saved = settings?.[option.key]
+    let email = saved?.email ?? option.email
+    if (!saved && legacy) {
+      if (option.key === 'BOOKING_REMINDER') email = legacy.emailEnabled && legacy.reminderEnabled
+      else if (option.key === 'BOOKING_UPDATE' || option.key === 'BOOKING_CANCELLATION') {
+        email = legacy.emailEnabled && legacy.bookingChangesEnabled
+      } else {
+        email = legacy.emailEnabled && option.email
+      }
+    }
+    acc[option.key] = { app: saved?.app ?? option.app, email }
+    return acc
+  }, {})
 
 const getInitialNotifications = (): NotificationItem[] => {
   try {
@@ -322,6 +416,7 @@ export function MainPage() {
   const [showResetSuccess, setShowResetSuccess] = useState(false)
 
   const [rooms, setRooms] = useState<Room[]>([])
+  const [roomDirectory, setRoomDirectory] = useState<Room[]>([])
   const [bookings, setBookings] = useState<Booking[]>([])
   const [profiles, setProfiles] = useState<Profile[]>([])
 
@@ -364,7 +459,11 @@ export function MainPage() {
   const [editBookingCompanions, setEditBookingCompanions] = useState<ReservationCompanion[]>([])
   const [editCompanionCodeInput, setEditCompanionCodeInput] = useState('')
 
+  const [roomSearchQuery, setRoomSearchQuery] = useState('')
+  const [roomFilterCampus, setRoomFilterCampus] = useState('Todos')
+  const [roomFilterVenue, setRoomFilterVenue] = useState('Todos')
   const [roomFilterLocation, setRoomFilterLocation] = useState('Todas')
+  const [roomStatusFilter, setRoomStatusFilter] = useState<'Todos' | 'Disponible' | 'En mantenimiento'>('Todos')
   const [roomModalMode, setRoomModalMode] = useState<'none' | 'add' | 'edit'>('none')
   const [roomModalTargetId, setRoomModalTargetId] = useState<string | null>(null)
   const [roomDraft, setRoomDraft] = useState<RoomDraft>({
@@ -375,6 +474,7 @@ export function MainPage() {
     minPeople: 1,
     minPeopleRequired: false,
     maxPeople: 6,
+    status: 'Disponible',
     schedule: [],
     pabellonCode: '',
   })
@@ -384,17 +484,21 @@ export function MainPage() {
 
   const [profilesPage, setProfilesPage] = useState(1)
   const [profilesTotalPages, setProfilesTotalPages] = useState(1)
+  const [adminSearchQuery, setAdminSearchQuery] = useState('')
   const [adminStatusFilter, setAdminStatusFilter] = useState<'Todos' | BookingStatus>('Todos')
+  const [adminCampusFilter, setAdminCampusFilter] = useState('Todos')
   const [adminDateFilter, setAdminDateFilter] = useState('')
+  const [adminDateQuickFilter, setAdminDateQuickFilter] = useState<'none' | 'today' | 'week'>('none')
   const [adminPage, setAdminPage] = useState(1)
   const [profilesQuery, setProfilesQuery] = useState('')
   const [profilesYearFilter, setProfilesYearFilter] = useState('')
-  const [profilesStatusFilter, setProfilesStatusFilter] = useState<'Todos' | 'Habilitado' | 'Deshabilitado'>('Todos')
+  const [profilesStatusFilter, setProfilesStatusFilter] = useState<'Todos' | 'Habilitado' | 'Deshabilitado' | 'Bloqueado'>('Todos')
   const [profilesSortBy, setProfilesSortBy] = useState('firstName')
   const [profilesSortDir, setProfilesSortDir] = useState<'asc' | 'desc'>('asc')
 
   const [toastMessage, setToastMessage] = useState('')
   const [modalMessage, setModalMessage] = useState<{ title: string; message: string; variant: 'error' | 'success' } | null>(null)
+  const [pendingCancelBooking, setPendingCancelBooking] = useState<{ bookingId: string; actor: Role } | null>(null)
   const [notifications, setNotifications] = useState<NotificationItem[]>(getInitialNotifications)
   const [isNotificationsModalOpen, setIsNotificationsModalOpen] = useState(false)
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false)
@@ -403,10 +507,11 @@ export function MainPage() {
   const [fontScale, setFontScale] = useState<number>(getInitialFontScale)
   const [twoFactorAction, setTwoFactorAction] = useState<'none' | 'enable' | 'disable'>('none')
   const [preferencesLoaded, setPreferencesLoaded] = useState(false)
-  const [notificationPrefs, setNotificationPrefs] = useState<Pick<ApiPreferences, 'emailEnabled' | 'reminderEnabled' | 'bookingChangesEnabled'>>({
+  const [notificationPrefs, setNotificationPrefs] = useState<Pick<ApiPreferences, 'emailEnabled' | 'reminderEnabled' | 'bookingChangesEnabled' | 'notificationSettings'>>({
     emailEnabled: true,
     reminderEnabled: true,
     bookingChangesEnabled: true,
+    notificationSettings: defaultNotificationSettings('student'),
   })
   const [loginLandingRoute, setLoginLandingRoute] = useState<RouteKey | null>(null)
   const [campusSchedules, setCampusSchedules] = useState<CampusSchedule[]>([])
@@ -418,10 +523,11 @@ export function MainPage() {
   const activeRooms = useMemo(() => rooms.filter((room) => room.active), [rooms])
   const campusValueOptions = useMemo(() => [...new Set(activeRooms.map((room) => room.campus))], [activeRooms])
   const campusOptions = useMemo(() => [...new Set(activeRooms.map((room) => room.campusLabel))], [activeRooms])
-  const locationOptions = useMemo(
+  const venueOptions = useMemo(
     () => [...new Set(activeRooms.map((room) => room.venueLabel))],
     [activeRooms],
   )
+  const roomLocationOptions = useMemo(() => [...new Set(activeRooms.map((room) => room.location))], [activeRooms])
   const locationOptionsByCampus = useMemo(() => {
     const grouped = new Map<string, string[]>()
     for (const room of activeRooms) {
@@ -451,29 +557,56 @@ export function MainPage() {
   const adminBookings = useMemo(() => {
     return bookings
       .filter((booking) => {
+        const room = activeRooms.find((item) => item.id === booking.roomId)
+        const normalizedQuery = adminSearchQuery.trim().toLowerCase()
+        if (normalizedQuery) {
+          const ownerMatch = (booking.userEmail ?? '').toLowerCase().includes(normalizedQuery)
+          const roomMatch = `${booking.roomId} ${room?.name ?? ''} ${room?.resourceLabel ?? ''}`.toLowerCase().includes(normalizedQuery)
+          if (!ownerMatch && !roomMatch) return false
+        }
         if (adminStatusFilter !== 'Todos' && booking.status !== adminStatusFilter) return false
-        if (adminDateFilter && booking.date !== adminDateFilter) return false
+        if (adminCampusFilter !== 'Todos' && room?.campusLabel !== adminCampusFilter) return false
+        if (adminDateQuickFilter === 'today' && booking.date !== getTodayIso()) return false
+        if (adminDateQuickFilter === 'week' && !isDateInCurrentWeek(booking.date)) return false
+        if (adminDateQuickFilter === 'none' && adminDateFilter && booking.date !== adminDateFilter) return false
         return true
       })
       .sort((a, b) => `${b.date} ${b.start}`.localeCompare(`${a.date} ${a.start}`))
-  }, [bookings, adminDateFilter, adminStatusFilter])
+  }, [activeRooms, adminCampusFilter, adminDateFilter, adminDateQuickFilter, adminSearchQuery, adminStatusFilter, bookings])
   const pageSize = 5
   const totalAdminPages = Math.max(1, Math.ceil(adminBookings.length / pageSize))
   const adminBookingsPage = adminBookings.slice((adminPage - 1) * pageSize, adminPage * pageSize)
   const filteredRooms = useMemo(() => {
-    if (roomFilterLocation === 'Todas') return activeRooms
-    return activeRooms.filter(
-      (room) => room.venueLabel === roomFilterLocation || room.campusLabel === roomFilterLocation,
-    )
-  }, [activeRooms, roomFilterLocation])
+    return roomDirectory.filter((room) => {
+      const normalizedQuery = roomSearchQuery.trim().toLowerCase()
+      if (normalizedQuery) {
+        const matchesQuery = `${room.id} ${room.name} ${room.location}`.toLowerCase().includes(normalizedQuery)
+        if (!matchesQuery) return false
+      }
+      if (roomFilterCampus !== 'Todos' && room.campusLabel !== roomFilterCampus) return false
+      if (roomFilterVenue !== 'Todos' && room.venueLabel !== roomFilterVenue) return false
+      if (roomFilterLocation !== 'Todas' && room.location !== roomFilterLocation) return false
+      if (roomStatusFilter !== 'Todos' && room.status !== roomStatusFilter) return false
+      return true
+    })
+  }, [roomDirectory, roomFilterCampus, roomFilterLocation, roomFilterVenue, roomSearchQuery, roomStatusFilter])
   const totalProfilePages = profilesTotalPages
   const paginatedProfiles = profiles
+  const pendingCancelTarget = useMemo(() => {
+    if (!pendingCancelBooking) return null
+    const booking = bookings.find((item) => item.id === pendingCancelBooking.bookingId)
+    if (!booking) return null
+    const room = activeRooms.find((item) => item.id === booking.roomId)
+    return { booking, room, actor: pendingCancelBooking.actor }
+  }, [activeRooms, bookings, pendingCancelBooking])
   const selectedReservationRoom = useMemo(
     () => activeRooms.find((room) => room.id === reservationForm.roomId) ?? null,
     [activeRooms, reservationForm.roomId],
   )
 
-  const pushNotification = (message: string) => {
+  const pushNotification = (message: string, type: NotificationPreferenceKey = 'BOOKING_CONFIRMATION') => {
+    const preference = notificationPrefs.notificationSettings[type]
+    if (preference && !preference.app) return
     setToastMessage(message)
     setNotifications((current) => [
       {
@@ -483,6 +616,35 @@ export function MainPage() {
       },
       ...current,
     ])
+  }
+
+  const setNotificationChannel = (key: NotificationPreferenceKey, channel: keyof NotificationChannelSettings, enabled: boolean) => {
+    if (!authenticatedUser) return
+    const nextSettings = normalizeNotificationSettings(authenticatedUser.role, notificationPrefs.notificationSettings)
+    nextSettings[key] = {
+      ...(nextSettings[key] ?? { app: true, email: true }),
+      [channel]: enabled,
+    }
+    setNotificationPrefs({
+      emailEnabled: Object.values(nextSettings).some((item) => item.email),
+      reminderEnabled: Boolean(nextSettings.BOOKING_REMINDER?.email),
+      bookingChangesEnabled: Boolean(nextSettings.BOOKING_UPDATE?.email || nextSettings.BOOKING_CANCELLATION?.email),
+      notificationSettings: nextSettings,
+    })
+  }
+
+  const setAllNotificationChannels = (enabled: boolean) => {
+    const role = authenticatedUser?.role ?? 'student'
+    const nextSettings = notificationPreferenceOptions(role).reduce<NotificationSettings>((acc, option) => {
+      acc[option.key] = { app: enabled, email: option.email ? enabled : false }
+      return acc
+    }, {})
+    setNotificationPrefs({
+      emailEnabled: Object.values(nextSettings).some((item) => item.email),
+      reminderEnabled: Boolean(nextSettings.BOOKING_REMINDER?.email),
+      bookingChangesEnabled: Boolean(nextSettings.BOOKING_UPDATE?.email || nextSettings.BOOKING_CANCELLATION?.email),
+      notificationSettings: nextSettings,
+    })
   }
 
   const navigateToRoute = (nextRoute: RouteKey, options?: { replace?: boolean }) => {
@@ -560,6 +722,17 @@ export function MainPage() {
     const result = await api.getRooms(authToken)
     const mapped = result.map(toUiRoom)
     setRooms(mapped)
+    setRoomDirectory(mapped)
+  }
+
+  const loadRoomDirectory = async (authToken: string) => {
+    const result = await api.getRooms(authToken, {
+      campus: roomFilterCampus,
+      venue: roomFilterVenue,
+      location: roomFilterLocation,
+      query: roomSearchQuery,
+    })
+    setRoomDirectory(result.map(toUiRoom))
   }
 
   const loadMyBookings = async (authToken: string) => {
@@ -641,6 +814,7 @@ export function MainPage() {
         emailEnabled: result.emailEnabled,
         reminderEnabled: result.reminderEnabled,
         bookingChangesEnabled: result.bookingChangesEnabled,
+        notificationSettings: normalizeNotificationSettings(user.role, result.notificationSettings, result),
       })
       const nextDarkMode = result.themeMode === 'DARK'
       const nextFontScale = clampFontScale(result.fontScale)
@@ -770,6 +944,18 @@ export function MainPage() {
     if (!token || authenticatedUser?.role !== 'admin') return
     loadAdminBookings(token).catch(() => undefined)
   }, [adminPage, adminStatusFilter, adminDateFilter, token, authenticatedUser])
+
+  useEffect(() => {
+    if (!token || authenticatedUser?.role !== 'admin') return
+    loadRoomDirectory(token).catch(() => undefined)
+  }, [
+    authenticatedUser,
+    roomFilterCampus,
+    roomFilterLocation,
+    roomFilterVenue,
+    roomSearchQuery,
+    token,
+  ])
 
   useEffect(() => {
     if (!token || authenticatedUser?.role !== 'admin') return
@@ -1047,6 +1233,7 @@ export function MainPage() {
       setReservationCompanionCodeInput('')
       pushNotification(
         `Reserva confirmada: ${selectedRoom.resourceLabel} (${reservationForm.location}), ${formatDisplayDate(reservationForm.date)} ${reservationForm.start}-${reservationForm.end}.`,
+        'BOOKING_CONFIRMATION',
       )
     } catch (error) {
       const message = error instanceof Error ? error.message : 'No se pudo crear la reserva'
@@ -1208,6 +1395,7 @@ export function MainPage() {
       setEditCompanionCodeInput('')
       pushNotification(
         `Reserva editada: ${selectedRoom.resourceLabel} (${editBookingForm.location}), ${formatDisplayDate(editBookingForm.date)} ${editBookingForm.start}-${editBookingForm.end}.`,
+        'BOOKING_UPDATE',
       )
     } catch (error) {
       const message = error instanceof Error ? error.message : 'No se pudo actualizar la reserva'
@@ -1216,8 +1404,14 @@ export function MainPage() {
     }
   }
 
-  const cancelBooking = async (bookingId: string, actor: Role) => {
+  const requestCancelBooking = (bookingId: string, actor: Role) => {
+    setPendingCancelBooking({ bookingId, actor })
+  }
+
+  const cancelBooking = async () => {
     if (!token) return
+    if (!pendingCancelBooking) return
+    const { bookingId, actor } = pendingCancelBooking
     const target = bookings.find((booking) => booking.id === bookingId)
     if (!target) return
     const targetRoom = activeRooms.find((room) => room.id === target.roomId)
@@ -1233,7 +1427,9 @@ export function MainPage() {
         actor === 'admin'
           ? `Reserva cancelada por administrador: ${targetRoomLabel} (${target.location}), ${formatDisplayDate(target.date)} ${target.start}-${target.end}.`
           : `Reserva cancelada: ${targetRoomLabel} (${target.location}), ${formatDisplayDate(target.date)} ${target.start}-${target.end}.`,
+        'BOOKING_CANCELLATION',
       )
+      setPendingCancelBooking(null)
     } catch (error) {
       const message = error instanceof Error ? error.message : 'No se pudo cancelar la reserva'
       setModalMessage({ title: 'No se pudo cancelar', message, variant: 'error' })
@@ -1251,8 +1447,9 @@ export function MainPage() {
       minPeople: 1,
       minPeopleRequired: false,
       maxPeople: 6,
+      status: 'Disponible',
       schedule: [],
-      pabellonCode: `${firstCampus}-${firstLocation}`.replace(/[^A-Za-z0-9]/g, '-').toUpperCase(),
+      pabellonCode: buildPabellonCode(firstCampus, firstLocation),
     })
     setRoomModalTargetId(null)
     setRoomModalMode('add')
@@ -1267,8 +1464,9 @@ export function MainPage() {
       minPeople: room.minPeople,
       minPeopleRequired: room.minPeopleRequired,
       maxPeople: room.maxPeople,
+      status: room.status,
       schedule: room.schedule,
-      pabellonCode: `${room.campus}-${room.venue}`.replace(/[^A-Za-z0-9]/g, '-').toUpperCase(),
+      pabellonCode: buildPabellonCode(room.campus, room.venue),
     })
     setRoomModalTargetId(room.id)
     setRoomModalMode('edit')
@@ -1279,6 +1477,7 @@ export function MainPage() {
     if (!token) return
     const payload = {
       ...roomDraft,
+      status: toApiRoomStatus(roomDraft.status),
       schedule: roomDraft.schedule.map((day) => ({
         dayOfWeek: day.dayOfWeek,
         openTime: day.openTime,
@@ -1297,6 +1496,7 @@ export function MainPage() {
         const updated = await api.updateRoom(token, target.backendId, payload)
         setRooms((current) => current.map((room) => (room.id === roomModalTargetId ? toUiRoom(updated) : room)))
       }
+      await loadRoomDirectory(token)
       setRoomModalMode('none')
     } catch (error) {
       const message = error instanceof Error ? error.message : 'No se pudo guardar la sala'
@@ -1316,7 +1516,8 @@ export function MainPage() {
           room.id === pendingDeleteRoomId ? { ...room, active: false } : room,
         ),
       )
-      pushNotification('Sala desactivada correctamente.')
+      await loadRoomDirectory(token)
+      pushNotification('Sala desactivada correctamente.', 'ROOM_MAINTENANCE')
     } catch (error) {
       const message = error instanceof Error ? error.message : 'No se pudo eliminar la sala'
       setModalMessage({ title: 'No se pudo eliminar la sala', message, variant: 'error' })
@@ -1329,7 +1530,14 @@ export function MainPage() {
     if (!token) return
     const target = profiles.find((profile) => profile.id === profileId)
     if (!target) return
-    await api.updateUserStatus(token, Number(profileId), target.status)
+    const nextStatus = target.status === 'Habilitado' ? 'Deshabilitado' : 'Habilitado'
+    await api.updateUserStatus(token, Number(profileId), nextStatus)
+    await loadProfiles(token)
+  }
+
+  const unlockProfile = async (profileId: string) => {
+    if (!token) return
+    await api.unlockUser(token, Number(profileId))
     await loadProfiles(token)
   }
 
@@ -1398,6 +1606,16 @@ export function MainPage() {
     : ''
   const mobileNavPaddingClass = showGlobalTopbar ? 'pt-16 md:pt-0 pb-20 md:pb-0' : ''
   const shouldShowAuthRestoreScreen = hasStoredSession && !authHydrated && route !== 'reset-password'
+  const settingsRole = authenticatedUser?.role ?? 'student'
+  const settingsNotificationOptions = notificationPreferenceOptions(settingsRole)
+  const settingsNotificationGroups = settingsNotificationOptions.reduce<Record<string, NotificationPreferenceOption[]>>((acc, option) => {
+    acc[option.group] = [...(acc[option.group] ?? []), option]
+    return acc
+  }, {})
+  const allNotificationsEnabled = settingsNotificationOptions.every((option) => {
+    const preference = notificationPrefs.notificationSettings[option.key] ?? { app: option.app, email: option.email }
+    return preference.app && (!option.email || preference.email)
+  })
 
   return (
     <>
@@ -1483,7 +1701,7 @@ export function MainPage() {
                 myBookings={myBookings}
                 activeRooms={activeRooms}
                 onEditBooking={openEditBooking}
-                onCancelBooking={(bookingId) => cancelBooking(bookingId, 'student')}
+                onCancelBooking={(bookingId) => requestCancelBooking(bookingId, 'student')}
                 onCreateFirstReservation={() => navigateToRoute('reservas')}
               />
             )}
@@ -1491,10 +1709,19 @@ export function MainPage() {
               <SalasPage
                 filteredRooms={filteredRooms}
                 campusOptions={campusOptions}
-                locationOptions={locationOptions}
+                venueOptions={venueOptions}
+                locationOptions={roomLocationOptions}
+                roomSearchQuery={roomSearchQuery}
+                roomFilterCampus={roomFilterCampus}
+                roomFilterVenue={roomFilterVenue}
                 roomFilterLocation={roomFilterLocation}
+                roomStatusFilter={roomStatusFilter}
                 roomNotice={roomNotice}
-                onRoomFilterChange={setRoomFilterLocation}
+                onRoomSearchChange={setRoomSearchQuery}
+                onRoomFilterCampusChange={setRoomFilterCampus}
+                onRoomFilterVenueChange={setRoomFilterVenue}
+                onRoomFilterLocationChange={setRoomFilterLocation}
+                onRoomStatusFilterChange={setRoomStatusFilter}
                 onOpenAddRoom={openAddRoom}
                 onOpenEditRoom={openEditRoom}
                 onAskDeleteRoom={setPendingDeleteRoomId}
@@ -1531,6 +1758,7 @@ export function MainPage() {
                   setProfilesSortDir((current) => (current === 'asc' ? 'desc' : 'asc'))
                 }}
                 onToggleProfileStatus={toggleProfileStatus}
+                onUnlockProfile={unlockProfile}
                 onPrevPage={() => setProfilesPage((current) => Math.max(1, current - 1))}
                 onNextPage={() => setProfilesPage((current) => Math.min(totalProfilePages, current + 1))}
               />
@@ -1539,26 +1767,54 @@ export function MainPage() {
               <AdminReservasPage
                 bookings={adminBookingsPage}
                 users={[]}
+                adminSearchQuery={adminSearchQuery}
                 adminStatusFilter={adminStatusFilter}
+                adminCampusFilter={adminCampusFilter}
                 adminDateFilter={adminDateFilter}
+                adminDateQuickFilter={adminDateQuickFilter}
                 adminPage={adminPage}
                 totalAdminPages={totalAdminPages}
+                campusOptions={campusOptions}
                 config={config}
                 configDraft={configDraft}
                 configNotice={configNotice}
                 campusSchedules={campusSchedules}
+                onSearchQueryChange={(value) => {
+                  setAdminSearchQuery(value)
+                  setAdminPage(1)
+                }}
                 onStatusFilterChange={(value) => {
                   setAdminStatusFilter(value)
                   setAdminPage(1)
                 }}
+                onCampusFilterChange={(value) => {
+                  setAdminCampusFilter(value)
+                  setAdminPage(1)
+                }}
                 onDateFilterChange={(value) => {
+                  setAdminDateQuickFilter('none')
                   setAdminDateFilter(value)
+                  setAdminPage(1)
+                }}
+                onTodayFilter={() => {
+                  setAdminDateQuickFilter('today')
+                  setAdminDateFilter(getTodayIso())
+                  setAdminPage(1)
+                }}
+                onWeekFilter={() => {
+                  setAdminDateQuickFilter('week')
+                  setAdminDateFilter('')
+                  setAdminPage(1)
+                }}
+                onClearDateFilter={() => {
+                  setAdminDateQuickFilter('none')
+                  setAdminDateFilter('')
                   setAdminPage(1)
                 }}
                 onPrevPage={() => setAdminPage((current) => current - 1)}
                 onNextPage={() => setAdminPage((current) => current + 1)}
                 onEditBooking={openEditBooking}
-                onCancelBooking={(bookingId) => cancelBooking(bookingId, 'admin')}
+                onCancelBooking={(bookingId) => requestCancelBooking(bookingId, 'admin')}
                 onConfigDraftChange={setConfigDraft}
                 onSaveConfig={saveAdminConfig}
                 onCampusScheduleChange={(nextCampus) =>
@@ -1757,6 +2013,70 @@ export function MainPage() {
             <div className="settings-divider" />
 
             <div className="settings-section">
+              <p className="settings-badge-ink">Notificaciones</p>
+              <div className="notification-master-row">
+                <p className="settings-field-title">Activar todas las notificaciones</p>
+                <button
+                  type="button"
+                  className={`settings-switch ${allNotificationsEnabled ? 'active' : ''}`}
+                  role="switch"
+                  aria-checked={allNotificationsEnabled}
+                  onClick={() => setAllNotificationChannels(!allNotificationsEnabled)}
+                >
+                  <span />
+                </button>
+              </div>
+              <div className="notification-preference-list">
+                {Object.entries(settingsNotificationGroups).map(([group, options]) => (
+                  <div className="notification-preference-group" key={group}>
+                    <h3>{group}</h3>
+                    {options.map((option) => {
+                      const preference = notificationPrefs.notificationSettings[option.key] ?? {
+                        app: option.app,
+                        email: option.email,
+                      }
+                      return (
+                        <div className="notification-preference-row" key={option.key}>
+                          <span className="notification-preference-label">{option.label}</span>
+                          <div className="notification-channel-controls">
+                            <span className="notification-channel-badge app">App</span>
+                            <button
+                              type="button"
+                              className={`settings-switch compact ${preference.app ? 'active' : ''}`}
+                              role="switch"
+                              aria-checked={preference.app}
+                              aria-label={`${option.label} por App`}
+                              onClick={() => setNotificationChannel(option.key, 'app', !preference.app)}
+                            >
+                              <span />
+                            </button>
+                            {option.email && (
+                              <>
+                                <span className="notification-channel-badge email">Email</span>
+                                <button
+                                  type="button"
+                                  className={`settings-switch compact ${preference.email ? 'active' : ''}`}
+                                  role="switch"
+                                  aria-checked={preference.email}
+                                  aria-label={`${option.label} por Email`}
+                                  onClick={() => setNotificationChannel(option.key, 'email', !preference.email)}
+                                >
+                                  <span />
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="settings-divider" />
+
+            <div className="settings-section">
               <p className="settings-badge-ink">Seguridad</p>
               <p className="settings-field-title">Autenticación en dos pasos (2FA)</p>
               <p className="settings-note">
@@ -1790,6 +2110,7 @@ export function MainPage() {
                 {authenticatedUser?.role === 'admin' ? (
                   <>
                     <option value="salas">Salas</option>
+                    <option value="perfiles">Perfiles</option>
                     <option value="admin-reservas">Reservas</option>
                   </>
                 ) : (
@@ -1819,6 +2140,18 @@ export function MainPage() {
           message={modalMessage.message}
           variant={modalMessage.variant}
           onClose={() => setModalMessage(null)}
+        />
+      )}
+      {pendingCancelTarget && (
+        <ConfirmCancelBookingModal
+          bookingLabel={pendingCancelTarget.actor === 'admin' ? 'esta reserva' : 'tu reserva'}
+          roomLabel={pendingCancelTarget.room?.resourceLabel ?? pendingCancelTarget.booking.roomId}
+          location={pendingCancelTarget.booking.location}
+          dateLabel={formatDisplayDate(pendingCancelTarget.booking.date)}
+          timeLabel={`${pendingCancelTarget.booking.start}-${pendingCancelTarget.booking.end}`}
+          actor={pendingCancelTarget.actor}
+          onConfirm={cancelBooking}
+          onClose={() => setPendingCancelBooking(null)}
         />
       )}
       {toastMessage && <div className="toast">{toastMessage}</div>}

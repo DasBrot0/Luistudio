@@ -79,9 +79,10 @@ public class UserService {
         String sortBy,
         String sortDir
     ) {
-        UserStatus userStatus = parseOptionalStatus(status);
+        boolean blockedOnly = "BLOQUEADO".equalsIgnoreCase(status);
+        UserStatus userStatus = blockedOnly ? null : parseOptionalStatus(status);
         PageRequest pageRequest = PageRequest.of(page, size, buildUserSort(sortBy, sortDir));
-        Page<UserEntity> users = userRepository.searchUsers(query, year, userStatus, pageRequest);
+        Page<UserEntity> users = userRepository.searchUsers(query, year, userStatus, blockedOnly ? Boolean.TRUE : null, pageRequest);
         return new PageResponse<>(
             users.getContent().stream().map(dtoMapper::toUser).toList(),
             users.getNumber(),
@@ -126,6 +127,9 @@ public class UserService {
         }
 
         user.setEstado(status);
+        if (status == UserStatus.HABILITADO) {
+            user.setLockedUntil(null);
+        }
         user.setActualizadoEn(OffsetDateTime.now());
         return dtoMapper.toUser(userRepository.save(user));
     }

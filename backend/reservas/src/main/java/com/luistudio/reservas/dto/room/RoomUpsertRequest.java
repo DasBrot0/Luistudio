@@ -1,5 +1,6 @@
 package com.luistudio.reservas.dto.room;
 
+import com.luistudio.reservas.model.RoomState;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
@@ -16,6 +17,7 @@ public record RoomUpsertRequest(
     @Min(1) Integer minPeople,
     @NotNull Boolean minPeopleRequired,
     List<@Valid RoomScheduleInput> schedule,
-    @Size(max = 20) String pabellonCode
+    @Size(max = 20, message = "El codigo de pabellon debe tener 20 caracteres como maximo") String pabellonCode,
+    RoomState status
 ) {
 }

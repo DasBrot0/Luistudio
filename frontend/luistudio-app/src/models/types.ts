@@ -10,7 +10,8 @@ export type RouteKey =
   | 'admin-reservas'
 
 export type BookingStatus = 'Confirmado' | 'Cancelado'
-export type ProfileStatus = 'Habilitado' | 'Deshabilitado'
+export type ProfileStatus = 'Habilitado' | 'Deshabilitado' | 'Bloqueado'
+export type RoomStatus = 'Disponible' | 'En mantenimiento' | 'Inactiva'
 
 export interface AuthUser {
   id: number
@@ -39,6 +40,7 @@ export interface Room {
   slotMinutes: number
   schedule: ScheduleDay[]
   active: boolean
+  status: RoomStatus
 }
 
 export interface ScheduleDay {
@@ -87,6 +89,7 @@ export interface Profile {
   firstName: string
   lastName: string
   status: ProfileStatus
+  blocked: boolean
 }
 
 export interface SystemConfig {
@@ -102,6 +105,7 @@ export interface RoomDraft {
   minPeople: number
   minPeopleRequired: boolean
   maxPeople: number
+  status: RoomStatus
   schedule: ScheduleDay[]
   pabellonCode: string
 }

@@ -36,6 +36,9 @@ public class NotificationPreferenceEntity {
     @Column(name = "booking_changes_enabled", nullable = false)
     private Boolean cambiosReservaHabilitado = true;
 
+    @Column(name = "notification_settings", columnDefinition = "TEXT")
+    private String notificationSettings;
+
     @Column(name = "theme_mode", nullable = false, length = 10)
     private String themeMode = "LIGHT";
 

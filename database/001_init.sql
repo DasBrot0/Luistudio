@@ -181,12 +181,13 @@ CREATE TABLE IF NOT EXISTS notification_preferences (
   email_enabled BOOLEAN NOT NULL DEFAULT TRUE,
   reminder_enabled BOOLEAN NOT NULL DEFAULT TRUE,
   booking_changes_enabled BOOLEAN NOT NULL DEFAULT TRUE,
+  notification_settings TEXT,
   theme_mode VARCHAR(10) NOT NULL DEFAULT 'LIGHT',
   font_scale DOUBLE PRECISION NOT NULL DEFAULT 1.0,
   login_landing_view VARCHAR(30) NOT NULL DEFAULT 'STUDENT_MY_BOOKINGS',
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   CONSTRAINT chk_preferencia_landing_view CHECK (
-    login_landing_view IN ('STUDENT_MY_BOOKINGS', 'STUDENT_RESERVE', 'ADMIN_ROOMS', 'ADMIN_BOOKINGS')
+    login_landing_view IN ('STUDENT_MY_BOOKINGS', 'STUDENT_RESERVE', 'ADMIN_ROOMS', 'ADMIN_PROFILES', 'ADMIN_BOOKINGS')
   ),
   CONSTRAINT fk_preferencia_notificacion_usuario FOREIGN KEY (user_id) REFERENCES users(id)
 );

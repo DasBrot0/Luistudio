@@ -100,6 +100,7 @@ interface ApiUser {
   lastName: string
   status: 'HABILITADO' | 'DESHABILITADO'
   role: 'ADMIN' | 'ESTUDIANTE'
+  blocked: boolean
 }
 
 export interface ApiUserLookup {
@@ -113,9 +114,10 @@ export interface ApiPreferences {
   emailEnabled: boolean
   reminderEnabled: boolean
   bookingChangesEnabled: boolean
+  notificationSettings: Record<string, { app: boolean; email: boolean }>
   themeMode: 'LIGHT' | 'DARK'
   fontScale: number
-  loginLandingView: 'STUDENT_MY_BOOKINGS' | 'STUDENT_RESERVE' | 'ADMIN_ROOMS' | 'ADMIN_BOOKINGS'
+  loginLandingView: 'STUDENT_MY_BOOKINGS' | 'STUDENT_RESERVE' | 'ADMIN_ROOMS' | 'ADMIN_PROFILES' | 'ADMIN_BOOKINGS'
 }
 
 async function http<T>(path: string, options: RequestInit = {}, _token?: string): Promise<T> {
@@ -207,10 +209,15 @@ export const api = {
     )
   },
 
-  getRooms(token: string, params?: { campus?: string; location?: string }) {
+  getRooms(
+    token: string,
+    params?: { campus?: string; venue?: string; location?: string; query?: string },
+  ) {
     const queryParams = new URLSearchParams()
     if (params?.campus && params.campus !== 'Todas') queryParams.set('campus', params.campus)
+    if (params?.venue && params.venue !== 'Todos') queryParams.set('recinto', params.venue)
     if (params?.location && params.location !== 'Todas') queryParams.set('ubicacion', params.location)
+    if (params?.query?.trim()) queryParams.set('q', params.query.trim())
     const query = queryParams.toString() ? `?${queryParams.toString()}` : ''
     return http<ApiRoom[]>(`/rooms${query}`, {}, token)
   },
@@ -232,6 +239,7 @@ export const api = {
       minPeople: number
       minPeopleRequired: boolean
       maxPeople: number
+      status?: 'DISPONIBLE' | 'EN_MANTENIMIENTO' | 'INACTIVA'
       schedule: ApiScheduleDay[]
       pabellonCode: string
     },
@@ -254,6 +262,7 @@ export const api = {
       minPeople: number
       minPeopleRequired: boolean
       maxPeople: number
+      status?: 'DISPONIBLE' | 'EN_MANTENIMIENTO' | 'INACTIVA'
       schedule: ApiScheduleDay[]
       pabellonCode: string
     },
@@ -317,10 +326,10 @@ export const api = {
     return http<ApiBooking>(`/bookings/${bookingId}/cancel`, { method: 'PATCH' }, token)
   },
 
-  getAdminBookings(token: string, page: number, status: string, date: string) {
+  getAdminBookings(token: string, _page: number, status: string, date: string) {
     const params = new URLSearchParams({
-      page: String(Math.max(page - 1, 0)),
-      size: '5',
+      page: '0',
+      size: '200',
     })
     if (status && status !== 'Todos') params.set('status', status === 'Confirmado' ? 'ACTIVA' : 'CANCELADA')
     if (date) params.set('fecha', date)
@@ -367,16 +376,27 @@ export const api = {
     if (filters.query) params.set('query', filters.query)
     if (filters.year) params.set('year', filters.year)
     if (filters.status && filters.status !== 'Todos') {
-      params.set('status', filters.status === 'Habilitado' ? 'HABILITADO' : 'DESHABILITADO')
+      if (filters.status === 'Bloqueado') {
+        params.set('status', 'BLOQUEADO')
+      } else {
+        params.set('status', filters.status === 'Habilitado' ? 'HABILITADO' : 'DESHABILITADO')
+      }
     }
     return http<ApiPage<ApiUser>>(`/admin/users?${params.toString()}`, {}, token)
   },
 
   updateUserStatus(token: string, userId: number, status: 'Habilitado' | 'Deshabilitado') {
-    const value = status === 'Habilitado' ? 'DESHABILITADO' : 'HABILITADO'
     return http<ApiUser>(
       `/admin/users/${userId}/estado`,
-      { method: 'PATCH', body: JSON.stringify({ status: value }) },
+      { method: 'PATCH', body: JSON.stringify({ status: status === 'Habilitado' ? 'HABILITADO' : 'DESHABILITADO' }) },
+      token,
+    )
+  },
+
+  unlockUser(token: string, userId: number) {
+    return http<ApiUser>(
+      `/admin/users/${userId}/estado`,
+      { method: 'PATCH', body: JSON.stringify({ status: 'HABILITADO' }) },
       token,
     )
   },

@@ -87,7 +87,7 @@ public interface ReservationRepository extends JpaRepository<ReservationEntity, 
         SELECT COUNT(r) > 0 FROM ReservationEntity r
         WHERE LOWER(r.sala.campus) = LOWER(:campus)
           AND r.estado = com.luistudio.reservas.model.ReservationStatus.ACTIVA
-          AND (r.fecha > :today OR (r.fecha = :today AND r.horaInicio >= :nowTime))
+          AND (r.fecha > :today OR (r.fecha = :today AND r.horaFin > :nowTime))
     """)
     boolean existsFutureActiveReservationsByCampus(
         @Param("campus") String campus,
@@ -107,7 +107,7 @@ public interface ReservationRepository extends JpaRepository<ReservationEntity, 
     @Query("""
         SELECT r FROM ReservationEntity r
         WHERE r.estado = com.luistudio.reservas.model.ReservationStatus.ACTIVA
-          AND (r.fecha > :today OR (r.fecha = :today AND r.horaInicio >= :nowTime))
+          AND (r.fecha > :today OR (r.fecha = :today AND r.horaFin > :nowTime))
           AND (r.fecha < :futureDate OR (r.fecha = :futureDate AND r.horaInicio <= :futureTime))
     """)
     List<ReservationEntity> findUpcomingWindow(

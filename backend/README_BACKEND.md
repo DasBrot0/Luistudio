@@ -74,7 +74,7 @@ Memoria (500 MB):
 ### Salas y disponibilidad
 
 - `GET /api/rooms`
-- `GET /api/rooms?campus&ubicacion`
+- `GET /api/rooms?campus&recinto&ubicacion&q`
 - `GET /api/rooms/available?fecha&horaInicio&horaFin`
 - `GET /api/rooms/{id}/bookings?desde&hasta`
 - `POST /api/rooms`
@@ -96,7 +96,7 @@ Memoria (500 MB):
 ### Administracion
 
 - `GET /api/admin/users`
-  - Soporta `query` por codigo/correo/nombres/apellidos, `year`, `status`, `sortBy` (`firstName`, `lastName`, `code`, `status`) y `sortDir`.
+  - Soporta `query` por codigo/correo/nombres/apellidos, `year`, `status` (`HABILITADO`, `DESHABILITADO`, `BLOQUEADO`), `sortBy` (`firstName`, `lastName`, `code`, `status`) y `sortDir`.
 - `PATCH /api/admin/users/{id}/estado`
 - `GET /api/admin/config`
 - `PUT /api/admin/config`
@@ -109,6 +109,7 @@ Memoria (500 MB):
 - `GET /api/me/preferences`
 - `PUT /api/me/preferences`
   - Incluye preferencias de notificaciones + UI (`themeMode`, `fontScale`).
+  - `notificationSettings` persiste por usuario los canales `app` y `email` por tipo de aviso, filtrados por rol.
 
 ### Usuarios (consulta para reservas)
 
@@ -119,6 +120,7 @@ Memoria (500 MB):
 ## Notas de implementacion
 
 - Se implementa bloqueo temporal tras intentos fallidos de login.
+- El listado administrativo de usuarios expone si una cuenta sigue bloqueada temporalmente y permite desbloquearla al volver a `HABILITADO`.
 - Se implementa 2FA por código temporal.
 - Los tokens de sesion y tokens provisionales viajan cifrados y se entregan en cookie `HttpOnly`.
 - Los tokens de recuperacion y codigos 2FA se almacenan hasheados; no se persisten en texto plano.
@@ -135,6 +137,7 @@ Memoria (500 MB):
 - Se agrega configuracion de duracion por bloque de reserva por campus (Monterrico 60 min, Mayorazgo 45 min por defecto).
 - Las reservas solo aceptan fechas/horas dentro de la ventana permitida (semana actual; fin de semana habilita tambien la siguiente semana) y siempre en horas futuras del dia actual.
 - No se permite cancelar reservas que ya finalizaron (validacion en backend).
+- La cancelacion administrativa reutiliza `PATCH /api/bookings/{id}/cancel`; el frontend ahora agrega confirmacion previa y el backend mantiene el envio de correo automatico.
 - Se agrega preferencia por usuario `login_landing_view` para definir la vista inicial al iniciar sesion (validada por rol).
 - Para bases ya existentes, aplicar `database/004_add_login_landing_view.sql`.
 - Para convertir data previa de salas (ingles -> espanol en `code/name/campus/venue/location`), aplicar `database/005_rooms_data_to_spanish.sql`.
@@ -195,3 +198,6 @@ Si falta alguna credencial, el sistema hace fallback a `log` y deja warning en l
 - Los correos salientes se renderizan con plantilla HTML unificada (resumen, detalles clave, enlaces y codigos), para mantener formato consistente e informativo en todos los eventos.
 - Correos de 2FA (activacion, desactivacion e inicio de sesion) ajustados con tildes correctas y render de codigo sin duplicados en plantilla HTML.
 - Para desarrollo, el backend incluye spring-boot-devtools (runtime) para reinicio automatico al detectar cambios mientras se ejecuta ./mvnw spring-boot:run.
+- El admin puede cambiar salas a disponible, mantenimiento o inactiva; inactivar/eliminar una sala se bloquea si tiene reservas activas en curso o futuras.
+- La preferencia de vista inicial para administradores acepta Salas, Perfiles y Reservas.
+- Las preferencias de notificacion por usuario se guardan en `notification_preferences.notification_settings`; los correos de reservas y recordatorios respetan el canal Email configurado.

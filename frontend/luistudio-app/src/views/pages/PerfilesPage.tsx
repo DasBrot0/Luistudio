@@ -1,5 +1,5 @@
-import { useState } from 'react'
 import { AppHeader } from '../components/layout/AppHeader'
+import { FilterBar } from '../components/filters/FilterBar'
 import type { Profile } from '../../models/types'
 
 interface PerfilesPageProps {
@@ -8,15 +8,16 @@ interface PerfilesPageProps {
   totalProfilePages: number
   searchQuery: string
   yearFilter: string
-  statusFilter: 'Todos' | 'Habilitado' | 'Deshabilitado'
+  statusFilter: 'Todos' | 'Habilitado' | 'Deshabilitado' | 'Bloqueado'
   sortBy: string
   sortDir: 'asc' | 'desc'
   onSearchQueryChange: (value: string) => void
   onYearFilterChange: (value: string) => void
-  onStatusFilterChange: (value: 'Todos' | 'Habilitado' | 'Deshabilitado') => void
+  onStatusFilterChange: (value: 'Todos' | 'Habilitado' | 'Deshabilitado' | 'Bloqueado') => void
   onSortChange: (value: string) => void
   onSortDirectionToggle: () => void
   onToggleProfileStatus: (profileId: string) => void
+  onUnlockProfile: (profileId: string) => void
   onPrevPage: () => void
   onNextPage: () => void
 }
@@ -36,11 +37,10 @@ export function PerfilesPage({
   onSortChange,
   onSortDirectionToggle,
   onToggleProfileStatus,
+  onUnlockProfile,
   onPrevPage,
   onNextPage,
 }: PerfilesPageProps) {
-  const [showFilters, setShowFilters] = useState(false)
-
   return (
     <main className="page dashboard-page">
       <AppHeader title="Perfiles" roleLabel="Administrador" />
@@ -49,57 +49,67 @@ export function PerfilesPage({
         <article className="card">
           <div className="card-head">
             <h2>Perfiles</h2>
-            <input
-              type="search"
-              value={searchQuery}
-              onChange={(event) => onSearchQueryChange(event.target.value)}
-              placeholder="Buscar por código, correo o nombre"
-            />
-            <button
-              type="button"
-              className="inline-flex min-h-8 items-center justify-center rounded-md border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 transition hover:-translate-y-px hover:bg-slate-50"
-              onClick={() => setShowFilters((current) => !current)}
-              aria-expanded={showFilters}
-            >
-              Filtros
-            </button>
-            <div className={`inline-filters ${showFilters ? '' : 'profiles-filters-hidden'}`}>
-              <input
-                type="text"
-                inputMode="numeric"
-                value={yearFilter}
-                onChange={(event) => onYearFilterChange(event.target.value)}
-                placeholder="Año"
-                aria-label="Filtrar por año"
-              />
-              <select
-                value={statusFilter}
-                onChange={(event) => onStatusFilterChange(event.target.value as 'Todos' | 'Habilitado' | 'Deshabilitado')}
-                aria-label="Filtrar por estado"
-              >
-                <option value="Todos">Todos</option>
-                <option value="Habilitado">Habilitado</option>
-                <option value="Deshabilitado">Deshabilitado</option>
-              </select>
-              <select value={sortBy} onChange={(event) => onSortChange(event.target.value)} aria-label="Ordenar por">
-                <option value="firstName">Nombre</option>
-                <option value="lastName">Apellidos</option>
-                <option value="code">Código</option>
-                <option value="status">Estado</option>
-              </select>
-              <button
-                type="button"
-                className="inline-flex min-h-8 items-center justify-center rounded-md border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 transition hover:-translate-y-px hover:bg-slate-50"
-                onClick={onSortDirectionToggle}
-                aria-label="Cambiar direccion del orden"
-              >
-                {sortDir === 'asc' ? 'Asc' : 'Desc'}
-              </button>
-            </div>
           </div>
 
+          <FilterBar
+            searchPlaceholder="Buscar por código, correo o nombre"
+            searchValue={searchQuery}
+            onSearchChange={onSearchQueryChange}
+            filters={[
+              {
+                id: 'profiles-status-filter',
+                value: statusFilter,
+                onChange: (value) => onStatusFilterChange(value as 'Todos' | 'Habilitado' | 'Deshabilitado' | 'Bloqueado'),
+                options: [
+                  { value: 'Todos', label: 'Estado: Todos' },
+                  { value: 'Habilitado', label: 'Estado: Habilitado' },
+                  { value: 'Deshabilitado', label: 'Estado: Deshabilitado' },
+                  { value: 'Bloqueado', label: 'Estado: Bloqueado' },
+                ],
+              },
+              {
+                id: 'profiles-year-filter',
+                type: 'text',
+                value: yearFilter,
+                onChange: onYearFilterChange,
+                placeholder: 'Año',
+                ariaLabel: 'Filtrar por año',
+                inputMode: 'numeric',
+              },
+              {
+                id: 'profiles-sort-filter',
+                value: sortBy,
+                onChange: onSortChange,
+                options: [
+                  { value: 'firstName', label: 'Ordenar por: Nombre' },
+                  { value: 'lastName', label: 'Ordenar por: Apellidos' },
+                  { value: 'code', label: 'Ordenar por: Código' },
+                  { value: 'status', label: 'Ordenar por: Estado' },
+                ],
+              },
+            ]}
+            quickChips={[
+              {
+                id: 'profiles-sort-asc',
+                label: 'Asc',
+                active: sortDir === 'asc',
+                onClick: () => {
+                  if (sortDir !== 'asc') onSortDirectionToggle()
+                },
+              },
+              {
+                id: 'profiles-sort-desc',
+                label: 'Desc',
+                active: sortDir === 'desc',
+                onClick: () => {
+                  if (sortDir !== 'desc') onSortDirectionToggle()
+                },
+              },
+            ]}
+          />
+
           <div className="table-wrap desktop-table-only">
-            <table>
+            <table className="profiles-table">
               <thead>
                 <tr>
                   <th>ID</th>
@@ -108,6 +118,7 @@ export function PerfilesPage({
                   <th>Nombre</th>
                   <th>Apellidos</th>
                   <th>Estado</th>
+                  <th>Acciones</th>
                 </tr>
               </thead>
               <tbody>
@@ -117,15 +128,32 @@ export function PerfilesPage({
                     <td data-label="Código">{profile.code}</td>
                     <td data-label="Correo">{profile.email}</td>
                     <td data-label="Nombre">{profile.firstName}</td>
-                    <td data-label="Apellidos">{profile.lastName}</td>
+                    <td data-label="Apellidos" className="profiles-last-name-cell">{profile.lastName}</td>
                     <td data-label="Estado">
-                      <button
-                        type="button"
-                        className={`status-pill clickable ${profile.status === 'Habilitado' ? 'ok' : 'cancelled'}`}
-                        onClick={() => onToggleProfileStatus(profile.id)}
-                      >
+                      <span className={`status-pill ${profile.status === 'Habilitado' ? 'ok' : 'cancelled'}`}>
                         {profile.status}
-                      </button>
+                      </span>
+                    </td>
+                    <td data-label="Acciones" className="actions-cell">
+                      <div className="actions-inline">
+                        {profile.blocked ? (
+                          <button
+                            type="button"
+                            className="inline-flex min-h-8 items-center justify-center rounded-md bg-slate-200 px-3 text-xs font-semibold text-slate-700 transition hover:-translate-y-px hover:bg-slate-300 disabled:cursor-not-allowed disabled:opacity-60"
+                            onClick={() => onUnlockProfile(profile.id)}
+                          >
+                            Desbloquear
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            className={`status-pill clickable ${profile.status === 'Habilitado' ? 'cancelled' : 'ok'}`}
+                            onClick={() => onToggleProfileStatus(profile.id)}
+                          >
+                            {profile.status === 'Habilitado' ? 'Deshabilitar' : 'Habilitar'}
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -142,16 +170,26 @@ export function PerfilesPage({
                   <p><strong>Correo:</strong> {profile.email}</p>
                   <p><strong>Nombre:</strong> {profile.firstName}</p>
                   <p><strong>Apellidos:</strong> {profile.lastName}</p>
-                  <p className="mobile-record-state">
-                    <strong>Estado:</strong>{' '}
+                  <p><strong>Estado:</strong> {profile.status}</p>
+                </div>
+                <div className="actions-inline mt-2">
+                  {profile.blocked ? (
                     <button
                       type="button"
-                      className={`status-pill clickable ${profile.status === 'Habilitado' ? 'ok' : 'cancelled'}`}
+                      className="inline-flex min-h-8 items-center justify-center rounded-md bg-slate-200 px-3 text-xs font-semibold text-slate-700 transition hover:-translate-y-px hover:bg-slate-300 disabled:cursor-not-allowed disabled:opacity-60"
+                      onClick={() => onUnlockProfile(profile.id)}
+                    >
+                      Desbloquear
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      className={`status-pill clickable ${profile.status === 'Habilitado' ? 'cancelled' : 'ok'}`}
                       onClick={() => onToggleProfileStatus(profile.id)}
                     >
-                      {profile.status}
+                      {profile.status === 'Habilitado' ? 'Deshabilitar' : 'Habilitar'}
                     </button>
-                  </p>
+                  )}
                 </div>
               </article>
             ))}

@@ -88,7 +88,7 @@ public class BookingService {
         String title = "Reserva confirmada";
         String body = buildBookingEmailBody(saved, "confirmada", null);
         String ics = getIcsContent(saved.getId());
-        emailOutboxService.enqueue(user, title, body, "{\"ics\":\"" + ics.replace("\n", "\\n") + "\"}");
+        emailOutboxService.enqueue(user, title, body, "{\"notificationType\":\"BOOKING_CONFIRMATION\",\"ics\":\"" + ics.replace("\n", "\\n") + "\"}");
 
         return dtoMapper.toBooking(saved);
     }
@@ -119,7 +119,7 @@ public class BookingService {
             saved.getUsuario(),
             "Reserva modificada",
             buildBookingEmailBody(saved, "editada", "Antes: " + previous + " | Ahora: " + next),
-            null
+            "{\"notificationType\":\"BOOKING_UPDATE\"}"
         );
         auditService.record(actor, "BOOKING_UPDATED", "reserva", String.valueOf(saved.getId()), "from=" + previous + ";to=" + next);
 
@@ -147,7 +147,7 @@ public class BookingService {
             saved.getUsuario(),
             "Reserva cancelada",
             buildBookingEmailBody(saved, "cancelada", "Estado: " + reason + ". Puedes reservar nuevamente."),
-            null
+            "{\"notificationType\":\"BOOKING_CANCELLATION\"}"
         );
         return dtoMapper.toBooking(saved);
     }

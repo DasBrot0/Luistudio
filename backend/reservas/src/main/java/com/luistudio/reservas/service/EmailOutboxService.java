@@ -27,6 +27,7 @@ public class EmailOutboxService {
     private static final Logger log = LoggerFactory.getLogger(EmailOutboxService.class);
     private static final Pattern URL_PATTERN = Pattern.compile("(https?://\\S+)");
     private static final Pattern CODE_PATTERN = Pattern.compile("\\b\\d{6}\\b");
+    private static final String BOOKING_REMINDER = "BOOKING_REMINDER";
 
     private final EmailOutboxRepository emailOutboxRepository;
     private final NotificationPreferenceRepository notificationPreferenceRepository;
@@ -55,6 +56,15 @@ public class EmailOutboxService {
             log.info(
                 "[EMAIL_OUTBOX] Omitido para {} porque emailEnabled=false",
                 recipient.getCorreo()
+            );
+            return;
+        }
+        String notificationType = resolveNotificationType(payload);
+        if (preference != null && notificationType != null && !isNotificationEmailEnabled(preference, notificationType)) {
+            log.info(
+                "[EMAIL_OUTBOX] Omitido para {} porque {}.email=false",
+                recipient.getCorreo(),
+                notificationType
             );
             return;
         }
@@ -96,6 +106,30 @@ public class EmailOutboxService {
             "reminderType", reminderType
         ));
         enqueue(recipient, subject, body, payload);
+    }
+
+    private String resolveNotificationType(String payload) {
+        JsonNode parsed = parsePayload(payload);
+        if (parsed == null || !parsed.isObject()) return null;
+        JsonNode explicitType = parsed.get("notificationType");
+        if (explicitType != null && explicitType.isTextual()) return explicitType.asText();
+        JsonNode reminderType = parsed.get("reminderType");
+        if (reminderType != null && reminderType.isTextual()) return BOOKING_REMINDER;
+        return null;
+    }
+
+    private boolean isNotificationEmailEnabled(NotificationPreferenceEntity preference, String notificationType) {
+        String raw = preference.getNotificationSettings();
+        if (raw == null || raw.isBlank()) return true;
+        try {
+            JsonNode settings = objectMapper.readTree(raw);
+            JsonNode typeSettings = settings.get(notificationType);
+            if (typeSettings == null || !typeSettings.isObject()) return true;
+            JsonNode email = typeSettings.get("email");
+            return email == null || !email.isBoolean() || email.asBoolean();
+        } catch (Exception ex) {
+            return true;
+        }
     }
 
     @Transactional

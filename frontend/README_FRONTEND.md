@@ -55,7 +55,15 @@ npm run dev
 - Configuración de accesibilidad visual en cliente: escala de texto global persistente (`luistudio_font_scale` en `localStorage`).
 - Sincronización de tema y escala de texto con backend en `GET/PUT /api/me/preferences` para usuarios autenticados.
 - Configuración de vista inicial de sesión por rol desde el modal de Configuración (estudiante: Mis reservas/Reservar; admin: Salas/Reservas).
+- Configuración incluye subsección Notificaciones con tipos por rol y switches independientes para canal App y Email, persistidos por usuario.
 - Mensajes de error/confirmación en modales integrados con la UI (sin `alert`/mensajes legacy).
+
+Notas recientes:
+
+- `FilterBar` reutilizable para Salas, Reservas registradas y Perfiles, con comportamiento consistente entre modulos.
+- Salas consume filtros de backend por campus, recinto, ubicacion y texto en `GET /api/rooms`.
+- Perfiles muestra apellidos completos, distingue cuentas bloqueadas temporalmente y permite desbloqueo manual.
+- Cancelar una reserva ahora solicita confirmacion previa mostrando el detalle y el aviso de notificacion automatica.
 
 ## Capa API
 
@@ -72,3 +80,6 @@ npm run dev
 - Para evitar duplicados visuales, el cliente conserva solo la ultima accion por reserva logica (usuario + recurso + ubicacion + fecha + horario), ignorando diferencias de cantidad de personas.
 - Configuracion incluye switch de 2FA por usuario con confirmacion por codigo enviado al correo (activar y desactivar).
 - Al presionar `Activar 2FA` o `Desactivar 2FA` desde Configuracion, se cierra ese modal y se abre el modal de confirmacion de 2FA.
+- El modal de salas permite marcar una sala como disponible, en mantenimiento o inactiva; los bloqueos por reserva activa se muestran en modal.
+- Configuracion permite elegir Salas, Perfiles o Reservas como vista inicial para administradores.
+- La sección Notificaciones muestra reservas para estudiantes y mantenimiento/perfiles para administradores; desactivar App evita el toast/centro local y desactivar Email se sincroniza con backend.
