@@ -12,15 +12,29 @@ interface SalasPageProps {
   roomFilterVenue: string
   roomFilterLocation: string
   roomStatusFilter: 'Todos' | 'Disponible' | 'En mantenimiento'
+  roomSort: string
   roomNotice: string
   onRoomSearchChange: (value: string) => void
   onRoomFilterCampusChange: (value: string) => void
   onRoomFilterVenueChange: (value: string) => void
   onRoomFilterLocationChange: (value: string) => void
   onRoomStatusFilterChange: (value: 'Todos' | 'Disponible' | 'En mantenimiento') => void
+  onRoomSortChange: (value: string) => void
+  onResetRoomFilters: () => void
   onOpenAddRoom: () => void
   onOpenEditRoom: (room: Room) => void
   onAskDeleteRoom: (roomId: string) => void
+}
+
+function ResetFiltersIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M17.5 8.5A6.2 6.2 0 0 0 7 6.8L5.5 8.3" />
+      <path d="M5.5 4.8v3.5H9" />
+      <path d="M6.5 15.5A6.2 6.2 0 0 0 17 17.2l1.5-1.5" />
+      <path d="M18.5 19.2v-3.5H15" />
+    </svg>
+  )
 }
 
 export function SalasPage({
@@ -33,12 +47,15 @@ export function SalasPage({
   roomFilterVenue,
   roomFilterLocation,
   roomStatusFilter,
+  roomSort,
   roomNotice,
   onRoomSearchChange,
   onRoomFilterCampusChange,
   onRoomFilterVenueChange,
   onRoomFilterLocationChange,
   onRoomStatusFilterChange,
+  onRoomSortChange,
+  onResetRoomFilters,
   onOpenAddRoom,
   onOpenEditRoom,
   onAskDeleteRoom,
@@ -50,13 +67,14 @@ export function SalasPage({
       <section className="dashboard-grid single-grid">
         <article className="card">
           <div className="card-head">
-            <h2>Salas</h2>
+            <h2>Listado de Salas</h2>
           </div>
 
           <FilterBar
-            searchPlaceholder="Buscar por nombre, código o ubicacion"
+            searchPlaceholder="Buscar por nombre, código o ubicación"
             searchValue={roomSearchQuery}
             onSearchChange={onRoomSearchChange}
+            fieldsClassName="filter-bar-fields-three"
             filters={[
               {
                 id: 'room-campus-filter',
@@ -71,6 +89,7 @@ export function SalasPage({
                 id: 'room-venue-filter',
                 value: roomFilterVenue,
                 onChange: onRoomFilterVenueChange,
+                disabled: roomFilterCampus === 'Todos',
                 options: [
                   { value: 'Todos', label: 'Recinto: Todos' },
                   ...venueOptions.map((venue) => ({ value: venue, label: `Recinto: ${venue}` })),
@@ -80,9 +99,23 @@ export function SalasPage({
                 id: 'room-location-filter',
                 value: roomFilterLocation,
                 onChange: onRoomFilterLocationChange,
+                disabled: roomFilterCampus === 'Todos',
                 options: [
                   { value: 'Todas', label: 'Ubicacion: Todas' },
                   ...locationOptions.map((location) => ({ value: location, label: `Ubicacion: ${location}` })),
+                ],
+              },
+            ]}
+            sortControls={[
+              {
+                id: 'room-sort-filter',
+                value: roomSort,
+                onChange: onRoomSortChange,
+                options: [
+                  { value: 'name:asc', label: 'Nombre A-Z' },
+                  { value: 'name:desc', label: 'Nombre Z-A' },
+                  { value: 'code:asc', label: 'Codigo ↑' },
+                  { value: 'code:desc', label: 'Codigo ↓' },
                 ],
               },
             ]}
@@ -110,18 +143,38 @@ export function SalasPage({
               <button
                 type="button"
                 className="inline-flex min-h-8 items-center justify-center gap-2 rounded-md border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 transition hover:-translate-y-px hover:bg-slate-50"
-                onClick={onOpenAddRoom}
+                onClick={onResetRoomFilters}
               >
                 <span className="btn-icon" aria-hidden="true">
-                  <svg viewBox="0 0 24 24">
-                    <path d="M12 5v14M5 12h14" />
-                  </svg>
+                  <ResetFiltersIcon />
                 </span>
-                Agregar
+                Reiniciar filtros
               </button>
             }
           />
 
+          <div className="filter-standalone-actions">
+            <button
+              type="button"
+              className="inline-flex min-h-8 items-center justify-center gap-2 rounded-md border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 transition hover:-translate-y-px hover:bg-slate-50"
+              onClick={onOpenAddRoom}
+            >
+                  <span className="btn-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24">
+                      <path d="M12 5v14M5 12h14" />
+                    </svg>
+                  </span>
+                  Agregar
+            </button>
+          </div>
+
+          {filteredRooms.length === 0 && (
+            <div className="empty-state">
+              <p>No hay salas para los filtros seleccionados.</p>
+            </div>
+          )}
+
+          {filteredRooms.length > 0 && (
           <div className="table-wrap desktop-table-only">
             <table>
               <thead>
@@ -148,7 +201,7 @@ export function SalasPage({
                       <span className={`status-pill ${room.status === 'En mantenimiento' ? 'cancelled' : 'ok'}`}>{room.status}</span>
                     </td>
                     <td data-label="Personas">
-                      {room.minPeopleRequired ? `${room.minPeople} (min obligatorio)` : `${room.minPeople} (min opcional)`} / {room.maxPeople} max
+                      {room.minPeople}-{room.maxPeople}
                     </td>
                     <td data-label="Acciones" className="actions-cell">
                       <div className="actions-inline">
@@ -161,7 +214,9 @@ export function SalasPage({
               </tbody>
             </table>
           </div>
+          )}
 
+          {filteredRooms.length > 0 && (
           <div className="mobile-list-only">
             {filteredRooms.map((room) => (
               <article key={`room-mobile-${room.id}`} className="mobile-record-card">
@@ -174,16 +229,17 @@ export function SalasPage({
                   <p><strong>Estado:</strong> {room.status}</p>
                   <p>
                     <strong>Personas:</strong>{' '}
-                    {room.minPeopleRequired ? `${room.minPeople} (min obligatorio)` : `${room.minPeople} (min opcional)`} / {room.maxPeople} max
+                    {room.minPeople}-{room.maxPeople}
                   </p>
                 </div>
-                <div className="actions-inline mt-2">
+                <div className="actions-inline mobile-card-actions mt-2">
                   <button type="button" className="inline-flex min-h-8 items-center justify-center rounded-md bg-slate-200 px-3 text-xs font-semibold text-slate-700 transition hover:-translate-y-px hover:bg-slate-300 disabled:cursor-not-allowed disabled:opacity-60" onClick={() => onOpenEditRoom(room)}>Editar</button>
                   <button type="button" className="danger-btn inline-flex min-h-8 items-center justify-center rounded-md px-3 text-xs font-semibold transition hover:-translate-y-px disabled:cursor-not-allowed disabled:opacity-60" onClick={() => onAskDeleteRoom(room.id)}>Eliminar</button>
                 </div>
               </article>
             ))}
           </div>
+          )}
 
           {roomNotice && <p className="error-text">{roomNotice}</p>}
         </article>

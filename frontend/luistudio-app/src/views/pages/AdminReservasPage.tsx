@@ -12,6 +12,7 @@ interface AdminReservasPageProps {
   adminCampusFilter: string
   adminDateFilter: string
   adminDateQuickFilter: 'none' | 'today' | 'week'
+  adminSort: string
   adminPage: number
   totalAdminPages: number
   campusOptions: string[]
@@ -26,6 +27,7 @@ interface AdminReservasPageProps {
   onTodayFilter: () => void
   onWeekFilter: () => void
   onClearDateFilter: () => void
+  onSortChange: (value: string) => void
   onPrevPage: () => void
   onNextPage: () => void
   onEditBooking: (booking: Booking) => void
@@ -38,6 +40,17 @@ interface AdminReservasPageProps {
 
 const dayLabels = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom']
 
+function ClearDateIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M17.5 8.5A6.2 6.2 0 0 0 7 6.8L5.5 8.3" />
+      <path d="M5.5 4.8v3.5H9" />
+      <path d="M6.5 15.5A6.2 6.2 0 0 0 17 17.2l1.5-1.5" />
+      <path d="M18.5 19.2v-3.5H15" />
+    </svg>
+  )
+}
+
 const patchDay = (days: ScheduleDay[], dayOfWeek: number, patch: Partial<ScheduleDay>) =>
   days.map((day) => (day.dayOfWeek === dayOfWeek ? { ...day, ...patch } : day))
 
@@ -49,6 +62,7 @@ export function AdminReservasPage({
   adminCampusFilter,
   adminDateFilter,
   adminDateQuickFilter,
+  adminSort,
   adminPage,
   totalAdminPages,
   campusOptions,
@@ -63,6 +77,7 @@ export function AdminReservasPage({
   onTodayFilter,
   onWeekFilter,
   onClearDateFilter,
+  onSortChange,
   onPrevPage,
   onNextPage,
   onEditBooking,
@@ -94,7 +109,7 @@ export function AdminReservasPage({
       <section className="dashboard-grid single-grid">
         <article className="card">
           <div className="card-head">
-            <h2>Reservas activas</h2>
+            <h2>Listado de Reservas</h2>
           </div>
 
           <FilterBar
@@ -129,6 +144,20 @@ export function AdminReservasPage({
                 ariaLabel: 'Filtrar por fecha',
               },
             ]}
+            sortControls={[
+              {
+                id: 'admin-bookings-sort-filter',
+                value: adminSort,
+                onChange: onSortChange,
+                options: [
+                  { value: 'date:desc', label: 'Fecha reciente' },
+                  { value: 'date:asc', label: 'Fecha antigua' },
+                  { value: 'room:asc', label: 'Sala A-Z' },
+                  { value: 'student:asc', label: 'Estudiante A-Z' },
+                ],
+              },
+            ]}
+            quickChipsPlacement="sort-row"
             quickChips={[
               {
                 id: 'admin-bookings-today',
@@ -142,78 +171,97 @@ export function AdminReservasPage({
                 active: adminDateQuickFilter === 'week',
                 onClick: onWeekFilter,
               },
-              {
-                id: 'admin-bookings-clear-date',
-                label: 'Limpiar fecha',
-                active: adminDateQuickFilter === 'none' && adminDateFilter === '',
-                onClick: onClearDateFilter,
-              },
             ]}
+            actions={
+              <button
+                type="button"
+                className="inline-flex min-h-8 items-center justify-center gap-2 rounded-md border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 transition hover:-translate-y-px hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                onClick={onClearDateFilter}
+                disabled={adminStatusFilter === 'Todos' && adminCampusFilter === 'Todos' && adminDateQuickFilter === 'none' && adminDateFilter === '' && adminSort === 'date:desc'}
+              >
+                <span className="btn-icon" aria-hidden="true">
+                  <ClearDateIcon />
+                </span>
+                Reiniciar filtros
+              </button>
+            }
           />
 
-          <div className="table-wrap desktop-table-only">
-            <table>
-              <thead>
-                <tr>
-                  <th>ID</th>
-                  <th>Estudiante</th>
-                  <th>Sala</th>
-                  <th>Fecha</th>
-                  <th>Horario</th>
-                  <th>Estado</th>
-                  <th>Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
+          {bookingRows.length === 0 && (
+            <div className="empty-state">
+              <p>No hay reservas para los filtros seleccionados.</p>
+            </div>
+          )}
+
+          {bookingRows.length > 0 && (
+            <>
+              <div className="table-wrap desktop-table-only">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>ID</th>
+                      <th>Estudiante</th>
+                      <th>Sala</th>
+                      <th>Fecha</th>
+                      <th>Horario</th>
+                      <th>Estado</th>
+                      <th>Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {bookingRows.map(({ booking, ownerEmail }) => (
+                      <tr key={booking.id}>
+                        <td data-label="ID">{booking.id}</td>
+                        <td data-label="Estudiante">{ownerEmail}</td>
+                        <td data-label="Sala">{booking.roomId}</td>
+                        <td data-label="Fecha">{formatDate(booking.date)}</td>
+                        <td data-label="Horario">{booking.start}-{booking.end}</td>
+                        <td data-label="Estado">
+                          <span className={`status-pill ${booking.status === 'Confirmado' ? 'ok' : 'cancelled'}`}>{booking.status}</span>
+                        </td>
+                        <td data-label="Acciones" className="actions-cell">
+                          <div className="actions-inline">
+                            <button type="button" className="inline-flex min-h-8 items-center justify-center rounded-md bg-slate-200 px-3 text-xs font-semibold text-slate-700 transition hover:-translate-y-px hover:bg-slate-300 disabled:cursor-not-allowed disabled:opacity-60" disabled={booking.status === 'Cancelado'} onClick={() => onEditBooking(booking)}>Editar</button>
+                            <button type="button" className="inline-flex min-h-8 items-center justify-center rounded-md bg-red-100 px-3 text-xs font-semibold text-red-700 transition hover:-translate-y-px hover:bg-red-200 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500 disabled:opacity-60" disabled={!canCancelBooking(booking)} onClick={() => onCancelBooking(booking.id)}>Cancelar</button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="mobile-list-only">
                 {bookingRows.map(({ booking, ownerEmail }) => (
-                  <tr key={booking.id}>
-                    <td data-label="ID">{booking.id}</td>
-                    <td data-label="Estudiante">{ownerEmail}</td>
-                    <td data-label="Sala">{booking.roomId}</td>
-                    <td data-label="Fecha">{formatDate(booking.date)}</td>
-                    <td data-label="Horario">{booking.start}-{booking.end}</td>
-                    <td data-label="Estado">
-                      <span className={`status-pill ${booking.status === 'Confirmado' ? 'ok' : 'cancelled'}`}>{booking.status}</span>
-                    </td>
-                    <td data-label="Acciones" className="actions-cell">
-                      <div className="actions-inline">
-                        <button type="button" className="inline-flex min-h-8 items-center justify-center rounded-md bg-slate-200 px-3 text-xs font-semibold text-slate-700 transition hover:-translate-y-px hover:bg-slate-300 disabled:cursor-not-allowed disabled:opacity-60" onClick={() => onEditBooking(booking)}>Editar</button>
-                        <button type="button" className="inline-flex min-h-8 items-center justify-center rounded-md bg-red-100 px-3 text-xs font-semibold text-red-700 transition hover:-translate-y-px hover:bg-red-200 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500 disabled:opacity-60" disabled={!canCancelBooking(booking)} onClick={() => onCancelBooking(booking.id)}>Cancelar</button>
-                      </div>
-                    </td>
-                  </tr>
+                  <article key={`admin-mobile-${booking.id}`} className="mobile-record-card">
+                    <div className="mobile-record-grid">
+                      <p><strong>ID:</strong> {booking.id}</p>
+                      <p><strong>Estudiante:</strong> {ownerEmail}</p>
+                      <p><strong>Sala:</strong> {booking.roomId}</p>
+                      <p><strong>Fecha:</strong> {formatDate(booking.date)}</p>
+                      <p><strong>Horario:</strong> {booking.start}-{booking.end}</p>
+                      <p className="mobile-record-state">
+                        <strong>Estado:</strong>{' '}
+                        <span className={`status-pill ${booking.status === 'Confirmado' ? 'ok' : 'cancelled'}`}>{booking.status}</span>
+                      </p>
+                    </div>
+                    <div className="actions-inline mt-2">
+                      <button type="button" className="inline-flex min-h-8 items-center justify-center rounded-md bg-slate-200 px-3 text-xs font-semibold text-slate-700 transition hover:-translate-y-px hover:bg-slate-300 disabled:cursor-not-allowed disabled:opacity-60" disabled={booking.status === 'Cancelado'} onClick={() => onEditBooking(booking)}>Editar</button>
+                      <button type="button" className="inline-flex min-h-8 items-center justify-center rounded-md bg-red-100 px-3 text-xs font-semibold text-red-700 transition hover:-translate-y-px hover:bg-red-200 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500 disabled:opacity-60" disabled={!canCancelBooking(booking)} onClick={() => onCancelBooking(booking.id)}>Cancelar</button>
+                    </div>
+                  </article>
                 ))}
-              </tbody>
-            </table>
-          </div>
+              </div>
+            </>
+          )}
 
-          <div className="mobile-list-only">
-            {bookingRows.map(({ booking, ownerEmail }) => (
-              <article key={`admin-mobile-${booking.id}`} className="mobile-record-card">
-                <div className="mobile-record-grid">
-                  <p><strong>ID:</strong> {booking.id}</p>
-                  <p><strong>Estudiante:</strong> {ownerEmail}</p>
-                  <p><strong>Sala:</strong> {booking.roomId}</p>
-                  <p><strong>Fecha:</strong> {formatDate(booking.date)}</p>
-                  <p><strong>Horario:</strong> {booking.start}-{booking.end}</p>
-                  <p className="mobile-record-state">
-                    <strong>Estado:</strong>{' '}
-                    <span className={`status-pill ${booking.status === 'Confirmado' ? 'ok' : 'cancelled'}`}>{booking.status}</span>
-                  </p>
-                </div>
-                <div className="actions-inline mt-2">
-                  <button type="button" className="inline-flex min-h-8 items-center justify-center rounded-md bg-slate-200 px-3 text-xs font-semibold text-slate-700 transition hover:-translate-y-px hover:bg-slate-300 disabled:cursor-not-allowed disabled:opacity-60" onClick={() => onEditBooking(booking)}>Editar</button>
-                  <button type="button" className="inline-flex min-h-8 items-center justify-center rounded-md bg-red-100 px-3 text-xs font-semibold text-red-700 transition hover:-translate-y-px hover:bg-red-200 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500 disabled:opacity-60" disabled={!canCancelBooking(booking)} onClick={() => onCancelBooking(booking.id)}>Cancelar</button>
-                </div>
-              </article>
-            ))}
-          </div>
-
+          {bookingRows.length > 0 && (
           <div className="pagination">
             <button type="button" className="inline-flex min-h-8 items-center justify-center rounded-md border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 transition hover:-translate-y-px hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60" disabled={adminPage === 1} onClick={onPrevPage}>Anterior</button>
             <p>Página {adminPage} de {totalAdminPages}</p>
             <button type="button" className="inline-flex min-h-8 items-center justify-center rounded-md border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 transition hover:-translate-y-px hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60" disabled={adminPage === totalAdminPages} onClick={onNextPage}>Siguiente</button>
           </div>
+          )}
         </article>
 
         <article className="card config-card">
@@ -240,7 +288,7 @@ export function AdminReservasPage({
 
         <article className="card config-card">
           <h2>Horario General por Campus</h2>
-          <p className="description">Regla base para todas las salas. Si hay override por sala, se validará conflicto.</p>
+          <p className="description">Regla base para todas las salas. Se validará conflicto con el horario individual de cada sala.</p>
 
           {campusSchedules.map((campusSchedule) => (
             <div key={campusSchedule.campus} className="campus-schedule-card">

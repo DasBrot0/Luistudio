@@ -16,10 +16,22 @@ interface PerfilesPageProps {
   onStatusFilterChange: (value: 'Todos' | 'Habilitado' | 'Deshabilitado' | 'Bloqueado') => void
   onSortChange: (value: string) => void
   onSortDirectionToggle: () => void
+  onResetFilters: () => void
   onToggleProfileStatus: (profileId: string) => void
   onUnlockProfile: (profileId: string) => void
   onPrevPage: () => void
   onNextPage: () => void
+}
+
+function ResetFiltersIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M17.5 8.5A6.2 6.2 0 0 0 7 6.8L5.5 8.3" />
+      <path d="M5.5 4.8v3.5H9" />
+      <path d="M6.5 15.5A6.2 6.2 0 0 0 17 17.2l1.5-1.5" />
+      <path d="M18.5 19.2v-3.5H15" />
+    </svg>
+  )
 }
 
 export function PerfilesPage({
@@ -36,25 +48,36 @@ export function PerfilesPage({
   onStatusFilterChange,
   onSortChange,
   onSortDirectionToggle,
+  onResetFilters,
   onToggleProfileStatus,
   onUnlockProfile,
   onPrevPage,
   onNextPage,
 }: PerfilesPageProps) {
+  const showMobileFilters = false
+  const sortValue = `${sortBy}:${sortDir}`
+
+  const handleCombinedSortChange = (value: string) => {
+    const [nextSortBy, nextSortDir] = value.split(':') as [string, 'asc' | 'desc']
+    if (nextSortBy !== sortBy) onSortChange(nextSortBy)
+    if (nextSortDir !== sortDir) onSortDirectionToggle()
+  }
+
   return (
-    <main className="page dashboard-page">
+    <main className="page dashboard-page profiles-page">
       <AppHeader title="Perfiles" roleLabel="Administrador" />
 
       <section className="dashboard-grid single-grid">
         <article className="card">
           <div className="card-head">
-            <h2>Perfiles</h2>
+            <h2>Listado de Perfiles</h2>
           </div>
 
           <FilterBar
             searchPlaceholder="Buscar por código, correo o nombre"
             searchValue={searchQuery}
             onSearchChange={onSearchQueryChange}
+            fieldsClassName="filter-bar-fields-three"
             filters={[
               {
                 id: 'profiles-status-filter',
@@ -78,35 +101,68 @@ export function PerfilesPage({
               },
               {
                 id: 'profiles-sort-filter',
-                value: sortBy,
-                onChange: onSortChange,
+                value: sortValue,
+                onChange: handleCombinedSortChange,
                 options: [
-                  { value: 'firstName', label: 'Ordenar por: Nombre' },
-                  { value: 'lastName', label: 'Ordenar por: Apellidos' },
-                  { value: 'code', label: 'Ordenar por: Código' },
-                  { value: 'status', label: 'Ordenar por: Estado' },
+                  { value: 'firstName:asc', label: 'Nombre A-Z' },
+                  { value: 'firstName:desc', label: 'Nombre Z-A' },
+                  { value: 'lastName:asc', label: 'Apellidos A-Z' },
+                  { value: 'lastName:desc', label: 'Apellidos Z-A' },
+                  { value: 'code:asc', label: 'Codigo ↑' },
+                  { value: 'code:desc', label: 'Codigo ↓' },
                 ],
               },
             ]}
-            quickChips={[
+            sortControls={[
               {
-                id: 'profiles-sort-asc',
-                label: 'Asc',
-                active: sortDir === 'asc',
-                onClick: () => {
-                  if (sortDir !== 'asc') onSortDirectionToggle()
-                },
-              },
-              {
-                id: 'profiles-sort-desc',
-                label: 'Desc',
-                active: sortDir === 'desc',
-                onClick: () => {
-                  if (sortDir !== 'desc') onSortDirectionToggle()
-                },
+                id: 'profiles-sort-control',
+                value: sortValue,
+                onChange: handleCombinedSortChange,
+                options: [
+                  { value: 'firstName:asc', label: 'Nombre A-Z' },
+                  { value: 'firstName:desc', label: 'Nombre Z-A' },
+                  { value: 'lastName:asc', label: 'Apellidos A-Z' },
+                  { value: 'lastName:desc', label: 'Apellidos Z-A' },
+                  { value: 'code:asc', label: 'Codigo ↑' },
+                  { value: 'code:desc', label: 'Codigo ↓' },
+                ],
               },
             ]}
+            quickChips={[]}
+            actions={
+              <button
+                type="button"
+                className="inline-flex min-h-8 items-center justify-center gap-2 rounded-md border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 transition hover:-translate-y-px hover:bg-slate-50"
+                onClick={onResetFilters}
+              >
+                <span className="btn-icon" aria-hidden="true">
+                  <ResetFiltersIcon />
+                </span>
+                Reiniciar filtros
+              </button>
+            }
           />
+
+          <div className={`profiles-secondary-filters ${showMobileFilters ? 'open' : ''}`}>
+            <select value={sortValue} onChange={(event) => handleCombinedSortChange(event.target.value)} aria-label="Ordenar perfiles">
+              <option value="firstName:asc">Nombre A-Z</option>
+              <option value="firstName:desc">Nombre Z-A</option>
+              <option value="lastName:asc">Apellidos A-Z</option>
+              <option value="lastName:desc">Apellidos Z-A</option>
+              <option value="code:asc">Codigo ascendente</option>
+              <option value="code:desc">Codigo descendente</option>
+              <option value="status:asc">Estado A-Z</option>
+              <option value="status:desc">Estado Z-A</option>
+            </select>
+            <input
+              type="text"
+              value={yearFilter}
+              onChange={(event) => onYearFilterChange(event.target.value)}
+              placeholder="Año"
+              aria-label="Filtrar por año"
+              inputMode="numeric"
+            />
+          </div>
 
           <div className="table-wrap desktop-table-only">
             <table className="profiles-table">
@@ -139,7 +195,7 @@ export function PerfilesPage({
                         {profile.blocked ? (
                           <button
                             type="button"
-                            className="inline-flex min-h-8 items-center justify-center rounded-md bg-slate-200 px-3 text-xs font-semibold text-slate-700 transition hover:-translate-y-px hover:bg-slate-300 disabled:cursor-not-allowed disabled:opacity-60"
+                            className="unlock-profile-btn inline-flex min-h-8 items-center justify-center rounded-md px-3 text-xs font-semibold transition hover:-translate-y-px disabled:cursor-not-allowed disabled:opacity-60"
                             onClick={() => onUnlockProfile(profile.id)}
                           >
                             Desbloquear
@@ -176,7 +232,7 @@ export function PerfilesPage({
                   {profile.blocked ? (
                     <button
                       type="button"
-                      className="inline-flex min-h-8 items-center justify-center rounded-md bg-slate-200 px-3 text-xs font-semibold text-slate-700 transition hover:-translate-y-px hover:bg-slate-300 disabled:cursor-not-allowed disabled:opacity-60"
+                      className="unlock-profile-btn inline-flex min-h-8 items-center justify-center rounded-md px-3 text-xs font-semibold transition hover:-translate-y-px disabled:cursor-not-allowed disabled:opacity-60"
                       onClick={() => onUnlockProfile(profile.id)}
                     >
                       Desbloquear

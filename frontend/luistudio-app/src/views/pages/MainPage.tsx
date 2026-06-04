@@ -323,7 +323,7 @@ const notificationPreferenceOptions = (role: Role): NotificationPreferenceOption
     { key: 'BOOKING_CONFIRMATION', group: 'Reservas', label: 'Confirmacion de reserva', app: true, email: true },
     { key: 'BOOKING_UPDATE', group: 'Reservas', label: 'Modificacion de reserva', app: true, email: true },
     { key: 'BOOKING_CANCELLATION', group: 'Reservas', label: 'Cancelacion de reserva', app: true, email: true },
-    { key: 'BOOKING_REMINDER', group: 'Reservas', label: 'Recordatorio previo a la reserva', app: true, email: true },
+    { key: 'BOOKING_REMINDER', group: 'Reservas', label: 'Recordatorio de reserva', app: true, email: true },
   ]
   if (role === 'admin') {
     return [
@@ -468,6 +468,7 @@ export function MainPage() {
   const [roomFilterVenue, setRoomFilterVenue] = useState('Todos')
   const [roomFilterLocation, setRoomFilterLocation] = useState('Todas')
   const [roomStatusFilter, setRoomStatusFilter] = useState<'Todos' | 'Disponible' | 'En mantenimiento'>('Todos')
+  const [roomSort, setRoomSort] = useState('name:asc')
   const [roomModalMode, setRoomModalMode] = useState<'none' | 'add' | 'edit'>('none')
   const [roomModalTargetId, setRoomModalTargetId] = useState<string | null>(null)
   const [roomDraft, setRoomDraft] = useState<RoomDraft>({
@@ -493,6 +494,7 @@ export function MainPage() {
   const [adminCampusFilter, setAdminCampusFilter] = useState('Todos')
   const [adminDateFilter, setAdminDateFilter] = useState('')
   const [adminDateQuickFilter, setAdminDateQuickFilter] = useState<'none' | 'today' | 'week'>('none')
+  const [adminSort, setAdminSort] = useState('date:desc')
   const [adminPage, setAdminPage] = useState(1)
   const [profilesQuery, setProfilesQuery] = useState('')
   const [profilesYearFilter, setProfilesYearFilter] = useState('')
@@ -527,11 +529,28 @@ export function MainPage() {
   const activeRooms = useMemo(() => rooms.filter((room) => room.active), [rooms])
   const campusValueOptions = useMemo(() => [...new Set(activeRooms.map((room) => room.campus))], [activeRooms])
   const campusOptions = useMemo(() => [...new Set(activeRooms.map((room) => room.campusLabel))], [activeRooms])
-  const venueOptions = useMemo(
-    () => [...new Set(activeRooms.map((room) => room.venueLabel))],
-    [activeRooms],
-  )
-  const roomLocationOptions = useMemo(() => [...new Set(activeRooms.map((room) => room.location))], [activeRooms])
+  const roomCampusOptions = useMemo(() => [...new Set(roomDirectory.map((room) => room.campusLabel))], [roomDirectory])
+  const venueOptions = useMemo(() => {
+    if (roomFilterCampus === 'Todos') return []
+    return [
+      ...new Set(
+        roomDirectory
+          .filter((room) => room.campusLabel === roomFilterCampus)
+          .map((room) => room.venueLabel),
+      ),
+    ]
+  }, [roomDirectory, roomFilterCampus])
+  const roomLocationOptions = useMemo(() => {
+    if (roomFilterCampus === 'Todos') return []
+    return [
+      ...new Set(
+        roomDirectory
+          .filter((room) => room.campusLabel === roomFilterCampus)
+          .filter((room) => roomFilterVenue === 'Todos' || room.venueLabel === roomFilterVenue)
+          .map((room) => room.location),
+      ),
+    ]
+  }, [roomDirectory, roomFilterCampus, roomFilterVenue])
   const locationOptionsByCampus = useMemo(() => {
     const grouped = new Map<string, string[]>()
     for (const room of activeRooms) {
@@ -575,8 +594,13 @@ export function MainPage() {
         if (adminDateQuickFilter === 'none' && adminDateFilter && booking.date !== adminDateFilter) return false
         return true
       })
-      .sort((a, b) => `${b.date} ${b.start}`.localeCompare(`${a.date} ${a.start}`))
-  }, [activeRooms, adminCampusFilter, adminDateFilter, adminDateQuickFilter, adminSearchQuery, adminStatusFilter, bookings])
+      .sort((a, b) => {
+        if (adminSort === 'date:asc') return `${a.date} ${a.start}`.localeCompare(`${b.date} ${b.start}`)
+        if (adminSort === 'room:asc') return a.roomId.localeCompare(b.roomId)
+        if (adminSort === 'student:asc') return (a.userEmail ?? '').localeCompare(b.userEmail ?? '')
+        return `${b.date} ${b.start}`.localeCompare(`${a.date} ${a.start}`)
+      })
+  }, [activeRooms, adminCampusFilter, adminDateFilter, adminDateQuickFilter, adminSearchQuery, adminSort, adminStatusFilter, bookings])
   const pageSize = 5
   const totalAdminPages = Math.max(1, Math.ceil(adminBookings.length / pageSize))
   const adminBookingsPage = adminBookings.slice((adminPage - 1) * pageSize, adminPage * pageSize)
@@ -592,8 +616,13 @@ export function MainPage() {
       if (roomFilterLocation !== 'Todas' && room.location !== roomFilterLocation) return false
       if (roomStatusFilter !== 'Todos' && room.status !== roomStatusFilter) return false
       return true
+    }).sort((a, b) => {
+      if (roomSort === 'name:desc') return b.name.localeCompare(a.name)
+      if (roomSort === 'code:asc') return a.id.localeCompare(b.id)
+      if (roomSort === 'code:desc') return b.id.localeCompare(a.id)
+      return a.name.localeCompare(b.name)
     })
-  }, [roomDirectory, roomFilterCampus, roomFilterLocation, roomFilterVenue, roomSearchQuery, roomStatusFilter])
+  }, [roomDirectory, roomFilterCampus, roomFilterLocation, roomFilterVenue, roomSearchQuery, roomSort, roomStatusFilter])
   const totalProfilePages = profilesTotalPages
   const paginatedProfiles = profiles
   const pendingCancelTarget = useMemo(() => {
@@ -730,12 +759,7 @@ export function MainPage() {
   }
 
   const loadRoomDirectory = async (authToken: string) => {
-    const result = await api.getRooms(authToken, {
-      campus: roomFilterCampus,
-      venue: roomFilterVenue,
-      location: roomFilterLocation,
-      query: roomSearchQuery,
-    })
+    const result = await api.getRooms(authToken)
     setRoomDirectory(result.map(toUiRoom))
   }
 
@@ -947,19 +971,12 @@ export function MainPage() {
   useEffect(() => {
     if (!token || authenticatedUser?.role !== 'admin') return
     loadAdminBookings(token).catch(() => undefined)
-  }, [adminPage, adminStatusFilter, adminDateFilter, token, authenticatedUser])
+  }, [adminPage, adminCampusFilter, adminSearchQuery, adminStatusFilter, adminDateFilter, token, authenticatedUser])
 
   useEffect(() => {
     if (!token || authenticatedUser?.role !== 'admin') return
     loadRoomDirectory(token).catch(() => undefined)
-  }, [
-    authenticatedUser,
-    roomFilterCampus,
-    roomFilterLocation,
-    roomFilterVenue,
-    roomSearchQuery,
-    token,
-  ])
+  }, [authenticatedUser, token])
 
   useEffect(() => {
     if (!token || authenticatedUser?.role !== 'admin') return
@@ -1705,7 +1722,7 @@ export function MainPage() {
               <ReservasPage
                 reservationForm={reservationForm}
                 reservationError={reservationError}
-                campusOptions={campusOptions}
+                campusOptions={roomCampusOptions}
                 locationOptionsByCampus={locationOptionsByCampus}
                 activeRooms={activeRooms}
                 selectedRoomCapacity={selectedReservationRoom?.capacity ?? null}
@@ -1748,12 +1765,29 @@ export function MainPage() {
                 roomFilterVenue={roomFilterVenue}
                 roomFilterLocation={roomFilterLocation}
                 roomStatusFilter={roomStatusFilter}
+                roomSort={roomSort}
                 roomNotice={roomNotice}
                 onRoomSearchChange={setRoomSearchQuery}
-                onRoomFilterCampusChange={setRoomFilterCampus}
-                onRoomFilterVenueChange={setRoomFilterVenue}
+                onRoomFilterCampusChange={(value) => {
+                  setRoomFilterCampus(value)
+                  setRoomFilterVenue('Todos')
+                  setRoomFilterLocation('Todas')
+                }}
+                onRoomFilterVenueChange={(value) => {
+                  setRoomFilterVenue(value)
+                  setRoomFilterLocation('Todas')
+                }}
                 onRoomFilterLocationChange={setRoomFilterLocation}
                 onRoomStatusFilterChange={setRoomStatusFilter}
+                onRoomSortChange={setRoomSort}
+                onResetRoomFilters={() => {
+                  setRoomSearchQuery('')
+                  setRoomFilterCampus('Todos')
+                  setRoomFilterVenue('Todos')
+                  setRoomFilterLocation('Todas')
+                  setRoomStatusFilter('Todos')
+                  setRoomSort('name:asc')
+                }}
                 onOpenAddRoom={openAddRoom}
                 onOpenEditRoom={openEditRoom}
                 onAskDeleteRoom={setPendingDeleteRoomId}
@@ -1789,6 +1823,14 @@ export function MainPage() {
                   setProfilesPage(1)
                   setProfilesSortDir((current) => (current === 'asc' ? 'desc' : 'asc'))
                 }}
+                onResetFilters={() => {
+                  setProfilesPage(1)
+                  setProfilesQuery('')
+                  setProfilesYearFilter('')
+                  setProfilesStatusFilter('Todos')
+                  setProfilesSortBy('firstName')
+                  setProfilesSortDir('asc')
+                }}
                 onToggleProfileStatus={toggleProfileStatus}
                 onUnlockProfile={unlockProfile}
                 onPrevPage={() => setProfilesPage((current) => Math.max(1, current - 1))}
@@ -1804,6 +1846,7 @@ export function MainPage() {
                 adminCampusFilter={adminCampusFilter}
                 adminDateFilter={adminDateFilter}
                 adminDateQuickFilter={adminDateQuickFilter}
+                adminSort={adminSort}
                 adminPage={adminPage}
                 totalAdminPages={totalAdminPages}
                 campusOptions={campusOptions}
@@ -1839,8 +1882,16 @@ export function MainPage() {
                   setAdminPage(1)
                 }}
                 onClearDateFilter={() => {
+                  setAdminSearchQuery('')
+                  setAdminStatusFilter('Todos')
+                  setAdminCampusFilter('Todos')
                   setAdminDateQuickFilter('none')
                   setAdminDateFilter('')
+                  setAdminSort('date:desc')
+                  setAdminPage(1)
+                }}
+                onSortChange={(value) => {
+                  setAdminSort(value)
                   setAdminPage(1)
                 }}
                 onPrevPage={() => setAdminPage((current) => current - 1)}
@@ -1952,7 +2003,7 @@ export function MainPage() {
           <div className="modal-card slim-modal text-left" onClick={(event) => event.stopPropagation()}>
             <h2>Notificaciones</h2>
             {notifications.length === 0 ? (
-              <p className="modal-copy">Aún no hay notificaciones.</p>
+              <p className="modal-copy">Aún no hay notificaciones</p>
             ) : (
               <ul className="m-0 mt-2 max-h-72 list-none space-y-2 overflow-y-auto p-0">
                 {notifications.map((item) => (
@@ -1988,57 +2039,51 @@ export function MainPage() {
 
             <div className="settings-section">
               <p className="settings-badge-ink">Apariencia</p>
-              <p className="settings-field-title">Tema</p>
-              <div className={`theme-toggle ${isDarkMode ? 'dark-active' : 'light-active'}`} role="group" aria-label="Seleccionar tema">
-                <span className="theme-toggle-thumb" aria-hidden="true" />
-                <button
-                  type="button"
-                  className={`theme-toggle-btn ${!isDarkMode ? 'active' : ''}`}
-                  onClick={() => setIsDarkMode(false)}
-                  aria-pressed={!isDarkMode}
-                  aria-label="Activar tema claro"
-                >
-                  <svg viewBox="0 0 24 24" aria-hidden="true">
-                    <circle cx="12" cy="12" r="4" />
-                    <path d="M12 2v2.2M12 19.8V22M4.9 4.9l1.6 1.6M17.5 17.5l1.6 1.6M2 12h2.2M19.8 12H22M4.9 19.1l1.6-1.6M17.5 6.5l1.6-1.6" />
-                  </svg>
-                </button>
-                <button
-                  type="button"
-                  className={`theme-toggle-btn ${isDarkMode ? 'active' : ''}`}
-                  onClick={() => setIsDarkMode(true)}
-                  aria-pressed={isDarkMode}
-                  aria-label="Activar tema oscuro"
-                >
-                  <svg viewBox="0 0 24 24" aria-hidden="true">
-                    <path d="M20 14.2A8 8 0 1 1 9.8 4a7 7 0 1 0 10.2 10.2z" />
-                  </svg>
-                </button>
+              <div className="settings-appearance-row">
+                <p className="settings-field-title">Tema</p>
+                <div className={`theme-toggle ${isDarkMode ? 'dark-active' : 'light-active'}`} role="group" aria-label="Seleccionar tema">
+                  <span className="theme-toggle-thumb" aria-hidden="true" />
+                  <button
+                    type="button"
+                    className={`theme-toggle-btn ${!isDarkMode ? 'active' : ''}`}
+                    onClick={() => setIsDarkMode(false)}
+                    aria-pressed={!isDarkMode}
+                    aria-label="Activar tema claro"
+                  >
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                      <circle cx="12" cy="12" r="4" />
+                      <path d="M12 2v2.2M12 19.8V22M4.9 4.9l1.6 1.6M17.5 17.5l1.6 1.6M2 12h2.2M19.8 12H22M4.9 19.1l1.6-1.6M17.5 6.5l1.6-1.6" />
+                    </svg>
+                    Claro
+                  </button>
+                  <button
+                    type="button"
+                    className={`theme-toggle-btn ${isDarkMode ? 'active' : ''}`}
+                    onClick={() => setIsDarkMode(true)}
+                    aria-pressed={isDarkMode}
+                    aria-label="Activar tema oscuro"
+                  >
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                      <path d="M20 14.2A8 8 0 1 1 9.8 4a7 7 0 1 0 10.2 10.2z" />
+                    </svg>
+                    Oscuro
+                  </button>
+                </div>
               </div>
-              <p className="settings-note">El tema se aplica a toda la aplicación.</p>
-            </div>
-
-            <div className="settings-divider" />
-
-            <div className="settings-section">
-              <div className="settings-scale-head">
-                <p className="settings-badge-ink">Texto</p>
-                <span className="settings-scale-value">{Math.round(fontScale * 100)}%</span>
-              </div>
-              <p className="settings-field-title">Tamaño de texto</p>
-              <input
-                type="range"
-                className="settings-range"
-                min={0.85}
-                max={1.3}
-                step={0.05}
-                value={fontScale}
-                onChange={(event) => setFontScale(clampFontScale(Number(event.target.value)))}
-              />
-              <div className="settings-scale-labels">
-                <span>A-</span>
-                <span>A</span>
-                <span>A+</span>
+              <div className="settings-appearance-row">
+                <p className="settings-field-title">Tamaño</p>
+                <div className="settings-scale-control">
+                  <input
+                    type="range"
+                    className="settings-range"
+                    min={0.85}
+                    max={1.3}
+                    step={0.05}
+                    value={fontScale}
+                    onChange={(event) => setFontScale(clampFontScale(Number(event.target.value)))}
+                  />
+                  <span className="settings-scale-value">{Math.round(fontScale * 100)}%</span>
+                </div>
               </div>
             </div>
 
@@ -2046,22 +2091,24 @@ export function MainPage() {
 
             <div className="settings-section">
               <p className="settings-badge-ink">Notificaciones</p>
-              <div className="notification-master-row">
-                <p className="settings-field-title">Activar todas las notificaciones</p>
-                <button
-                  type="button"
-                  className={`settings-switch ${allNotificationsEnabled ? 'active' : ''}`}
-                  role="switch"
-                  aria-checked={allNotificationsEnabled}
-                  onClick={() => setAllNotificationChannels(!allNotificationsEnabled)}
-                >
-                  <span />
-                </button>
-              </div>
               <div className="notification-preference-list">
                 {Object.entries(settingsNotificationGroups).map(([group, options]) => (
                   <div className="notification-preference-group" key={group}>
                     <h3>{group}</h3>
+                    {group === 'Reservas' && (
+                      <div className="notification-preference-row notification-master-row">
+                        <span className="notification-preference-label">Activar todas las notificaciones</span>
+                        <button
+                          type="button"
+                          className={`settings-switch ${allNotificationsEnabled ? 'active' : ''}`}
+                          role="switch"
+                          aria-checked={allNotificationsEnabled}
+                          onClick={() => setAllNotificationChannels(!allNotificationsEnabled)}
+                        >
+                          <span />
+                        </button>
+                      </div>
+                    )}
                     {options.map((option) => {
                       const preference = notificationPrefs.notificationSettings[option.key] ?? {
                         app: option.app,
@@ -2110,10 +2157,12 @@ export function MainPage() {
 
             <div className="settings-section">
               <p className="settings-badge-ink">Seguridad</p>
-              <p className="settings-field-title">Autenticación en dos pasos (2FA)</p>
-              <p className="settings-note">
-                Estado actual: <strong>{authenticatedUser?.has2fa ? 'Activado' : 'Desactivado'}</strong>
-              </p>
+              <div className="two-factor-title-row">
+                <p className="settings-field-title">Autenticación en dos pasos (2FA)</p>
+                <span className={`two-factor-status-pill ${authenticatedUser?.has2fa ? 'active' : 'inactive'}`}>
+                  {authenticatedUser?.has2fa ? 'Activado' : 'Desactivado'}
+                </span>
+              </div>
               <button
                 type="button"
                 className={`settings-action-btn ${authenticatedUser?.has2fa ? 'danger' : ''}`}
@@ -2158,11 +2207,6 @@ export function MainPage() {
               </button>
             </div>
 
-            <div className="modal-actions">
-              <button type="button" className="ghost-btn" onClick={() => setIsSettingsModalOpen(false)}>
-                Cerrar
-              </button>
-            </div>
           </div>
         </div>
       )}
