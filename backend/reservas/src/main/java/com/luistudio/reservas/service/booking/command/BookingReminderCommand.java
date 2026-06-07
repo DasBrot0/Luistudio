@@ -1,5 +1,7 @@
 package com.luistudio.reservas.service.booking.command;
 
 public interface BookingReminderCommand {
-    void execute();
+    void ejecutar();
+
+    void deshacer();
 }

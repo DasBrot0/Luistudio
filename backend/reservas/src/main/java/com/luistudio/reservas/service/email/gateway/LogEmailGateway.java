@@ -9,6 +9,16 @@ import org.springframework.stereotype.Component;
 public class LogEmailGateway implements EmailGateway {
 
     @Override
+    public String provider() {
+        return "log";
+    }
+
+    @Override
+    public boolean isConfigured() {
+        return true;
+    }
+
+    @Override
     public void send(EmailOutboxEntity email) {
         log.info("[OUTBOX] To: {} | Subject: {}", email.getDestinatario(), email.getAsunto());
     }

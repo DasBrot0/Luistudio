@@ -10,7 +10,6 @@ import java.time.LocalTime;
 import java.time.OffsetDateTime;
 import java.util.List;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
 
 @Component
 public class SendUpcomingReservationReminderCommand implements BookingReminderCommand {
@@ -30,20 +29,22 @@ public class SendUpcomingReservationReminderCommand implements BookingReminderCo
     }
 
     @Override
-    @Transactional
-    public void execute() {
+    public void ejecutar() {
         LocalDate today = AppTime.today();
         LocalTime now = AppTime.nowTime();
-        OffsetDateTime nextHour = AppTime.nowDateTime().atZone(AppTime.ZONE).toOffsetDateTime().plusMinutes(60);
+        OffsetDateTime nextHour = AppTime.nowDateTime()
+            .atZone(AppTime.ZONE)
+            .toOffsetDateTime()
+            .plusMinutes(60);
 
-        List<ReservationEntity> upcoming = reservationRepository.findUpcomingWindow(
+        List<ReservationEntity> reservations = reservationRepository.findUpcomingWindow(
             today,
             now,
             nextHour.toLocalDate(),
             nextHour.toLocalTime()
         );
 
-        for (ReservationEntity booking : upcoming) {
+        for (ReservationEntity booking : reservations) {
             emailOutboxService.enqueueReminderOnce(
                 booking.getUsuario(),
                 "Recordatorio de reserva",
@@ -56,5 +57,10 @@ public class SendUpcomingReservationReminderCommand implements BookingReminderCo
                 "UPCOMING_60M"
             );
         }
+    }
+
+    @Override
+    public void deshacer() {
+        // No aplica reversion: el comando solo encola recordatorios si todavia no existen.
     }
 }

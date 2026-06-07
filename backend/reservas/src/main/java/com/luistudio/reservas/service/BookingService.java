@@ -10,10 +10,8 @@ import com.luistudio.reservas.model.ReservationStatus;
 import com.luistudio.reservas.model.RoomEntity;
 import com.luistudio.reservas.model.UserEntity;
 import com.luistudio.reservas.repository.ReservationRepository;
-import com.luistudio.reservas.service.booking.rule.BookingRuleContext;
-import com.luistudio.reservas.service.booking.rule.BookingValidationRule;
+import com.luistudio.reservas.service.booking.validation.BookingValidationService;
 import com.luistudio.reservas.service.email.EmailTemplateService;
-import com.luistudio.reservas.service.factory.ReservationFactory;
 import com.luistudio.reservas.util.AppTime;
 import com.luistudio.reservas.util.CalendarUtils;
 import java.time.LocalDate;
@@ -34,8 +32,7 @@ public class BookingService {
     private final EmailOutboxService emailOutboxService;
     private final AuditService auditService;
     private final DtoMapper dtoMapper;
-    private final ReservationFactory reservationFactory;
-    private final List<BookingValidationRule> bookingValidationRules;
+    private final BookingValidationService bookingValidationService;
     private final EmailTemplateService emailTemplateService;
 
     public BookingService(
@@ -45,8 +42,7 @@ public class BookingService {
         EmailOutboxService emailOutboxService,
         AuditService auditService,
         DtoMapper dtoMapper,
-        ReservationFactory reservationFactory,
-        List<BookingValidationRule> bookingValidationRules,
+        BookingValidationService bookingValidationService,
         EmailTemplateService emailTemplateService
     ) {
         this.reservationRepository = reservationRepository;
@@ -55,8 +51,7 @@ public class BookingService {
         this.emailOutboxService = emailOutboxService;
         this.auditService = auditService;
         this.dtoMapper = dtoMapper;
-        this.reservationFactory = reservationFactory;
-        this.bookingValidationRules = bookingValidationRules;
+        this.bookingValidationService = bookingValidationService;
         this.emailTemplateService = emailTemplateService;
     }
 
@@ -74,7 +69,7 @@ public class BookingService {
                 request.end()
             )
             .map(existing -> {
-                validateBookingRules(user, room, request, existing.getId());
+                bookingValidationService.validate(user, room, request, existing.getId());
                 existing.setEstado(ReservationStatus.ACTIVA);
                 existing.setCantidadPersonas(request.people());
                 existing.setObservacion(request.observation());
@@ -83,8 +78,8 @@ public class BookingService {
                 return reservationRepository.save(existing);
             })
             .orElseGet(() -> {
-                validateBookingRules(user, room, request, null);
-                ReservationEntity booking = reservationFactory.createActiveReservation(user, room, request);
+                bookingValidationService.validate(user, room, request, null);
+                ReservationEntity booking = buildActiveReservation(user, room, request);
                 return reservationRepository.save(booking);
             });
 
@@ -102,7 +97,7 @@ public class BookingService {
         RoomEntity room = roomService.getRoomEntity(request.roomId());
         UserEntity actor = userService.getById(actorUserId);
 
-        validateBookingRules(current.getUsuario(), room, request, bookingId);
+        bookingValidationService.validate(current.getUsuario(), room, request, bookingId);
 
         String previous = current.getSala().getCodigo() + " " + current.getFecha() + " " + current.getHoraInicio() + "-" + current.getHoraFin();
 
@@ -244,10 +239,20 @@ public class BookingService {
         );
     }
 
-    private void validateBookingRules(UserEntity user, RoomEntity room, BookingUpsertRequest request, Long excludeBookingId) {
-        BookingRuleContext context = new BookingRuleContext(user, room, request, excludeBookingId);
-        for (BookingValidationRule rule : bookingValidationRules) {
-            rule.validate(context);
-        }
+    private ReservationEntity buildActiveReservation(
+        UserEntity user,
+        RoomEntity room,
+        BookingUpsertRequest request
+    ) {
+        ReservationEntity booking = new ReservationEntity();
+        booking.setUsuario(user);
+        booking.setSala(room);
+        booking.setFecha(request.date());
+        booking.setHoraInicio(request.start());
+        booking.setHoraFin(request.end());
+        booking.setCantidadPersonas(request.people());
+        booking.setObservacion(request.observation());
+        booking.setEstado(ReservationStatus.ACTIVA);
+        return booking;
     }
 }

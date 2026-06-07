@@ -7,6 +7,7 @@ import com.luistudio.reservas.dto.room.RoomUpsertRequest;
 import com.luistudio.reservas.exception.BusinessException;
 import com.luistudio.reservas.exception.NotFoundException;
 import com.luistudio.reservas.model.MaintenanceEntity;
+import com.luistudio.reservas.model.MaintenanceStatus;
 import com.luistudio.reservas.model.PabellonEntity;
 import com.luistudio.reservas.model.RoomEntity;
 import com.luistudio.reservas.model.RoomState;
@@ -14,8 +15,6 @@ import com.luistudio.reservas.repository.MaintenanceRepository;
 import com.luistudio.reservas.repository.PabellonRepository;
 import com.luistudio.reservas.repository.ReservationRepository;
 import com.luistudio.reservas.repository.RoomRepository;
-import com.luistudio.reservas.service.factory.MaintenanceFactory;
-import com.luistudio.reservas.service.factory.RoomFactory;
 import com.luistudio.reservas.util.AppTime;
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -35,8 +34,6 @@ public class RoomService {
     private final ReservationRepository reservationRepository;
     private final MaintenanceRepository maintenanceRepository;
     private final DtoMapper dtoMapper;
-    private final RoomFactory roomFactory;
-    private final MaintenanceFactory maintenanceFactory;
     private final RoomScheduleService roomScheduleService;
 
     public RoomService(
@@ -45,8 +42,6 @@ public class RoomService {
         ReservationRepository reservationRepository,
         MaintenanceRepository maintenanceRepository,
         DtoMapper dtoMapper,
-        RoomFactory roomFactory,
-        MaintenanceFactory maintenanceFactory,
         RoomScheduleService roomScheduleService
     ) {
         this.roomRepository = roomRepository;
@@ -54,8 +49,6 @@ public class RoomService {
         this.reservationRepository = reservationRepository;
         this.maintenanceRepository = maintenanceRepository;
         this.dtoMapper = dtoMapper;
-        this.roomFactory = roomFactory;
-        this.maintenanceFactory = maintenanceFactory;
         this.roomScheduleService = roomScheduleService;
     }
 
@@ -79,7 +72,7 @@ public class RoomService {
         validatePeopleConstraints(request.capacity(), request.minPeople(), request.minPeopleRequired(), request.maxPeople());
 
         PabellonEntity pabellon = resolvePabellon(request.pabellonCode(), request.location());
-        RoomEntity room = roomFactory.createAvailableRoom(
+        RoomEntity room = buildAvailableRoom(
             request.name(),
             request.campus(),
             request.location(),
@@ -139,7 +132,7 @@ public class RoomService {
             throw new BusinessException(HttpStatus.BAD_REQUEST, "La fecha fin debe ser mayor que inicio");
         }
 
-        MaintenanceEntity maintenance = maintenanceFactory.createScheduled(room, request);
+        MaintenanceEntity maintenance = buildScheduledMaintenance(room, request);
         room.setEstado(RoomState.EN_MANTENIMIENTO);
         roomRepository.save(room);
 
@@ -217,6 +210,43 @@ public class RoomService {
 
     private int resolveMinPeople(Integer minPeople) {
         return minPeople == null ? 1 : minPeople;
+    }
+
+    private RoomEntity buildAvailableRoom(
+        String name,
+        String campus,
+        String venue,
+        Integer capacity,
+        Integer minPeople,
+        Boolean minPeopleRequired,
+        Integer maxPeople,
+        String location,
+        PabellonEntity pabellon,
+        String roomCode
+    ) {
+        RoomEntity room = new RoomEntity();
+        room.setNombre(name.trim());
+        room.setCampus(campus.trim());
+        room.setVenue(venue.trim());
+        room.setCapacidad(capacity);
+        room.setMinimoPersonas(minPeople);
+        room.setMinimoPersonasObligatorio(minPeopleRequired);
+        room.setMaximoPersonas(maxPeople);
+        room.setUbicacion(location.trim());
+        room.setEstado(RoomState.DISPONIBLE);
+        room.setPabellon(pabellon);
+        room.setCodigo(roomCode);
+        return room;
+    }
+
+    private MaintenanceEntity buildScheduledMaintenance(RoomEntity room, MaintenanceRequest request) {
+        MaintenanceEntity maintenance = new MaintenanceEntity();
+        maintenance.setSala(room);
+        maintenance.setInicio(request.start());
+        maintenance.setFin(request.end());
+        maintenance.setMotivo(request.reason());
+        maintenance.setEstado(MaintenanceStatus.PROGRAMADO);
+        return maintenance;
     }
 
     private void ensureRoomCanBeInactivated(RoomEntity room) {

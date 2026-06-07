@@ -99,17 +99,16 @@ Luistudio/
 │           │   │   ├── security/                       # 🛡️ JWT, cookies y usuario autenticado
 │           │   │   ├── service/                        # 🧠 Lógica de negocio
 │           │   │   │   ├── auth/strategy/              # 🔐 Estrategias de login estándar y 2FA
-│           │   │   │   ├── booking/command/            # ⏰ Comandos y scheduler de recordatorios
-│           │   │   │   ├── booking/rule/               # ✅ Reglas de validación de reservas
+│           │   │   │   ├── booking/command/            # Comandos y scheduler de recordatorios
+│           │   │   │   ├── booking/validation/         # Servicio de validacion de reservas
 │           │   │   │   ├── email/gateway/              # ✉️ Adaptadores para envío de correo
-│           │   │   │   └── factory/                    # 🏭 Creación consistente de entidades
 │           │   │   └── util/
 │           │   │       └── CalendarUtils.java          # 🗓️ Generación de archivos/calendarios ICS
 │           │   └── resources/                          # 🧾 Configuración y recursos del backend
 │           └── test/java/com/luistudio/reservas/
 │               ├── ReservasApplicationTests.java       # ✅ Prueba de carga del contexto Spring
 │               ├── security/                           # 🧪 Tests de seguridad
-│               └── service/factory/                    # 🧪 Tests de factories
+│               └── service/auth/                       # Tests de servicios de autenticacion
 ├── frontend/
 │   ├── README_FRONTEND.md                # 📘 Guía técnica del frontend
 │   └── luistudio-app/
@@ -272,37 +271,33 @@ Luistudio/
 | `StandardLoginStrategy.java` | Implementa login estándar con credenciales. |
 | `TwoFactorLoginStrategy.java` | Implementa el flujo de login que requiere segundo factor. |
 
-**⏰ Comandos y reglas de reserva**
 
-| Archivo | Descripción breve |
+**Comandos y validacion de reserva**
+
+| Archivo | Descripcion breve |
 |---|---|
 | `BookingReminderCommand.java` | Contrato para comandos de recordatorio de reservas. |
-| `BookingReminderScheduler.java` | Programa la ejecución periódica de recordatorios. |
-| `SendEndingSoonReservationReminderCommand.java` | Envía avisos de reservas próximas a terminar. |
-| `SendUpcomingReservationReminderCommand.java` | Envía avisos de reservas próximas a iniciar. |
-| `BookingRuleContext.java` | Contexto compartido para validar una reserva. |
-| `BookingValidationRule.java` | Contrato de regla de validación de reserva. |
-| `BookingWindowAndSlotRule.java` | Valida ventana permitida y bloques horarios. |
-| `CapacityRule.java` | Valida capacidad solicitada contra la sala. |
-| `EndTimeAfterStartRule.java` | Valida que la hora de fin sea posterior al inicio. |
-| `MaxActiveBookingsRule.java` | Limita reservas activas simultáneas por usuario. |
-| `MaxDurationRule.java` | Valida duración máxima de una reserva. |
-| `RoomAvailabilityRule.java` | Valida disponibilidad de la sala y conflictos. |
+| `BookingReminderCommandManager.java` | Administra la cola y ejecuta comandos pendientes. |
+| `BookingReminderScheduler.java` | Agrega comandos de recordatorio al manager periodicamente. |
+| `SendEndingSoonReservationReminderCommand.java` | Encola avisos de reservas proximas a terminar. |
+| `SendUpcomingReservationReminderCommand.java` | Encola avisos de reservas proximas a iniciar. |
+| `BookingValidationService.java` | Concentra las validaciones de creacion y edicion de reservas. |
 
-**✉️ Email y factories**
+**Email y servicios auxiliares**
 
-| Archivo | Descripción breve |
+| Archivo | Descripcion breve |
 |---|---|
 | `EmailTemplateService.java` | Construye contenido de emails del sistema. |
-| `EmailGateway.java` | Contrato para proveedores de envío de correo. |
-| `EmailGatewayFactory.java` | Selecciona el gateway de email configurado. |
-| `GmailEmailGateway.java` | Envía correos usando Gmail/SMTP. |
-| `LogEmailGateway.java` | Simula envío registrando correos en logs. |
-| `ResendEmailGateway.java` | Envía correos usando Resend. |
-| `MaintenanceFactory.java` | Crea entidades de mantenimiento consistentes. |
-| `ReservationFactory.java` | Crea entidades de reserva con valores iniciales correctos. |
-| `RoomFactory.java` | Crea entidades de sala. |
-| `SecurityEntityFactory.java` | Crea entidades relacionadas con seguridad, tokens y 2FA. |
+| `EmailDispatchService.java` | Despacha correos pendientes y maneja reintentos. |
+| `EmailOutboxScheduler.java` | Programa el despacho de la cola de correos. |
+| `EmailGateway.java` | Target comun para proveedores de envio de correo. |
+| `EmailGatewayResolver.java` | Resuelve el gateway configurado con fallback a log. |
+| `GmailEmailAdapter.java` | Adapta el contrato interno hacia Gmail. |
+| `GmailClientAdaptee.java` | Encapsula la API externa de Gmail. |
+| `LogEmailGateway.java` | Simula envio registrando correos en logs. |
+| `ResendEmailAdapter.java` | Adapta el contrato interno hacia Resend. |
+| `ResendClientAdaptee.java` | Encapsula la API externa de Resend. |
+| `SecurityCodeService.java` | Genera codigos 2FA y tokens de recuperacion hasheados. |
 | `CalendarUtils.java` | Genera contenido de calendario para integraciones `.ics`. |
 
 **🧪 Tests Java**
@@ -311,7 +306,7 @@ Luistudio/
 |---|---|
 | `ReservasApplicationTests.java` | Verifica que el contexto de Spring Boot cargue correctamente. |
 | `JwtServiceTest.java` | Prueba generación y validación de tokens JWT. |
-| `SecurityEntityFactoryTest.java` | Prueba la creación de entidades de seguridad. |
+| `SecurityCodeServiceTest.java` | Prueba la generacion hasheada de codigos y tokens de seguridad. |
 
 ### ⚛️ Frontend: detalle de archivos TS/TSX/CSS
 

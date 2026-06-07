@@ -1,4 +1,4 @@
-package com.luistudio.reservas.service.email.gateway;
+package com.luistudio.reservas.service.email.gateway.adaptee;
 
 import com.luistudio.reservas.model.EmailOutboxEntity;
 import com.luistudio.reservas.service.email.EmailTemplateService;
@@ -9,10 +9,11 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
 import org.springframework.web.client.RestClient;
 
 @Component
-public class GmailEmailGateway implements EmailGateway {
+public class GmailClientAdaptee {
 
     private final RestClient oauthClient;
     private final RestClient gmailClient;
@@ -22,7 +23,7 @@ public class GmailEmailGateway implements EmailGateway {
     private final String emailFrom;
     private final EmailTemplateService emailTemplateService;
 
-    public GmailEmailGateway(
+    public GmailClientAdaptee(
         RestClient.Builder restClientBuilder,
         @Value("${app.email.gmail.client-id:}") String clientId,
         @Value("${app.email.gmail.client-secret:}") String clientSecret,
@@ -39,8 +40,13 @@ public class GmailEmailGateway implements EmailGateway {
         this.emailTemplateService = emailTemplateService;
     }
 
-    @Override
-    public void send(EmailOutboxEntity email) {
+    public boolean canSend() {
+        return StringUtils.hasText(clientId)
+            && StringUtils.hasText(clientSecret)
+            && StringUtils.hasText(refreshToken);
+    }
+
+    public void sendWithGmail(EmailOutboxEntity email) {
         String accessToken = fetchAccessToken();
         String rawMessage = buildRawMessage(email);
         String encodedRaw = Base64.getUrlEncoder()

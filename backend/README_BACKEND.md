@@ -173,17 +173,20 @@ Nota:
 - No uses `GET /api/rooms` para keep-alive si no mandas token, porque ese endpoint requiere autenticación.
 
 ## Patrones aplicados
+## Patrones aplicados
 
 - `Strategy`:
-  - Reglas de validacion de reservas (`service/booking/rule/*`).
-  - Flujo de respuesta de login (`service/auth/strategy/*`).
-- `Command`:
-  - Recordatorios de reservas (`service/booking/command/*`).
-- `Factory Method`:
-  - Creacion de entidades de reservas/salas/mantenimiento/seguridad (`service/factory/*`).
-  - Selección de proveedor de envío de correo (`service/email/gateway/EmailGatewayFactory`).
+  - Login con `LoginContext`, `LoginStrategy`, `StandardLoginStrategy` y `TwoFactorLoginStrategy`.
 - `Adapter`:
-  - Adaptacion de proveedor de correo (`service/email/gateway/*Gateway`).
+  - Email con `EmailGateway` como target, `GmailEmailAdapter`/`ResendEmailAdapter` como adapters y adaptees explicitos para Gmail/Resend.
+  - `LogEmailGateway` es fallback local, no adapter externo.
+- `Command`:
+  - Recordatorios con `BookingReminderCommand`, comandos concretos, `BookingReminderCommandManager` y scheduler.
+- `Facade`:
+  - `AuthService` conserva el contrato de autenticacion y delega en `LoginService`, `PasswordResetService`, `TwoFactorService` y `LoginAttemptService`.
+
+Como arquitectura, no como GoF: `BookingValidationService` concentra validaciones de reserva; `repository/*Repository.java` usa Spring Data JPA; `DtoMapper` y `dto/**` manejan DTOs. No se implementa Factory Method ni Singleton manual.
+
 
 - Regla de no duplicacion de reservas: si el usuario vuelve a reservar exactamente el mismo recurso, fecha y horario (misma identidad logica), se reutiliza el mismo registro en BD y se actualiza su estado/datos; no se crea una fila adicional. La cantidad de personas no define identidad para esta regla.
 

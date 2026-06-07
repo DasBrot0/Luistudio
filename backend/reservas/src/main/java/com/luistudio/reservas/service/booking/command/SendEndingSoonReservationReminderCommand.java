@@ -9,7 +9,6 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
 
 @Component
 public class SendEndingSoonReservationReminderCommand implements BookingReminderCommand {
@@ -29,14 +28,18 @@ public class SendEndingSoonReservationReminderCommand implements BookingReminder
     }
 
     @Override
-    @Transactional
-    public void execute() {
+    public void ejecutar() {
         LocalDate date = AppTime.today();
         LocalTime now = AppTime.nowTime();
         LocalTime min = now.minusMinutes(15);
 
-        List<ReservationEntity> endingSoon = reservationRepository.findEndingSoon(date, now.plusMinutes(15), min);
-        for (ReservationEntity booking : endingSoon) {
+        List<ReservationEntity> reservations = reservationRepository.findEndingSoon(
+            date,
+            now.plusMinutes(15),
+            min
+        );
+
+        for (ReservationEntity booking : reservations) {
             emailOutboxService.enqueueReminderOnce(
                 booking.getUsuario(),
                 "Tu reserva termina pronto",
@@ -49,5 +52,10 @@ public class SendEndingSoonReservationReminderCommand implements BookingReminder
                 "ENDING_SOON_15M"
             );
         }
+    }
+
+    @Override
+    public void deshacer() {
+        // No aplica reversion: el comando solo encola recordatorios si todavia no existen.
     }
 }

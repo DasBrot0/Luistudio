@@ -6,24 +6,24 @@ import org.springframework.stereotype.Component;
 @Component
 public class BookingReminderScheduler {
 
-    private final SendUpcomingReservationReminderCommand upcomingReminderCommand;
-    private final SendEndingSoonReservationReminderCommand endingSoonReminderCommand;
+    private final BookingReminderCommandManager commandManager;
+    private final SendUpcomingReservationReminderCommand upcomingCommand;
+    private final SendEndingSoonReservationReminderCommand endingSoonCommand;
 
     public BookingReminderScheduler(
-        SendUpcomingReservationReminderCommand upcomingReminderCommand,
-        SendEndingSoonReservationReminderCommand endingSoonReminderCommand
+        BookingReminderCommandManager commandManager,
+        SendUpcomingReservationReminderCommand upcomingCommand,
+        SendEndingSoonReservationReminderCommand endingSoonCommand
     ) {
-        this.upcomingReminderCommand = upcomingReminderCommand;
-        this.endingSoonReminderCommand = endingSoonReminderCommand;
+        this.commandManager = commandManager;
+        this.upcomingCommand = upcomingCommand;
+        this.endingSoonCommand = endingSoonCommand;
     }
 
     @Scheduled(fixedDelay = 300000)
-    public void runUpcomingReminderCommand() {
-        upcomingReminderCommand.execute();
-    }
-
-    @Scheduled(fixedDelay = 300000)
-    public void runEndingSoonReminderCommand() {
-        endingSoonReminderCommand.execute();
+    public void run() {
+        commandManager.agregarComando(upcomingCommand);
+        commandManager.agregarComando(endingSoonCommand);
+        commandManager.ejecutarPendientes();
     }
 }

@@ -9,14 +9,10 @@ import com.luistudio.reservas.model.UserEntity;
 import com.luistudio.reservas.repository.EmailOutboxRepository;
 import com.luistudio.reservas.repository.NotificationPreferenceRepository;
 import com.luistudio.reservas.service.email.EmailTemplateService;
-import com.luistudio.reservas.service.email.gateway.EmailGateway;
-import com.luistudio.reservas.service.email.gateway.EmailGatewayFactory;
 import java.time.OffsetDateTime;
-import java.util.List;
 import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -27,20 +23,17 @@ public class EmailOutboxService {
 
     private final EmailOutboxRepository emailOutboxRepository;
     private final NotificationPreferenceRepository notificationPreferenceRepository;
-    private final EmailGateway emailGateway;
     private final ObjectMapper objectMapper;
     private final EmailTemplateService emailTemplateService;
 
     public EmailOutboxService(
         EmailOutboxRepository emailOutboxRepository,
         NotificationPreferenceRepository notificationPreferenceRepository,
-        EmailGatewayFactory emailGatewayFactory,
         ObjectMapper objectMapper,
         EmailTemplateService emailTemplateService
     ) {
         this.emailOutboxRepository = emailOutboxRepository;
         this.notificationPreferenceRepository = notificationPreferenceRepository;
-        this.emailGateway = emailGatewayFactory.createGateway();
         this.objectMapper = objectMapper;
         this.emailTemplateService = emailTemplateService;
     }
@@ -100,41 +93,6 @@ public class EmailOutboxService {
             "reminderType", reminderType
         ));
         enqueue(recipient, subject, body, payload);
-    }
-
-    @Transactional
-    @Scheduled(fixedDelay = 60000)
-    public void processPendingEmails() {
-        List<EmailOutboxEntity> pending = emailOutboxRepository.findReadyToProcess(EmailStatus.PENDIENTE, OffsetDateTime.now());
-        for (EmailOutboxEntity email : pending) {
-            try {
-                sendEmail(email);
-                email.setEstado(EmailStatus.ENVIADO);
-                email.setEnviadoEn(OffsetDateTime.now());
-                emailOutboxRepository.save(email);
-            } catch (Exception ex) {
-                email.setIntentos(email.getIntentos() + 1);
-                email.setErrorDetalle(ex.getMessage());
-                if (email.getIntentos() >= 3) {
-                    email.setEstado(EmailStatus.ERROR);
-                } else {
-                    email.setDisponibleDesde(OffsetDateTime.now().plusMinutes(2));
-                }
-                emailOutboxRepository.save(email);
-                log.warn(
-                    "[EMAIL_OUTBOX] Fallo envío a {} | Subject: {} | intento={} | estado={} | error={}",
-                    email.getDestinatario(),
-                    email.getAsunto(),
-                    email.getIntentos(),
-                    email.getEstado(),
-                    ex.getMessage()
-                );
-            }
-        }
-    }
-
-    private void sendEmail(EmailOutboxEntity email) {
-        emailGateway.send(email);
     }
 
     private String toHtmlBody(String subject, String body) {

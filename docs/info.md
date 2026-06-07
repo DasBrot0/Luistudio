@@ -47,8 +47,8 @@ Lo más importante:
   * Diferencia entre datos reales y datos seed.
 * **Patrones usados**
   * Strategy: login normal vs 2FA.
-  * Factory: crear entidades con valores consistentes.
-  * Command: recordatorios programados.
+  * Facade: AuthService como entrada estable del modulo de autenticacion.
+  * Strategy: politicas de recordatorios programados.
   * Rules/Strategy: reglas de validación de reservas.
 
 **Frontend React**

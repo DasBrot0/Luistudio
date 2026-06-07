@@ -2,101 +2,54 @@
 
 ## Objetivo
 
-Este documento resume los patrones aplicados en el proyecto y su ubicacion principal en codigo.
+Este documento resume los patrones que se aplican en el backend y su ubicacion principal en código.
 
-## Principios OO (guia de referencia)
+## Strategy
 
-### SRP (Single Responsibility Principle)
+El login usa Strategy con un contexto explícito:
 
-- Backend por capas:
-  - `controller`: expone endpoints HTTP.
-  - `service`: concentra reglas de negocio.
-  - `repository`: acceso a datos.
-- Ejemplos:
-  - `backend/reservas/src/main/java/com/luistudio/reservas/controller/*`
-  - `backend/reservas/src/main/java/com/luistudio/reservas/service/*`
-  - `backend/reservas/src/main/java/com/luistudio/reservas/repository/*`
+- `backend/reservas/src/main/java/com/luistudio/reservas/service/auth/strategy/LoginContext.java`
+- `backend/reservas/src/main/java/com/luistudio/reservas/service/auth/strategy/LoginStrategy.java`
+- `backend/reservas/src/main/java/com/luistudio/reservas/service/auth/strategy/StandardLoginStrategy.java`
+- `backend/reservas/src/main/java/com/luistudio/reservas/service/auth/strategy/TwoFactorLoginStrategy.java`
 
-### DIP (Dependency Inversion Principle)
+`LoginService` elige la estrategia segun el usuario tenga 2FA activo y la asigna al `LoginContext` mediante `setLoginStrategy(...)`.
 
-- Dependencias inyectadas por constructor en controladores y servicios.
-- Ejemplos:
-  - `backend/reservas/src/main/java/com/luistudio/reservas/service/BookingService.java`
-  - `backend/reservas/src/main/java/com/luistudio/reservas/service/AuthService.java`
+## Adapter
 
-### DRY
+El envio de correo usa Adapter porque el sistema habla con el Target `EmailGateway`, mientras Gmail y Resend tienen APIs externas distintas:
 
-- Mapeo centralizado entidad->DTO:
-  - `backend/reservas/src/main/java/com/luistudio/reservas/service/DtoMapper.java`
-
-## Patrones Creacionales
-
-### Factory Method
-
-- Creacion de entidades de reserva:
-  - `backend/reservas/src/main/java/com/luistudio/reservas/service/factory/ReservationFactory.java`
-- Creacion de entidades de sala y mantenimiento:
-  - `backend/reservas/src/main/java/com/luistudio/reservas/service/factory/RoomFactory.java`
-  - `backend/reservas/src/main/java/com/luistudio/reservas/service/factory/MaintenanceFactory.java`
-- Creacion de entidades de seguridad (2FA, reset, intentos):
-  - `backend/reservas/src/main/java/com/luistudio/reservas/service/factory/SecurityEntityFactory.java`
-- Seleccion de gateway de correo:
-  - `backend/reservas/src/main/java/com/luistudio/reservas/service/email/gateway/EmailGatewayFactory.java`
-
-## Patrones Estructurales
-
-### Adapter
-
-- Abstraccion para envio de correo:
+- Target:
   - `backend/reservas/src/main/java/com/luistudio/reservas/service/email/gateway/EmailGateway.java`
-- Adaptador concreto para Resend:
-  - `backend/reservas/src/main/java/com/luistudio/reservas/service/email/gateway/ResendEmailGateway.java`
-- Adaptador concreto para Gmail API:
-  - `backend/reservas/src/main/java/com/luistudio/reservas/service/email/gateway/GmailEmailGateway.java`
-- Adaptador de fallback por logs:
-  - `backend/reservas/src/main/java/com/luistudio/reservas/service/email/gateway/LogEmailGateway.java`
+- Adapters:
+  - `backend/reservas/src/main/java/com/luistudio/reservas/service/email/gateway/ResendEmailAdapter.java`
+  - `backend/reservas/src/main/java/com/luistudio/reservas/service/email/gateway/GmailEmailAdapter.java`
+- Adaptees:
+  - `backend/reservas/src/main/java/com/luistudio/reservas/service/email/gateway/adaptee/ResendClientAdaptee.java`
+  - `backend/reservas/src/main/java/com/luistudio/reservas/service/email/gateway/adaptee/GmailClientAdaptee.java`
 
-## Patrones de Comportamiento
+`LogEmailGateway` se mantiene como fallback local o mock, no como adapter externo. `EmailGatewayResolver` solo resuelve el proveedor configurado.
 
-### Strategy
+## Command
 
-- Reglas de validacion de reservas (OCP):
-  - `backend/reservas/src/main/java/com/luistudio/reservas/service/booking/rule/BookingValidationRule.java`
-  - `backend/reservas/src/main/java/com/luistudio/reservas/service/booking/rule/*Rule.java`
-  - Integracion: `backend/reservas/src/main/java/com/luistudio/reservas/service/BookingService.java`
-- Estrategias de respuesta de login (2FA vs login estandar):
-  - `backend/reservas/src/main/java/com/luistudio/reservas/service/auth/strategy/LoginStrategy.java`
-  - `backend/reservas/src/main/java/com/luistudio/reservas/service/auth/strategy/TwoFactorLoginStrategy.java`
-  - `backend/reservas/src/main/java/com/luistudio/reservas/service/auth/strategy/StandardLoginStrategy.java`
+Los recordatorios programados usan Command con manager y cola:
 
-### Command
+- `backend/reservas/src/main/java/com/luistudio/reservas/service/booking/command/BookingReminderCommand.java`
+- `backend/reservas/src/main/java/com/luistudio/reservas/service/booking/command/BookingReminderCommandManager.java`
+- `backend/reservas/src/main/java/com/luistudio/reservas/service/booking/command/SendUpcomingReservationReminderCommand.java`
+- `backend/reservas/src/main/java/com/luistudio/reservas/service/booking/command/SendEndingSoonReservationReminderCommand.java`
+- `backend/reservas/src/main/java/com/luistudio/reservas/service/booking/command/BookingReminderScheduler.java`
 
-- Comandos para recordatorios programados:
-  - `backend/reservas/src/main/java/com/luistudio/reservas/service/booking/command/BookingReminderCommand.java`
-  - `backend/reservas/src/main/java/com/luistudio/reservas/service/booking/command/SendUpcomingReservationReminderCommand.java`
-  - `backend/reservas/src/main/java/com/luistudio/reservas/service/booking/command/SendEndingSoonReservationReminderCommand.java`
-  - Scheduler invocador: `backend/reservas/src/main/java/com/luistudio/reservas/service/booking/command/BookingReminderScheduler.java`
+El scheduler agrega comandos al manager; el manager ejecuta los comandos pendientes. Cada tarea queda encapsulada como objeto ejecutable.
 
-## Patrones de Spring usados en backend
+## Facade
 
-- `Controller-Service-Repository`:
-  - `controller`: entrada HTTP y contrato REST.
-  - `service`: casos de uso y reglas de negocio.
-  - `repository`: persistencia con Spring Data JPA.
-- `Repository` (Spring Data JPA):
-  - `backend/reservas/src/main/java/com/luistudio/reservas/repository/*`
-- `Controller + Service`:
-  - `backend/reservas/src/main/java/com/luistudio/reservas/controller/*`
-  - `backend/reservas/src/main/java/com/luistudio/reservas/service/*`
-- `DTO Mapper`:
-  - `backend/reservas/src/main/java/com/luistudio/reservas/service/DtoMapper.java`
-- `Global Exception Handler`:
-  - `backend/reservas/src/main/java/com/luistudio/reservas/exception/GlobalExceptionHandler.java`
+`AuthService` es la fachada del modulo de autenticación:
 
-## Frontend (organizacion aplicada)
+- `backend/reservas/src/main/java/com/luistudio/reservas/service/AuthService.java`
+- `backend/reservas/src/main/java/com/luistudio/reservas/service/auth/LoginService.java`
+- `backend/reservas/src/main/java/com/luistudio/reservas/service/auth/LoginAttemptService.java`
+- `backend/reservas/src/main/java/com/luistudio/reservas/service/auth/PasswordResetService.java`
+- `backend/reservas/src/main/java/com/luistudio/reservas/service/auth/TwoFactorService.java`
 
-- Estructura separada por responsabilidades en `frontend/luistudio-app/src`:
-  - `models/` (tipos de dominio)
-  - `services/` (acceso a API)
-  - `viewmodels/` (rutas y estado de presentacion)
-  - `views/` (componentes y paginas)
+`AuthController` se comunica con `AuthService`, y la fachada delega internamente en los servicios especializados.

@@ -87,10 +87,10 @@ flowchart LR
 
     subgraph Domain[Dominio y reglas]
         Entities[Entidades JPA]
-        BookingRules[BookingValidationRule]
+        BookingRules[BookingValidationService]
         LoginStrategies[LoginStrategy]
         Factories[Factories]
-        Commands[BookingReminderCommand]
+        Strategys[BookingReminderStrategy]
     end
 
     subgraph Infrastructure[Infraestructura]
@@ -135,11 +135,11 @@ flowchart TB
 | Modulo | Componentes principales | Descripcion |
 | --- | --- | --- |
 | Autenticacion y seguridad | `AuthController`, `AuthService`, `JwtService`, `JwtAuthenticationFilter`, `LoginStrategy` | Login, JWT, 2FA, recuperacion de contrasena y bloqueo por intentos fallidos. |
-| Reservas | `BookingController`, `BookingService`, `BookingValidationRule`, `ReservationRepository` | Creacion, edicion, cancelacion, consulta e integracion calendario `.ics`. |
+| Reservas | `BookingController`, `BookingService`, `BookingValidationService`, `ReservationRepository` | Creacion, edicion, cancelacion, consulta e integracion calendario `.ics`. |
 | Salas y disponibilidad | `RoomController`, `RoomService`, `RoomScheduleService`, `RoomRepository` | CRUD de salas, disponibilidad, horarios por campus/sala y mantenimientos. |
 | Administracion | `AdminController`, `UserService`, `SystemConfigService` | Gestion de usuarios, configuracion de limites y horarios generales. |
 | Preferencias | `PreferenceController`, `PreferenceService` | Preferencias de correo, recordatorios, tema visual, escala de fuente y vista inicial. |
-| Notificaciones | `EmailOutboxService`, `EmailGatewayFactory`, `EmailGateway` | Cola transaccional de correos y envio mediante adaptadores. |
+| Notificaciones | `EmailOutboxService`, `EmailGatewayResolver`, `EmailGateway` | Cola transaccional de correos y envio mediante adaptadores. |
 | Auditoria | `AuditService`, `AuditLogRepository` | Registro de acciones relevantes, como actualizaciones de reservas. |
 
 ## 5.3 Explicacion y justificacion del diseno
@@ -170,7 +170,7 @@ La comunicacion entre frontend y backend se realiza con JSON sobre HTTP. Los DTO
 
 ### Validacion centralizada de reservas
 
-La creacion y edicion de reservas se valida en `BookingService` mediante una lista de objetos `BookingValidationRule`. Cada regla revisa una condicion concreta: capacidad, duracion maxima, horario permitido, disponibilidad de sala, cantidad maxima de reservas activas y consistencia entre hora inicial/final. Esta decision aplica OCP: para agregar una nueva restriccion se crea una nueva regla sin modificar el flujo principal.
+La creacion y edicion de reservas se valida en `BookingService` mediante una lista de objetos `BookingValidationService`. Cada regla revisa una condicion concreta: capacidad, duracion maxima, horario permitido, disponibilidad de sala, cantidad maxima de reservas activas y consistencia entre hora inicial/final. Esta decision aplica OCP: para agregar una nueva restriccion se crea una nueva regla sin modificar el flujo principal.
 
 ### Seguridad por JWT, roles y 2FA
 
@@ -188,7 +188,7 @@ El sistema no envia correos directamente dentro del caso de uso principal. Prime
 
 ### Adaptadores para proveedores externos
 
-El envio de correo depende de la interfaz `EmailGateway`. Las implementaciones concretas (`GmailEmailGateway`, `ResendEmailGateway`, `LogEmailGateway`) adaptan proveedores distintos al mismo contrato interno. Esta decision evita que el dominio dependa de APIs externas y facilita cambiar proveedor por variables de entorno.
+El envio de correo depende de la interfaz `EmailGateway`. Las implementaciones concretas (`GmailEmailAdapter`, `ResendEmailAdapter`, `LogEmailGateway`) adaptan proveedores distintos al mismo contrato interno. Esta decision evita que el dominio dependa de APIs externas y facilita cambiar proveedor por variables de entorno.
 
 ### Frontend organizado por responsabilidades
 
@@ -206,27 +206,27 @@ El detalle operativo de patrones esta documentado en `docs/principios/applicatio
 | --- | --- | --- | --- |
 | Controller-Service-Repository | Arquitectonico / Spring | `controller`, `service`, `repository` | Separa entrada HTTP, negocio y persistencia. |
 | DTO Mapper | Estructural de soporte | `DtoMapper` | Evita exponer entidades JPA al frontend y centraliza conversiones. |
-| Strategy | Comportamiento | `service/booking/rule/*`, `service/auth/strategy/*` | Permite intercambiar o agregar reglas/algoritmos sin modificar servicios principales. |
-| Factory Method | Creacional | `service/factory/*`, `EmailGatewayFactory` | Centraliza creacion de entidades y seleccion de gateway. |
+| Strategy | Comportamiento | `service/auth/strategy/*` | Permite intercambiar o agregar reglas/algoritmos sin modificar servicios principales. |
+| Facade | Creacional | `metodos privados y service/auth/*`, `EmailGatewayResolver` | Centraliza creacion de entidades y seleccion de gateway. |
 | Adapter | Estructural | `service/email/gateway/*Gateway` | Encapsula diferencias entre Gmail, Resend y log. |
-| Command | Comportamiento | `service/booking/command/*` | Encapsula acciones programadas de recordatorio de reservas. |
+| Command | Comportamiento | `service/booking/command/*` | Encapsula tareas programadas de recordatorio como comandos ejecutables. |
 | Repository | Persistencia | `repository/*Repository` | Abstrae operaciones de base de datos. |
 | Global Exception Handler | Manejo transversal | `GlobalExceptionHandler` | Normaliza errores de negocio y validacion para la API. |
 
-### Patron principal destacado: Strategy en validacion de reservas
+### Patron principal destacado: Servicio de validacion de reservas
 
-`BookingService` no implementa todas las validaciones con una cadena larga de `if`. En su lugar recibe una lista de `BookingValidationRule` por inyeccion de dependencias. Cada regla implementa el mismo contrato y valida una condicion especifica.
+`BookingService` no implementa todas las validaciones con una cadena larga de `if`. En su lugar recibe una lista de `BookingValidationService` por inyeccion de dependencias. El servicio concentra metodos privados para cada condicion de validacion.
 
 ```mermaid
 classDiagram
     class BookingService {
-        -List~BookingValidationRule~ bookingValidationRules
+        -BookingValidationService bookingValidationService
         +createBooking(userId, request)
         +updateBooking(bookingId, actorUserId, request)
         -validateBookingRules(user, room, request, excludeBookingId)
     }
 
-    class BookingValidationRule {
+    class BookingValidationService {
         <<interface>>
         +validate(context)
     }
@@ -238,16 +238,16 @@ classDiagram
     class RoomAvailabilityRule
     class BookingWindowAndSlotRule
 
-    BookingService --> BookingValidationRule
-    BookingValidationRule <|.. CapacityRule
-    BookingValidationRule <|.. EndTimeAfterStartRule
-    BookingValidationRule <|.. MaxDurationRule
-    BookingValidationRule <|.. MaxActiveBookingsRule
-    BookingValidationRule <|.. RoomAvailabilityRule
-    BookingValidationRule <|.. BookingWindowAndSlotRule
+    BookingService --> BookingValidationService
+    BookingValidationService <|.. CapacityRule
+    BookingValidationService <|.. EndTimeAfterStartRule
+    BookingValidationService <|.. MaxDurationRule
+    BookingValidationService <|.. MaxActiveBookingsRule
+    BookingValidationService <|.. RoomAvailabilityRule
+    BookingValidationService <|.. BookingWindowAndSlotRule
 ```
 
-La ventaja es que una nueva regla, por ejemplo bloqueo por feriados o prioridad por tipo de usuario, puede agregarse como otra clase que implemente `BookingValidationRule` sin reescribir `BookingService`.
+La ventaja es que una nueva regla, por ejemplo bloqueo por feriados o prioridad por tipo de usuario, puede agregarse como otra clase que implemente `BookingValidationService` sin reescribir `BookingService`.
 
 ## 6. Diseno estructural
 
@@ -425,9 +425,9 @@ classDiagram
         +send(email)
     }
     class LogEmailGateway
-    class ResendEmailGateway
-    class GmailEmailGateway
-    class EmailGatewayFactory {
+    class ResendEmailAdapter
+    class GmailEmailAdapter
+    class EmailGatewayResolver {
         +createGateway()
     }
     class EmailOutboxService {
@@ -436,10 +436,10 @@ classDiagram
     }
 
     EmailGateway <|.. LogEmailGateway
-    EmailGateway <|.. ResendEmailGateway
-    EmailGateway <|.. GmailEmailGateway
-    EmailGatewayFactory --> EmailGateway
-    EmailOutboxService --> EmailGatewayFactory
+    EmailGateway <|.. ResendEmailAdapter
+    EmailGateway <|.. GmailEmailAdapter
+    EmailGatewayResolver --> EmailGateway
+    EmailOutboxService --> EmailGatewayResolver
     EmailOutboxService --> EmailGateway
 
     class LoginStrategy {
@@ -455,17 +455,17 @@ classDiagram
     LoginStrategy <|.. TwoFactorLoginStrategy
     AuthService --> LoginStrategy
 
-    class BookingReminderCommand {
+    class BookingReminderStrategy {
         <<interface>>
         +execute()
     }
-    class SendUpcomingReservationReminderCommand
-    class SendEndingSoonReservationReminderCommand
+    class SendUpcomingReservationReminderStrategy
+    class SendEndingSoonReservationReminderStrategy
     class BookingReminderScheduler
 
-    BookingReminderCommand <|.. SendUpcomingReservationReminderCommand
-    BookingReminderCommand <|.. SendEndingSoonReservationReminderCommand
-    BookingReminderScheduler --> BookingReminderCommand
+    BookingReminderStrategy <|.. SendUpcomingReservationReminderStrategy
+    BookingReminderStrategy <|.. SendEndingSoonReservationReminderStrategy
+    BookingReminderScheduler --> BookingReminderStrategy
 ```
 
 ## 6.2 Descripcion de clases
@@ -485,8 +485,8 @@ classDiagram
 
 | Clase | Responsabilidad | Decisiones importantes |
 | --- | --- | --- |
-| `AuthService` | Gestiona login, 2FA, bloqueo por intentos fallidos y recuperacion de contrasena. | Usa `LoginStrategy`, `SecurityEntityFactory`, `JwtService` y `EmailOutboxService`. |
-| `BookingService` | Ejecuta casos de uso de reservas. | Valida reglas con `BookingValidationRule`, reutiliza reservas duplicadas logicas, genera `.ics` y encola correos. |
+| `AuthService` | Gestiona login, 2FA, bloqueo por intentos fallidos y recuperacion de contrasena. | Usa `LoginStrategy`, `SecurityCodeService`, `JwtService` y `EmailOutboxService`. |
+| `BookingService` | Ejecuta casos de uso de reservas. | Valida reglas con `BookingValidationService`, reutiliza reservas duplicadas logicas, genera `.ics` y encola correos. |
 | `RoomService` | Gestiona salas, disponibilidad y mantenimientos. | Coordina catalogo, horarios, capacidad y estados de sala. |
 | `RoomScheduleService` | Administra horarios por campus y sala. | Permite validar bloques y detectar conflictos con reservas futuras. |
 | `UserService` | Lista usuarios, cambia estados y obtiene usuarios por id/codigo. | Mantiene reglas de perfiles y permisos administrativos. |
@@ -519,7 +519,7 @@ classDiagram
 
 | Clase o interfaz | Patron | Funcion |
 | --- | --- | --- |
-| `BookingValidationRule` | Strategy | Contrato comun para reglas de validacion de reservas. |
+| `BookingValidationService` | Strategy | Contrato comun para reglas de validacion de reservas. |
 | `CapacityRule` | Strategy | Verifica minimo/maximo de personas y capacidad. |
 | `EndTimeAfterStartRule` | Strategy | Verifica que la hora final sea posterior a la inicial. |
 | `MaxDurationRule` | Strategy | Limita duracion segun configuracion del campus. |
@@ -529,17 +529,17 @@ classDiagram
 | `LoginStrategy` | Strategy | Define respuesta de login segun configuracion del usuario. |
 | `StandardLoginStrategy` | Strategy | Emite JWT final para login sin 2FA. |
 | `TwoFactorLoginStrategy` | Strategy | Emite token provisional y envia codigo 2FA. |
-| `ReservationFactory` | Factory Method | Crea reservas activas con valores iniciales consistentes. |
-| `RoomFactory` | Factory Method | Crea entidades de sala a partir de solicitudes. |
-| `MaintenanceFactory` | Factory Method | Crea mantenimientos o indisponibilidades. |
-| `SecurityEntityFactory` | Factory Method | Crea codigos 2FA, tokens de reseteo e intentos de login. |
+| `BookingService.buildActiveReservation` | Facade | Crea reservas activas con valores iniciales consistentes. |
+| `RoomService.buildAvailableRoom` | Facade | Crea entidades de sala a partir de solicitudes. |
+| `RoomService.buildScheduledMaintenance` | Facade | Crea mantenimientos o indisponibilidades. |
+| `SecurityCodeService` | Facade | Crea codigos 2FA, tokens de reseteo e intentos de login. |
 | `EmailGateway` | Adapter | Interfaz comun para proveedores de correo. |
-| `GmailEmailGateway` | Adapter | Adapta Gmail API al contrato interno. |
-| `ResendEmailGateway` | Adapter | Adapta Resend API al contrato interno. |
+| `GmailEmailAdapter` | Adapter | Adapta Gmail API al contrato interno. |
+| `ResendEmailAdapter` | Adapter | Adapta Resend API al contrato interno. |
 | `LogEmailGateway` | Adapter | Implementa fallback local por logs. |
-| `EmailGatewayFactory` | Factory Method | Selecciona gateway segun variables de entorno disponibles. |
-| `BookingReminderCommand` | Command | Contrato para acciones programadas de recordatorio. |
-| `BookingReminderScheduler` | Command invoker | Ejecuta comandos de recordatorio mediante scheduler. |
+| `EmailGatewayResolver` | Facade | Selecciona gateway segun variables de entorno disponibles. |
+| `BookingReminderStrategy` | Strategy | Contrato para acciones programadas de recordatorio. |
+| `BookingReminderScheduler` | Strategy invoker | Ejecuta comandos de recordatorio mediante scheduler. |
 
 ### Clases/archivos relevantes del frontend
 
@@ -655,7 +655,7 @@ sequenceDiagram
     participant AuthController
     participant AuthService
     participant TwoFactorLoginStrategy
-    participant SecurityEntityFactory
+    participant SecurityCodeService
     participant TwoFactorCodeRepository
     participant EmailOutboxService
     participant JwtService
@@ -665,8 +665,8 @@ sequenceDiagram
     API->>AuthController: POST /api/auth/login
     AuthController->>AuthService: login(request, ip)
     AuthService->>TwoFactorLoginStrategy: buildResponse(user con has2fa=true)
-    TwoFactorLoginStrategy->>SecurityEntityFactory: newTwoFactorCode(user, 10)
-    SecurityEntityFactory-->>TwoFactorLoginStrategy: TwoFactorCodeEntity
+    TwoFactorLoginStrategy->>SecurityCodeService: newTwoFactorCode(user, 10)
+    SecurityCodeService-->>TwoFactorLoginStrategy: TwoFactorCodeEntity
     TwoFactorLoginStrategy->>TwoFactorCodeRepository: save(code)
     TwoFactorLoginStrategy->>EmailOutboxService: enqueue(user, codigo 2FA)
     TwoFactorLoginStrategy->>JwtService: generateProvisionalToken(...)
@@ -699,8 +699,8 @@ sequenceDiagram
     participant BookingService
     participant UserService
     participant RoomService
-    participant Rule as BookingValidationRule[]
-    participant ReservationFactory
+    participant Rule as BookingValidationService[]
+    participant BookingService.buildActiveReservation
     participant ReservationRepository
     participant EmailOutboxService
     participant DtoMapper
@@ -722,8 +722,8 @@ sequenceDiagram
         Rule-->>BookingService: ok o BusinessException
     end
     alt No existe reserva previa
-        BookingService->>ReservationFactory: createActiveReservation(user, room, request)
-        ReservationFactory-->>BookingService: ReservationEntity ACTIVA
+        BookingService->>BookingService.buildActiveReservation: createActiveReservation(user, room, request)
+        BookingService.buildActiveReservation-->>BookingService: ReservationEntity ACTIVA
     else Existe reserva previa
         BookingService->>BookingService: actualiza estado/datos de reserva existente
     end
@@ -834,3 +834,6 @@ sequenceDiagram
 - Si el docente pide UML formal, los diagramas Mermaid pueden convertirse a imagen o replicarse en StarUML, Visual Paradigm, draw.io o PlantUML.
 - Para no sobrecargar el diagrama de clases, se recomienda mostrar solo entidades y servicios principales, dejando DTOs y repositorios secundarios en tablas descriptivas.
 - La seccion de patrones debe referenciar `docs/principios/application.md` como documento tecnico interno del equipo.
+
+
+

@@ -4,11 +4,9 @@ import com.luistudio.reservas.dto.auth.LoginResponse;
 import com.luistudio.reservas.model.UserEntity;
 import com.luistudio.reservas.security.JwtService;
 import com.luistudio.reservas.service.DtoMapper;
-import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
 @Component
-@Order(20)
 public class StandardLoginStrategy implements LoginStrategy {
 
     private final JwtService jwtService;
@@ -17,11 +15,6 @@ public class StandardLoginStrategy implements LoginStrategy {
     public StandardLoginStrategy(JwtService jwtService, DtoMapper dtoMapper) {
         this.jwtService = jwtService;
         this.dtoMapper = dtoMapper;
-    }
-
-    @Override
-    public boolean supports(UserEntity user) {
-        return true;
     }
 
     @Override
