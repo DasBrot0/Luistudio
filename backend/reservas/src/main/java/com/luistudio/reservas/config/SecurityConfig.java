@@ -26,6 +26,9 @@ public class SecurityConfig {
     @Value("${app.cors.origins}")
     private String corsOrigins;
 
+    @Value("${security.password.bcrypt-strength:10}")
+    private int bcryptStrength;
+
     public SecurityConfig(JwtAuthenticationFilter jwtAuthenticationFilter) {
         this.jwtAuthenticationFilter = jwtAuthenticationFilter;
     }
@@ -70,6 +73,6 @@ public class SecurityConfig {
 
     @Bean
     public PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder(12);
+        return new BCryptPasswordEncoder(bcryptStrength);
     }
 }

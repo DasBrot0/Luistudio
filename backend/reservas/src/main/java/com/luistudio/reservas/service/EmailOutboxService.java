@@ -95,6 +95,19 @@ public class EmailOutboxService {
         enqueue(recipient, subject, body, payload);
     }
 
+    @Transactional
+    public void enqueueSecurity(UserEntity recipient, String subject, String body) {
+        EmailOutboxEntity email = new EmailOutboxEntity();
+        email.setDestinatario(recipient.getCorreo());
+        email.setAsunto(subject);
+        email.setCuerpo(toHtmlBody(subject, body));
+        email.setPayload(null);
+        email.setEstado(EmailStatus.PENDIENTE);
+        email.setIntentos(0);
+        email.setDisponibleDesde(OffsetDateTime.now());
+        emailOutboxRepository.save(email);
+    }
+
     private String toHtmlBody(String subject, String body) {
         if (emailTemplateService.isHtml(body)) {
             return body;

@@ -10,11 +10,13 @@ import com.luistudio.reservas.service.auth.strategy.LoginContext;
 import com.luistudio.reservas.service.auth.strategy.StandardLoginStrategy;
 import com.luistudio.reservas.service.auth.strategy.TwoFactorLoginStrategy;
 import java.time.OffsetDateTime;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+@Slf4j
 @Service
 public class LoginService {
 
@@ -40,8 +42,12 @@ public class LoginService {
 
     @Transactional(noRollbackFor = BusinessException.class)
     public LoginResponse login(LoginRequest request, String ipAddress) {
-        UserEntity user = userRepository.findByCorreoIgnoreCase(request.email())
+        String email = request.email().trim();
+
+        long t0 = System.currentTimeMillis();
+        UserEntity user = userRepository.findByCorreoIgnoreCase(email)
             .orElseThrow(() -> new BusinessException(HttpStatus.UNAUTHORIZED, "Credenciales incorrectas"));
+        log.info("[PERF][LOGIN] find user: {} ms", System.currentTimeMillis() - t0);
 
         if (user.getEstado() == UserStatus.DESHABILITADO) {
             throw new BusinessException(HttpStatus.FORBIDDEN, "Cuenta deshabilitada");
@@ -51,12 +57,19 @@ public class LoginService {
             throw new BusinessException(HttpStatus.FORBIDDEN, "Cuenta bloqueada temporalmente");
         }
 
-        if (!passwordEncoder.matches(request.password(), user.getPasswordHash())) {
+        long t1 = System.currentTimeMillis();
+        boolean passwordOk = passwordEncoder.matches(request.password(), user.getPasswordHash());
+        log.info("[PERF][LOGIN] bcrypt matches: {} ms", System.currentTimeMillis() - t1);
+
+        if (!passwordOk) {
             loginAttemptService.registerFailedAttemptOrLock(user, ipAddress);
             throw new BusinessException(HttpStatus.UNAUTHORIZED, "Credenciales incorrectas");
         }
 
+        long t2 = System.currentTimeMillis();
         loginAttemptService.registerSuccessfulAttempt(user, ipAddress);
+        log.info("[PERF][LOGIN] success attempt handling: {} ms", System.currentTimeMillis() - t2);
+
         LoginContext loginContext = new LoginContext();
         if (Boolean.TRUE.equals(user.getHas2fa())) {
             loginContext.setLoginStrategy(twoFactorLoginStrategy);
@@ -64,6 +77,10 @@ public class LoginService {
             loginContext.setLoginStrategy(standardLoginStrategy);
         }
 
-        return loginContext.login(user);
+        long t3 = System.currentTimeMillis();
+        LoginResponse response = loginContext.login(user);
+        log.info("[PERF][LOGIN] strategy response: {} ms", System.currentTimeMillis() - t3);
+
+        return response;
     }
 }

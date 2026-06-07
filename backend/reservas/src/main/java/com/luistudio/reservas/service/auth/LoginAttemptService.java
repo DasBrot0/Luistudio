@@ -67,7 +67,6 @@ public class LoginAttemptService {
     }
 
     public void registerSuccessfulAttempt(UserEntity user, String ipAddress) {
-        recordAttempt(user, true, ipAddress);
         if (user.getLockedUntil() != null) {
             user.setLockedUntil(null);
             userRepository.save(user);

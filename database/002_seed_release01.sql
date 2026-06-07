@@ -25,7 +25,7 @@ SELECT
   v.first_name,
   v.last_name,
   v.email,
-  crypt(v.plain_password, gen_salt('bf', 12)),
+  crypt(v.plain_password, gen_salt('bf', 10)),
   'HABILITADO',
   NULL,
   CASE WHEN v.rol_nombre = 'ADMIN' THEN TRUE ELSE FALSE END,
@@ -51,6 +51,25 @@ SET has_2fa = TRUE,
 WHERE LOWER(email) IN (
   LOWER('20233916@aloe.ulima.edu.pe'),
   LOWER('20224815@aloe.ulima.edu.pe')
+);
+
+-- DEMO/DEV opcional: rehashea usuarios seed existentes con bcrypt cost 10.
+-- No aplicar este bloque en produccion real si ya existen usuarios reales.
+UPDATE users
+SET password_hash = crypt('Admin123!', gen_salt('bf', 10)),
+    updated_at = NOW()
+WHERE LOWER(email) IN (
+  LOWER('20233916@aloe.ulima.edu.pe'),
+  LOWER('20224815@aloe.ulima.edu.pe')
+);
+
+UPDATE users
+SET password_hash = crypt('Student123!', gen_salt('bf', 10)),
+    updated_at = NOW()
+WHERE LOWER(email) IN (
+  LOWER('20224692@aloe.ulima.edu.pe'),
+  LOWER('20246423@aloe.ulima.edu.pe'),
+  LOWER('20193934@aloe.ulima.edu.pe')
 );
 
 -- Buildings (campus + center)

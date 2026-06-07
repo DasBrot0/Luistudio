@@ -18,6 +18,7 @@
    - `DB_PASSWORD`
    - `DB_DRIVER` (por defecto H2)
    - `JWT_SECRET`
+   - `BCRYPT_STRENGTH` (`10` por defecto; puede subirse a `11` o `12` en produccion real)
    - `CORS_ORIGINS`
    - `AUTH_COOKIE_SECURE` (`false` en local, `true` en despliegue HTTPS)
    - `AUTH_COOKIE_SAME_SITE` (`Lax` por defecto)
@@ -124,6 +125,7 @@ Memoria (500 MB):
 ## Notas de implementacion
 
 - Se implementa bloqueo temporal tras intentos fallidos de login.
+- El costo BCrypt es configurable con `BCRYPT_STRENGTH`; para demo/nube barata se usa `10` por defecto.
 - El login usa busqueda por correo con indice funcional `LOWER(email)` y evita escrituras/flushes innecesarios en el flujo exitoso.
 - Para bases existentes, aplicar `database/004_optimize_auth_indexes.sql` para crear los índices de autenticación.
 - El listado administrativo de usuarios expone si una cuenta sigue bloqueada temporalmente y permite desbloquearla al volver a `HABILITADO`.

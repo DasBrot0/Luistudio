@@ -22,6 +22,8 @@ server:
   port: ${PORT:8080}
 
 security:
+  password:
+    bcrypt-strength: ${BCRYPT_STRENGTH:10}
   jwt:
     secret: ${JWT_SECRET:luistudio-dev-secret-change-me}
     expiration-minutes: ${JWT_EXP_MINUTES:180}
