@@ -11,6 +11,9 @@ import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 import org.springframework.web.client.RestClient;
+import jakarta.mail.internet.MimeUtility;
+import java.io.UnsupportedEncodingException;
+import java.nio.charset.StandardCharsets;
 
 @Component
 public class GmailClientAdaptee {
@@ -87,13 +90,23 @@ public class GmailClientAdaptee {
         String contentType = html
             ? "text/html; charset=UTF-8"
             : "text/plain; charset=UTF-8";
+
         return "From: " + emailFrom + "\r\n"
             + "To: " + email.getDestinatario() + "\r\n"
-            + "Subject: " + sanitizeHeader(email.getAsunto()) + "\r\n"
+            + "Subject: " + encodeSubject(email.getAsunto()) + "\r\n"
             + "MIME-Version: 1.0\r\n"
             + "Content-Type: " + contentType + "\r\n"
             + "\r\n"
             + (email.getCuerpo() == null ? "" : email.getCuerpo());
+    }
+
+    private String encodeSubject(String subject) {
+        String sanitized = sanitizeHeader(subject);
+        try {
+            return MimeUtility.encodeText(sanitized, StandardCharsets.UTF_8.name(), "B");
+        } catch (UnsupportedEncodingException ex) {
+            return sanitized;
+        }
     }
 
     private String encode(String value) {

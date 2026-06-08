@@ -297,7 +297,7 @@ export const api = {
     queryParams.set('page', String(params?.page ?? 0))
     queryParams.set('size', String(params?.size ?? 50))
     queryParams.set('includeSchedule', String(params?.includeSchedule ?? false))
-    if (params?.campus && params.campus !== 'Todas') queryParams.set('campus', params.campus)
+    if (params?.campus && params.campus !== 'Todos') queryParams.set('campus', params.campus)
     if (params?.venue && params.venue !== 'Todos') queryParams.set('recinto', params.venue)
     if (params?.location && params.location !== 'Todas') queryParams.set('ubicacion', params.location)
     if (params?.query?.trim()) queryParams.set('q', params.query.trim())

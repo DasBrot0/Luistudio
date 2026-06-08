@@ -2080,7 +2080,7 @@ export function MainPage() {
             {effectiveRoute === 'salas' && (
               <SalasPage
                 filteredRooms={filteredRooms}
-                campusOptions={campusOptions}
+                campusOptions={roomCampusOptions}
                 venueOptions={venueOptions}
                 locationOptions={roomLocationOptions}
                 roomSearchQuery={roomSearchQuery}
