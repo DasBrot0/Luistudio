@@ -65,7 +65,7 @@ public class BookingValidationService {
         boolean minRequired = Boolean.TRUE.equals(room.getMinimoPersonasObligatorio());
 
         if (people > roomCapacity || people > roomMax) {
-            throw new BusinessException(HttpStatus.BAD_REQUEST, "La cantidad de personas supera el maximo permitido para la sala");
+            throw new BusinessException(HttpStatus.BAD_REQUEST, "La cantidad de personas supera el máximo permitido para la sala");
         }
         if (minRequired && people < roomMin) {
             throw new BusinessException(HttpStatus.BAD_REQUEST, "La reserva requiere al menos " + roomMin + " personas para esta sala");
@@ -115,7 +115,7 @@ public class BookingValidationService {
         LocalTime start = request.start();
         LocalTime end = request.end();
         if (start.isBefore(schedule.openTime()) || end.isAfter(schedule.closeTime())) {
-            throw new BusinessException(HttpStatus.BAD_REQUEST, "El horario no esta dentro del rango disponible de la sala");
+            throw new BusinessException(HttpStatus.BAD_REQUEST, "El horario no está dentro del rango disponible de la sala");
         }
 
         long fromOpenToStart = Duration.between(schedule.openTime(), start).toMinutes();
@@ -123,7 +123,7 @@ public class BookingValidationService {
         if (fromOpenToStart < 0 || fromOpenToEnd < 0 || fromOpenToStart % slotMinutes != 0 || fromOpenToEnd % slotMinutes != 0) {
             throw new BusinessException(
                 HttpStatus.BAD_REQUEST,
-                "El horario debe alinearse con bloques de " + slotMinutes + " minutos desde la apertura del dia"
+                "El horario debe alinearse con bloques de " + slotMinutes + " minutos desde la apertura del día"
             );
         }
     }
@@ -134,7 +134,7 @@ public class BookingValidationService {
         if (durationMinutes > maxDuration) {
             throw new BusinessException(
                 HttpStatus.BAD_REQUEST,
-                "La duracion maxima permitida para esta sala/campus es " + maxDuration + " minutos"
+                "La duración máxima permitida para esta sala/campus es " + maxDuration + " minutos"
             );
         }
     }
@@ -152,7 +152,7 @@ public class BookingValidationService {
             excludeBookingId
         );
         if (!available) {
-            throw new BusinessException(HttpStatus.BAD_REQUEST, "La sala no esta disponible para el horario seleccionado");
+            throw new BusinessException(HttpStatus.BAD_REQUEST, "La sala no está disponible para el horario seleccionado");
         }
     }
 
@@ -166,7 +166,7 @@ public class BookingValidationService {
         if (activeCount >= maxAllowed) {
             throw new BusinessException(
                 HttpStatus.BAD_REQUEST,
-                "Alcanzaste el limite de reservas activas (" + maxAllowed + ")"
+                "Alcanzaste el límite de reservas activas (" + maxAllowed + ")"
             );
         }
     }

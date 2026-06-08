@@ -63,10 +63,10 @@ public class PasswordResetService {
 
             emailOutboxService.enqueue(
                 user,
-                "Recuperacion de contrasena",
+                "Recuperación de contraseña",
                 emailTemplateService.callToAction(
-                    "Recuperacion de contrasena",
-                    "Recibimos una solicitud para restablecer tu contrasena.",
+                    "Recuperación de contraseña",
+                    "Recibimos una solicitud para restablecer tu contraseña.",
                     resetLink
                 ),
                 null
@@ -80,7 +80,7 @@ public class PasswordResetService {
 
         String tokenHash = secretHashService.hash(request.token());
         PasswordResetEntity reset = passwordResetRepository.findByTokenAndUsadoFalse(tokenHash)
-            .orElseThrow(() -> new BusinessException(HttpStatus.BAD_REQUEST, "Token invalido o expirado"));
+            .orElseThrow(() -> new BusinessException(HttpStatus.BAD_REQUEST, "Token inválido o expirado"));
 
         if (reset.getExpiraEn().isBefore(OffsetDateTime.now())) {
             throw new BusinessException(HttpStatus.BAD_REQUEST, "Token expirado");
@@ -88,7 +88,7 @@ public class PasswordResetService {
 
         UserEntity user = reset.getUsuario();
         if (passwordEncoder.matches(request.newPassword(), user.getPasswordHash())) {
-            throw new BusinessException(HttpStatus.BAD_REQUEST, "La nueva contrasena no puede ser igual a la anterior");
+            throw new BusinessException(HttpStatus.BAD_REQUEST, "La nueva contraseña no puede ser igual a la anterior");
         }
         user.setPasswordHash(passwordEncoder.encode(request.newPassword()));
         user.setActualizadoEn(OffsetDateTime.now());

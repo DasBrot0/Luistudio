@@ -21,6 +21,8 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.OffsetDateTime;
 import java.util.List;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -30,6 +32,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class RoomService {
+    private static final Logger log = LoggerFactory.getLogger(RoomService.class);
     private static final String ROOM_HAS_ACTIVE_RESERVATION_MESSAGE =
         "En esta sala hay reserva activa, así que no se puede eliminar";
 
@@ -78,8 +81,17 @@ public class RoomService {
             pageRequest
         );
 
+        List<RoomResponse> items = roomPage.getContent().stream().map(room -> toRoomResponse(room, includeSchedule)).toList();
+        log.info(
+            "rooms_listed page={} size={} includeSchedule={} returned={} total={}",
+            safePage,
+            safeSize,
+            includeSchedule,
+            items.size(),
+            roomPage.getTotalElements()
+        );
         return new PageResponse<>(
-            roomPage.getContent().stream().map(room -> toRoomResponse(room, includeSchedule)).toList(),
+            items,
             roomPage.getNumber(),
             roomPage.getSize(),
             roomPage.getTotalElements(),
@@ -115,6 +127,7 @@ public class RoomService {
         );
         RoomEntity saved = roomRepository.save(room);
         roomScheduleService.saveRoomSchedule(saved, request.schedule());
+        log.info("room_created roomId={} roomCode={} status={}", saved.getId(), saved.getCodigo(), saved.getEstado());
         return toRoomResponse(saved, true);
     }
 
@@ -138,6 +151,7 @@ public class RoomService {
         room.setEstado(requestedStatus);
         RoomEntity saved = roomRepository.save(room);
         roomScheduleService.saveRoomSchedule(saved, request.schedule());
+        log.info("room_updated roomId={} roomCode={} status={}", saved.getId(), saved.getCodigo(), saved.getEstado());
         return toRoomResponse(saved, true);
     }
 
@@ -147,6 +161,7 @@ public class RoomService {
         ensureRoomCanBeInactivated(room);
         room.setEstado(RoomState.INACTIVA);
         roomRepository.save(room);
+        log.info("room_deleted roomId={} roomCode={} status={}", room.getId(), room.getCodigo(), room.getEstado());
     }
 
     @Transactional(readOnly = true)
@@ -282,6 +297,7 @@ public class RoomService {
     private void ensureRoomCanBeInactivated(RoomEntity room) {
         boolean hasFuture = reservationRepository.existsFutureActiveReservations(room, AppTime.today(), AppTime.nowTime());
         if (hasFuture) {
+            log.warn("room_inactivation_blocked roomId={} roomCode={}", room.getId(), room.getCodigo());
             throw new BusinessException(HttpStatus.BAD_REQUEST, ROOM_HAS_ACTIVE_RESERVATION_MESSAGE);
         }
     }

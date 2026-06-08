@@ -106,7 +106,7 @@ export function GlobalTopbar({
 
         <div className="border-t border-primary-light px-3 pb-4 pt-3">
           <button type="button" className={`mb-2 flex w-full items-center gap-3 rounded-lg border border-transparent px-3 py-2 text-sm font-semibold text-accent-muted transition hover:border-primary-light hover:bg-bg-active hover:text-accent ${isSidebarCollapsed ? 'justify-center' : 'justify-start'}`} onClick={onOpenNotifications} title="Notificaciones"><NavIcon type="bell" />{!isSidebarCollapsed && <span>Notificaciones ({notifications.length})</span>}</button>
-          <button type="button" className={`flex w-full items-center gap-3 rounded-lg border border-transparent px-3 py-2 text-sm font-semibold text-accent-muted transition hover:border-primary-light hover:bg-bg-active hover:text-accent ${isSidebarCollapsed ? 'justify-center' : 'justify-start'}`} onClick={onOpenSettings} title="Configuracion"><NavIcon type="settings" />{!isSidebarCollapsed && <span>Configuracion</span>}</button>
+          <button type="button" className={`flex w-full items-center gap-3 rounded-lg border border-transparent px-3 py-2 text-sm font-semibold text-accent-muted transition hover:border-primary-light hover:bg-bg-active hover:text-accent ${isSidebarCollapsed ? 'justify-center' : 'justify-start'}`} onClick={onOpenSettings} title="Configuración"><NavIcon type="settings" />{!isSidebarCollapsed && <span>Configuración</span>}</button>
         </div>
       </aside>
 

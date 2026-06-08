@@ -60,79 +60,79 @@ Un sistema web que permita:
 - Interfaz con modo oscuro
 - Acceso desde PC y dispositivos móviles
 
-## 🗂️ Estructura del proyecto
+##  Estructura del proyecto
 
 La aplicación está separada en backend Spring Boot y frontend React/Vite. Esta vista prioriza los archivos `.java`, `.tsx`, `.ts` y `.css` propios del proyecto, además de otros archivos relevantes para entender cómo se organiza Luistudio.
 
 ```text
 Luistudio/
 ├── backend/
-│   ├── README_BACKEND.md                 # 📘 Guía técnica del backend
+│   ├── README_BACKEND.md                 #  Guía técnica del backend
 │   └── reservas/
-│       ├── pom.xml                       # 📦 Dependencias y build Maven
+│       ├── pom.xml                       #  Dependencias y build Maven
 │       └── src/
 │           ├── main/
 │           │   ├── java/com/luistudio/reservas/
-│           │   │   ├── ReservasApplication.java        # 🚀 Punto de entrada de Spring Boot
-│           │   │   ├── config/                         # ⚙️ Configuración transversal
-│           │   │   │   └── SecurityConfig.java         # 🔐 Reglas de seguridad HTTP, CORS y filtros JWT
-│           │   │   ├── controller/                     # 🌐 Endpoints REST
-│           │   │   │   ├── AdminController.java        # 🛠️ Configuración, usuarios y horarios administrativos
-│           │   │   │   ├── AuthController.java         # 🔑 Login, logout, sesión, 2FA y recuperación
-│           │   │   │   ├── BookingController.java      # 📅 CRUD y consulta de reservas
-│           │   │   │   ├── PreferenceController.java   # 🔔 Preferencias de notificación del usuario
-│           │   │   │   ├── RoomController.java         # 🚪 Gestión y consulta de salas
-│           │   │   │   └── UserLookupController.java   # 👤 Búsqueda ligera de usuarios
-│           │   │   ├── dto/                            # 📄 Contratos de entrada y salida
-│           │   │   │   ├── admin/                      # 🛠️ DTOs de administración
-│           │   │   │   ├── auth/                       # 🔑 DTOs de autenticación
-│           │   │   │   ├── booking/                    # 📅 DTOs de reservas
-│           │   │   │   ├── common/                     # 🧩 Respuestas comunes
-│           │   │   │   ├── room/                       # 🚪 DTOs de salas y mantenimiento
-│           │   │   │   └── user/                       # 👤 DTOs de usuarios y preferencias
-│           │   │   ├── exception/                      # 🚨 Manejo de errores
-│           │   │   │   ├── BusinessException.java      # ⚠️ Error de regla de negocio
-│           │   │   │   ├── GlobalExceptionHandler.java # 🧯 Convierte excepciones en respuestas HTTP
-│           │   │   │   └── NotFoundException.java      # 🔎 Error para recursos inexistentes
-│           │   │   ├── model/                          # 🗃️ Entidades JPA y enums
-│           │   │   ├── repository/                     # 🧱 Acceso a datos con Spring Data JPA
-│           │   │   ├── security/                       # 🛡️ JWT, cookies y usuario autenticado
-│           │   │   ├── service/                        # 🧠 Lógica de negocio
-│           │   │   │   ├── auth/strategy/              # 🔐 Estrategias de login estándar y 2FA
+│           │   │   ├── ReservasApplication.java        #  Punto de entrada de Spring Boot
+│           │   │   ├── config/                         # ⚙ Configuración transversal
+│           │   │   │   └── SecurityConfig.java         # ” Reglas de seguridad HTTP, CORS y filtros JWT
+│           │   │   ├── controller/                     # Œ Endpoints REST
+│           │   │   │   ├── AdminController.java        #  Configuración, usuarios y horarios administrativos
+│           │   │   │   ├── AuthController.java         #  Login, logout, sesión, 2FA y recuperación
+│           │   │   │   ├── BookingController.java      #  CRUD y consulta de reservas
+│           │   │   │   ├── PreferenceController.java   #  Preferencias de notificación del usuario
+│           │   │   │   ├── RoomController.java         #  Gestión y consulta de salas
+│           │   │   │   └── UserLookupController.java   #  Búsqueda ligera de usuarios
+│           │   │   ├── dto/                            #  Contratos de entrada y salida
+│           │   │   │   ├── admin/                      #  DTOs de administración
+│           │   │   │   ├── auth/                       #  DTOs de autenticación
+│           │   │   │   ├── booking/                    #  DTOs de reservas
+│           │   │   │   ├── common/                     #  Respuestas comunes
+│           │   │   │   ├── room/                       #  DTOs de salas y mantenimiento
+│           │   │   │   └── user/                       #  DTOs de usuarios y preferencias
+│           │   │   ├── exception/                      #  Manejo de errores
+│           │   │   │   ├── BusinessException.java      # ⚠ Error de regla de negocio
+│           │   │   │   ├── GlobalExceptionHandler.java #  Convierte excepciones en respuestas HTTP
+│           │   │   │   └── NotFoundException.java      #  Error para recursos inexistentes
+│           │   │   ├── model/                          #  Entidades JPA y enums
+│           │   │   ├── repository/                     #  Acceso a datos con Spring Data JPA
+│           │   │   ├── security/                       #  JWT, cookies y usuario autenticado
+│           │   │   ├── service/                        #  Lógica de negocio
+│           │   │   │   ├── auth/strategy/              # ” Estrategias de login estándar y 2FA
 │           │   │   │   ├── booking/command/            # Comandos y scheduler de recordatorios
-│           │   │   │   ├── booking/validation/         # Servicio de validacion de reservas
-│           │   │   │   ├── email/gateway/              # ✉️ Adaptadores para envío de correo
+│           │   │   │   ├── booking/validation/         # Servicio de validación de reservas
+│           │   │   │   ├── email/gateway/              # ✉ Adaptadores para envío de correo
 │           │   │   └── util/
-│           │   │       └── CalendarUtils.java          # 🗓️ Generación de archivos/calendarios ICS
-│           │   └── resources/                          # 🧾 Configuración y recursos del backend
+│           │   │       └── CalendarUtils.java          #  Generación de archivos/calendarios ICS
+│           │   └── resources/                          #  Configuración y recursos del backend
 │           └── test/java/com/luistudio/reservas/
 │               ├── ReservasApplicationTests.java       # ✅ Prueba de carga del contexto Spring
-│               ├── security/                           # 🧪 Tests de seguridad
-│               └── service/auth/                       # Tests de servicios de autenticacion
+│               ├── security/                           #  Tests de seguridad
+│               └── service/auth/                       # Tests de servicios de autenticación
 ├── frontend/
-│   ├── README_FRONTEND.md                # 📘 Guía técnica del frontend
+│   ├── README_FRONTEND.md                #  Guía técnica del frontend
 │   └── luistudio-app/
-│       ├── index.html                    # 🌎 HTML base donde monta React
-│       ├── package.json                  # 📦 Scripts y dependencias npm
+│       ├── index.html                    #  HTML base donde monta React
+│       ├── package.json                  #  Scripts y dependencias npm
 │       ├── vite.config.ts                # ⚡ Configuración de Vite
 │       └── src/
-│           ├── App.tsx                   # 🧭 Componente raíz, estado global básico y rutas
-│           ├── App.css                   # 🎨 Estilos específicos de la app
-│           ├── index.css                 # 🎨 Estilos globales y Tailwind
-│           ├── main.tsx                  # 🚀 Punto de entrada de React
-│           ├── models/                   # 🧾 Tipos TypeScript del dominio
-│           ├── services/                 # 🔌 Cliente HTTP hacia el backend
-│           ├── utils/                    # 🧰 Funciones auxiliares
-│           ├── viewmodels/               # 🧭 Definición de rutas/vistas
-│           └── views/                    # 🖥️ Páginas y componentes visuales
-├── database/                             # 🗄️ Scripts SQL iniciales
-├── docs/                                 # 📚 Documentación funcional y técnica
-└── scripts/                              # 🧪 Scripts de arranque y automatización
+│           ├── App.tsx                   #  Componente raíz, estado global básico y rutas
+│           ├── App.css                   #  Estilos específicos de la app
+│           ├── index.css                 #  Estilos globales y Tailwind
+│           ├── main.tsx                  #  Punto de entrada de React
+│           ├── models/                   #  Tipos TypeScript del dominio
+│           ├── services/                 #  Cliente HTTP hacia el backend
+│           ├── utils/                    #  Funciones auxiliares
+│           ├── viewmodels/               #  Definición de rutas/vistas
+│           └── views/                    #  Páginas y componentes visuales
+├── database/                             #  Scripts SQL iniciales
+├── docs/                                 #  Documentación funcional y técnica
+└── scripts/                              #  Scripts de arranque y automatización
 ```
 
 ### ☕ Backend: detalle de archivos Java
 
-**🌐 Controllers**
+**Œ Controllers**
 
 | Archivo | Descripción breve |
 |---|---|
@@ -143,7 +143,7 @@ Luistudio/
 | `RoomController.java` | Gestiona salas, estados, mantenimiento y consultas del catálogo. |
 | `UserLookupController.java` | Resuelve búsquedas simples de usuarios para formularios o flujos administrativos. |
 
-**📄 DTOs**
+** DTOs**
 
 | Archivo | Descripción breve |
 |---|---|
@@ -180,7 +180,7 @@ Luistudio/
 | `UserResponse.java` | Representación de usuario para vistas administrativas. |
 | `UserStatusUpdateRequest.java` | Entrada para cambiar estado de usuario. |
 
-**🚨 Excepciones**
+** Excepciones**
 
 | Archivo | Descripción breve |
 |---|---|
@@ -188,7 +188,7 @@ Luistudio/
 | `GlobalExceptionHandler.java` | Centraliza la traducción de errores Java a respuestas HTTP. |
 | `NotFoundException.java` | Excepción para recursos no encontrados. |
 
-**🗃️ Modelos**
+** Modelos**
 
 | Archivo | Descripción breve |
 |---|---|
@@ -214,7 +214,7 @@ Luistudio/
 | `UserEntity.java` | Entidad de usuarios. |
 | `UserStatus.java` | Enum de estados de usuario. |
 
-**🧱 Repositories**
+** Repositories**
 
 | Archivo | Descripción breve |
 |---|---|
@@ -234,18 +234,18 @@ Luistudio/
 | `TwoFactorCodeRepository.java` | Acceso a códigos 2FA. |
 | `UserRepository.java` | Consultas y persistencia de usuarios. |
 
-**🛡️ Seguridad**
+** Seguridad**
 
 | Archivo | Descripción breve |
 |---|---|
 | `AuthCookieService.java` | Crea, limpia y configura cookies de autenticación. |
 | `AuthPrincipal.java` | Representa al usuario autenticado dentro de Spring Security. |
 | `CurrentUserProvider.java` | Obtiene el usuario actual desde el contexto de seguridad. |
-| `JwtAuthenticationFilter.java` | Lee y valida JWT en cada request protegido. |
-| `JwtService.java` | Genera, firma y valida tokens JWT. |
-| `SecretHashService.java` | Aplica hashing seguro a secretos como códigos o tokens. |
+| `JwtAuthenticationFilter.java` | Lee y v?lida JWT en cada request protegido. |
+| `JwtService.java` | Genera, firma y v?lida tokens JWT. |
+| `SecretHashService.java` | Aplica hashing seguro a secretos c?mo códigos o tokens. |
 
-**🧠 Services**
+** Services**
 
 | Archivo | Descripción breve |
 |---|---|
@@ -263,7 +263,7 @@ Luistudio/
 | `SystemConfigService.java` | Lee y actualiza configuración global del sistema. |
 | `UserService.java` | Gestiona usuarios, estados y consultas administrativas. |
 
-**🔐 Estrategias de autenticación**
+**” Estrategias de autenticación**
 
 | Archivo | Descripción breve |
 |---|---|
@@ -272,43 +272,43 @@ Luistudio/
 | `TwoFactorLoginStrategy.java` | Implementa el flujo de login que requiere segundo factor. |
 
 
-**Comandos y validacion de reserva**
+**Comandos y validación de reserva**
 
-| Archivo | Descripcion breve |
+| Archivo | Descripción breve |
 |---|---|
 | `BookingReminderCommand.java` | Contrato para comandos de recordatorio de reservas. |
 | `BookingReminderCommandManager.java` | Administra la cola y ejecuta comandos pendientes. |
 | `BookingReminderScheduler.java` | Agrega comandos de recordatorio al manager periodicamente. |
-| `SendEndingSoonReservationReminderCommand.java` | Encola avisos de reservas proximas a terminar. |
-| `SendUpcomingReservationReminderCommand.java` | Encola avisos de reservas proximas a iniciar. |
-| `BookingValidationService.java` | Concentra las validaciones de creacion y edicion de reservas. |
+| `SendEndingSoonReservationReminderCommand.java` | Encola avisos de reservas próximas a terminar. |
+| `SendUpcomingReservationReminderCommand.java` | Encola avisos de reservas próximas a iniciar. |
+| `BookingValidationService.java` | Concentra las validaciones de creación y edición de reservas. |
 
 **Email y servicios auxiliares**
 
-| Archivo | Descripcion breve |
+| Archivo | Descripción breve |
 |---|---|
 | `EmailTemplateService.java` | Construye contenido de emails del sistema. |
 | `EmailDispatchService.java` | Despacha correos pendientes y maneja reintentos. |
 | `EmailOutboxScheduler.java` | Programa el despacho de la cola de correos. |
-| `EmailGateway.java` | Target comun para proveedores de envio de correo. |
+| `EmailGateway.java` | Target com?n para proveedores de env?o de correo. |
 | `EmailGatewayResolver.java` | Resuelve el gateway configurado con fallback a log. |
 | `GmailEmailAdapter.java` | Adapta el contrato interno hacia Gmail. |
 | `GmailClientAdaptee.java` | Encapsula la API externa de Gmail. |
-| `LogEmailGateway.java` | Simula envio registrando correos en logs. |
+| `LogEmailGateway.java` | Simula env?o registrando correos en logs. |
 | `ResendEmailAdapter.java` | Adapta el contrato interno hacia Resend. |
 | `ResendClientAdaptee.java` | Encapsula la API externa de Resend. |
-| `SecurityCodeService.java` | Genera codigos 2FA y tokens de recuperacion hasheados. |
+| `SecurityCodeService.java` | Genera códigos 2FA y tokens de recuperación hasheados. |
 | `CalendarUtils.java` | Genera contenido de calendario para integraciones `.ics`. |
 
-**🧪 Tests Java**
+** Tests Java**
 
 | Archivo | Descripción breve |
 |---|---|
 | `ReservasApplicationTests.java` | Verifica que el contexto de Spring Boot cargue correctamente. |
 | `JwtServiceTest.java` | Prueba generación y validación de tokens JWT. |
-| `SecurityCodeServiceTest.java` | Prueba la generacion hasheada de codigos y tokens de seguridad. |
+| `SecurityCodeServiceTest.java` | Prueba la generación hasheada de códigos y tokens de seguridad. |
 
-### ⚛️ Frontend: detalle de archivos TS/TSX/CSS
+### ⚛ Frontend: detalle de archivos TS/TSX/CSS
 
 | Archivo | Descripción breve |
 |---|---|

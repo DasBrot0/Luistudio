@@ -28,18 +28,23 @@ public class EmailDispatchService {
 
     @Transactional
     public void processPendingEmails() {
+        long startedAt = System.currentTimeMillis();
         List<EmailOutboxEntity> pending = emailOutboxRepository.findReadyToProcess(
             EmailStatus.PENDIENTE,
             OffsetDateTime.now(),
             PageRequest.of(0, 50)
         );
+        int sent = 0;
+        int failed = 0;
         for (EmailOutboxEntity email : pending) {
             try {
                 sendEmail(email);
                 email.setEstado(EmailStatus.ENVIADO);
                 email.setEnviadoEn(OffsetDateTime.now());
                 emailOutboxRepository.save(email);
+                sent++;
             } catch (Exception ex) {
+                failed++;
                 email.setIntentos(email.getIntentos() + 1);
                 email.setErrorDetalle(ex.getMessage());
                 if (email.getIntentos() >= 3) {
@@ -49,18 +54,31 @@ public class EmailDispatchService {
                 }
                 emailOutboxRepository.save(email);
                 log.warn(
-                    "[EMAIL_OUTBOX] Fallo envio a {} | Subject: {} | intento={} | estado={} | error={}",
-                    email.getDestinatario(),
-                    email.getAsunto(),
+                    "email_dispatch_failed emailId={} attempt={} status={} error={}",
+                    email.getId(),
                     email.getIntentos(),
                     email.getEstado(),
-                    ex.getMessage()
+                    sanitize(ex.getMessage())
                 );
             }
         }
+        log.info(
+            "email_dispatch_cycle processed={} sent={} failed={} durationMs={}",
+            pending.size(),
+            sent,
+            failed,
+            System.currentTimeMillis() - startedAt
+        );
     }
 
     private void sendEmail(EmailOutboxEntity email) {
         emailGatewayResolver.resolve().send(email);
+    }
+
+    private String sanitize(String message) {
+        if (message == null || message.isBlank()) {
+            return "n/a";
+        }
+        return message.replaceAll("[\\r\\n]+", " ");
     }
 }

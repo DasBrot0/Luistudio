@@ -5,7 +5,7 @@ Lo más importante:
   * **controller**: recibe requests HTTP.
   * **service**: lógica de negocio.
   * **repository**: acceso a base de datos.
-  * **model/entity**: tablas representadas como clases.
+  * **model/entity**: tablas representadas c?mo clases.
   * **dto**: objetos que entran/salen por API.
 * **Anotaciones Spring**
   * **@RestController**: clase que expone endpoints.
@@ -28,7 +28,7 @@ Lo más importante:
   * Por qué no se devuelve directamente una entidad.
   * **record** en Java para requests/responses.
   * Validaciones tipo **@NotNull**, **@Email**, **@Size**.
-  * Mapeo entidad → DTO, como hace **DtoMapper**.
+  * Mapeo entidad → DTO, c?mo hace **DtoMapper**.
 * **Seguridad**
   * JWT o cookie de sesión.
   * **HttpOnly**, **Secure**, **SameSite**.
@@ -47,7 +47,7 @@ Lo más importante:
   * Diferencia entre datos reales y datos seed.
 * **Patrones usados**
   * Strategy: login normal vs 2FA.
-  * Facade: AuthService como entrada estable del modulo de autenticacion.
+  * Facade: AuthService c?mo entrada estable del m?dulo de autenticaci?n.
   * Strategy: politicas de recordatorios programados.
   * Rules/Strategy: reglas de validación de reservas.
 

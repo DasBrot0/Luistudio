@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { getRouteFromPath, resolveRouteByAuth, routePaths } from '../../viewmodels/routes'
@@ -362,8 +362,8 @@ const landingViewCodeToRoute = (role: Role, code: LoginLandingViewCode): RouteKe
 const notificationPreferenceOptions = (role: Role): NotificationPreferenceOption[] => {
   const studentOptions: NotificationPreferenceOption[] = [
     { key: 'BOOKING_CONFIRMATION', group: 'Reservas', label: 'Confirmación de reserva', app: true, email: true },
-    { key: 'BOOKING_UPDATE', group: 'Reservas', label: 'Modificacion de reserva', app: true, email: true },
-    { key: 'BOOKING_CANCELLATION', group: 'Reservas', label: 'Cancelacion de reserva', app: true, email: true },
+    { key: 'BOOKING_UPDATE', group: 'Reservas', label: 'Modificación de reserva', app: true, email: true },
+    { key: 'BOOKING_CANCELLATION', group: 'Reservas', label: 'Cancelación de reserva', app: true, email: true },
     { key: 'BOOKING_REMINDER', group: 'Reservas', label: 'Recordatorio de reserva', app: true, email: true },
   ]
   if (role === 'admin') {
@@ -557,7 +557,7 @@ export function MainPage() {
   const [fontScale, setFontScale] = useState<number>(getInitialFontScale)
   const [twoFactorAction, setTwoFactorAction] = useState<'none' | 'enable' | 'disable'>('none')
   const [preferencesLoaded, setPreferencesLoaded] = useState(false)
-  const [lastPreferencesSignature, setLastPreferencesSignature] = useState('')
+  const lastPreferencesSignatureRef = useRef('')
   const [notificationPrefs, setNotificationPrefs] = useState<Pick<ApiPreferences, 'emailEnabled' | 'reminderEnabled' | 'bookingChangesEnabled' | 'notificationSettings'>>({
     emailEnabled: true,
     reminderEnabled: true,
@@ -924,11 +924,12 @@ export function MainPage() {
   const loadUserPreferences = async (authToken: string, user: AuthUser) => {
     try {
       const result = await api.getPreferences(authToken)
+      const nextNotificationSettings = normalizeNotificationSettings(user.role, result.notificationSettings, result)
       setNotificationPrefs({
         emailEnabled: result.emailEnabled,
         reminderEnabled: result.reminderEnabled,
         bookingChangesEnabled: result.bookingChangesEnabled,
-        notificationSettings: normalizeNotificationSettings(user.role, result.notificationSettings, result),
+        notificationSettings: nextNotificationSettings,
       })
       const nextDarkMode = result.themeMode === 'DARK'
       const nextFontScale = clampFontScale(result.fontScale)
@@ -936,6 +937,15 @@ export function MainPage() {
       setFontScale(nextFontScale)
       const landing = landingViewCodeToRoute(user.role, result.loginLandingView)
       setLoginLandingRoute(landing)
+      lastPreferencesSignatureRef.current = JSON.stringify({
+        emailEnabled: result.emailEnabled,
+        reminderEnabled: result.reminderEnabled,
+        bookingChangesEnabled: result.bookingChangesEnabled,
+        notificationSettings: nextNotificationSettings,
+        themeMode: nextDarkMode ? 'DARK' : 'LIGHT',
+        fontScale: nextFontScale,
+        loginLandingView: routeToLandingViewCode(user.role, landing),
+      })
       localStorage.setItem(LOCAL_STORAGE_THEME_KEY, nextDarkMode ? '1' : '0')
       localStorage.setItem(LOCAL_STORAGE_FONT_SCALE_KEY, String(nextFontScale))
       localStorage.setItem(LOCAL_STORAGE_LANDING_KEY, landing)
@@ -1076,18 +1086,29 @@ export function MainPage() {
       ),
     }
     const signature = JSON.stringify(payload)
-    if (!lastPreferencesSignature) {
-      setLastPreferencesSignature(signature)
+    if (!lastPreferencesSignatureRef.current) {
+      lastPreferencesSignatureRef.current = signature
       return
     }
-    if (signature === lastPreferencesSignature) return
-    setLastPreferencesSignature(signature)
+    if (signature === lastPreferencesSignatureRef.current) return
+    if (import.meta.env.DEV) {
+      console.debug('[preferences] autosave scheduled')
+    }
     const timeout = window.setTimeout(() => {
       api
         .updatePreferences(token, payload)
-        .then(() => setToastMessage('Preferencias guardadas.'))
+        .then(() => {
+          lastPreferencesSignatureRef.current = signature
+          if (import.meta.env.DEV) {
+            console.info('[preferences] autosave confirmed')
+          }
+          setToastMessage('Preferencias guardadas.')
+        })
         .catch((error) => {
           const message = error instanceof Error ? error.message : 'No se pudieron guardar tus preferencias.'
+          if (import.meta.env.DEV) {
+            console.warn('[preferences] autosave failed', { message })
+          }
           setToastMessage(message)
         })
     }, 300)
@@ -1100,7 +1121,6 @@ export function MainPage() {
     isDarkMode,
     fontScale,
     loginLandingRoute,
-    lastPreferencesSignature,
   ])
 
   useEffect(() => {
@@ -1207,7 +1227,7 @@ export function MainPage() {
     setAuthenticatedUser(null)
     setToken('')
     setPreferencesLoaded(false)
-    setLastPreferencesSignature('')
+    lastPreferencesSignatureRef.current = ''
     setShowTwoFactorModal(false)
     setTwoFactorCode('')
     setLoginLandingRoute(null)

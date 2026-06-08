@@ -54,6 +54,6 @@ public class ResendClientAdaptee {
             .retrieve()
             .body(String.class);
 
-        log.info("[RESEND] Email enviado a {} | Subject: {} | Response: {}", email.getDestinatario(), email.getAsunto(), response);
+        log.info("email_resend_sent emailId={} responsePresent={}", email.getId(), StringUtils.hasText(response));
     }
 }

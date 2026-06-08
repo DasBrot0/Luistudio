@@ -18,11 +18,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class CampusMapService {
+    private static final Logger log = LoggerFactory.getLogger(CampusMapService.class);
 
     private final PabellonRepository pabellonRepository;
     private final RoomRepository roomRepository;
@@ -43,6 +46,7 @@ public class CampusMapService {
 
     @Transactional(readOnly = true)
     public CampusMapResponse getCampusMap() {
+        long startedAt = System.currentTimeMillis();
         LocalDate today = AppTime.today();
         LocalTime now = AppTime.nowTime();
 
@@ -77,6 +81,13 @@ public class CampusMapService {
             return new CampusMapResponse.PabellonMapItem(p.getCodigo(), p.getNombre(), buildingRooms);
         }).toList();
 
+        log.info(
+            "campus_map_built rooms={} activeReservations={} activeMaintenances={} durationMs={}",
+            rooms.size(),
+            activeNow.size(),
+            activeMaintenances.size(),
+            System.currentTimeMillis() - startedAt
+        );
         return new CampusMapResponse(mapped);
     }
 

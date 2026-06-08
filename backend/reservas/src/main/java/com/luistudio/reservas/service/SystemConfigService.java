@@ -5,11 +5,14 @@ import com.luistudio.reservas.dto.admin.AdminConfigUpdateRequest;
 import com.luistudio.reservas.model.SystemConfigEntity;
 import com.luistudio.reservas.repository.SystemConfigRepository;
 import java.time.OffsetDateTime;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class SystemConfigService {
+    private static final Logger log = LoggerFactory.getLogger(SystemConfigService.class);
 
     public static final String KEY_MAX_ACTIVE_BOOKINGS = "max_reservas_simultaneas";
     public static final String KEY_MAX_DURATION_MINUTES = "duracion_maxima_minutos";
@@ -40,6 +43,11 @@ public class SystemConfigService {
     public AdminConfigResponse updateConfig(AdminConfigUpdateRequest request) {
         upsert(KEY_MAX_ACTIVE_BOOKINGS, String.valueOf(request.maxActiveBookings()));
         upsert(KEY_MAX_DURATION_MINUTES, String.valueOf(request.maxDurationMinutes()));
+        log.info(
+            "system_config_updated maxActiveBookings={} maxDurationMinutes={}",
+            request.maxActiveBookings(),
+            request.maxDurationMinutes()
+        );
         return getConfig();
     }
 

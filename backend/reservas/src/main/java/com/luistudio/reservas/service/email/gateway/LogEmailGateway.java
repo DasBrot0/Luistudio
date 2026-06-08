@@ -20,6 +20,6 @@ public class LogEmailGateway implements EmailGateway {
 
     @Override
     public void send(EmailOutboxEntity email) {
-        log.info("[OUTBOX] To: {} | Subject: {}", email.getDestinatario(), email.getAsunto());
+        log.info("email_gateway_log_send emailId={}", email.getId());
     }
 }

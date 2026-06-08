@@ -7,12 +7,15 @@ import java.util.stream.Collectors;
 import org.springframework.dao.DataAccessException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+    private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
     @ExceptionHandler(BusinessException.class)
     public ResponseEntity<ApiError> handleBusiness(BusinessException ex, HttpServletRequest request) {
@@ -23,6 +26,12 @@ public class GlobalExceptionHandler {
             status.getReasonPhrase(),
             ex.getMessage(),
             request.getRequestURI()
+        );
+        log.warn(
+            "http_error endpoint={} status={} message={}",
+            request.getRequestURI(),
+            status.value(),
+            sanitize(ex.getMessage())
         );
         return ResponseEntity.status(status).body(body);
     }
@@ -42,6 +51,12 @@ public class GlobalExceptionHandler {
             message,
             request.getRequestURI()
         );
+        log.warn(
+            "http_validation_error endpoint={} status={} message={}",
+            request.getRequestURI(),
+            HttpStatus.BAD_REQUEST.value(),
+            sanitize(message)
+        );
         return ResponseEntity.badRequest().body(body);
     }
 
@@ -53,6 +68,13 @@ public class GlobalExceptionHandler {
             HttpStatus.SERVICE_UNAVAILABLE.getReasonPhrase(),
             "No se pudo acceder a la base de datos. Verifica que el servicio este disponible y que el esquema inicial haya sido aplicado.",
             request.getRequestURI()
+        );
+        log.error(
+            "http_database_error endpoint={} status={} message={}",
+            request.getRequestURI(),
+            HttpStatus.SERVICE_UNAVAILABLE.value(),
+            sanitize(ex.getMessage()),
+            ex
         );
         return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(body);
     }
@@ -66,6 +88,20 @@ public class GlobalExceptionHandler {
             "Ocurrio un error interno. Intenta nuevamente o contacta al administrador.",
             request.getRequestURI()
         );
+        log.error(
+            "http_unexpected_error endpoint={} status={} message={}",
+            request.getRequestURI(),
+            HttpStatus.INTERNAL_SERVER_ERROR.value(),
+            sanitize(ex.getMessage()),
+            ex
+        );
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(body);
+    }
+
+    private String sanitize(String message) {
+        if (message == null || message.isBlank()) {
+            return "n/a";
+        }
+        return message.replaceAll("[\\r\\n]+", " ");
     }
 }

@@ -8,6 +8,8 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.List;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -19,6 +21,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 @Component
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
+    private static final Logger log = LoggerFactory.getLogger(JwtAuthenticationFilter.class);
 
     private final JwtService jwtService;
     private final String cookieName;
@@ -48,7 +51,20 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
                 authentication.setDetails(parsed.provisional());
                 SecurityContextHolder.getContext().setAuthentication(authentication);
+                log.debug(
+                    "jwt_authenticated endpoint={} actorRole={} userIdHash={} provisional={}",
+                    request.getRequestURI(),
+                    parsed.role(),
+                    hashId(parsed.userId()),
+                    parsed.provisional()
+                );
             } catch (BusinessException ex) {
+                log.warn(
+                    "jwt_invalid endpoint={} optional={} message={}",
+                    request.getRequestURI(),
+                    isOptionalAuthenticationRequest(request),
+                    sanitize(ex.getMessage())
+                );
                 if (isOptionalAuthenticationRequest(request)) {
                     SecurityContextHolder.clearContext();
                     filterChain.doFilter(request, response);
@@ -59,6 +75,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 response.getWriter().write("{\"message\":\"" + ex.getMessage() + "\"}");
                 return;
             }
+        } else {
+            log.debug("jwt_absent endpoint={}", request.getRequestURI());
         }
 
         filterChain.doFilter(request, response);
@@ -87,5 +105,16 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private boolean isOptionalAuthenticationRequest(HttpServletRequest request) {
         String path = request.getRequestURI();
         return path.startsWith("/api/auth/") || "/actuator/health".equals(path);
+    }
+
+    private String hashId(Long userId) {
+        return userId == null ? "anonymous" : Integer.toHexString(Long.hashCode(userId));
+    }
+
+    private String sanitize(String message) {
+        if (message == null || message.isBlank()) {
+            return "n/a";
+        }
+        return message.replaceAll("[\\r\\n]+", " ");
     }
 }

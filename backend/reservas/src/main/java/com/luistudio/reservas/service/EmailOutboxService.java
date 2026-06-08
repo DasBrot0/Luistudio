@@ -45,15 +45,14 @@ public class EmailOutboxService {
             .orElse(null);
 
         if (preference != null && Boolean.FALSE.equals(preference.getEmailHabilitado())) {
-            log.info("[EMAIL_OUTBOX] Omitido para {} porque emailEnabled=false", recipient.getCorreo());
+            log.info("email_outbox_skipped reason=email_disabled");
             return;
         }
 
         String notificationType = resolveNotificationType(payload);
         if (preference != null && notificationType != null && !isNotificationEmailEnabled(preference, notificationType)) {
             log.info(
-                "[EMAIL_OUTBOX] Omitido para {} porque {}.email=false",
-                recipient.getCorreo(),
+                "email_outbox_skipped reason=notification_email_disabled notificationType={}",
                 notificationType
             );
             return;
@@ -68,7 +67,7 @@ public class EmailOutboxService {
         email.setIntentos(0);
         email.setDisponibleDesde(OffsetDateTime.now());
         emailOutboxRepository.save(email);
-        log.info("[EMAIL_OUTBOX] Encolado para {} | Subject: {}", email.getDestinatario(), email.getAsunto());
+        log.info("email_outbox_enqueued emailId={} notificationType={}", email.getId(), notificationType);
     }
 
     @Transactional
@@ -143,7 +142,7 @@ public class EmailOutboxService {
         try {
             return objectMapper.writeValueAsString(payload);
         } catch (Exception ex) {
-            log.warn("[EMAIL_OUTBOX] No se pudo serializar payload: {}", ex.getMessage());
+            log.warn("email_outbox_payload_serialize_failed message={}", sanitize(ex.getMessage()));
             return null;
         }
     }
@@ -158,5 +157,12 @@ public class EmailOutboxService {
         } catch (Exception ex) {
             return objectMapper.getNodeFactory().textNode(payload);
         }
+    }
+
+    private String sanitize(String message) {
+        if (message == null || message.isBlank()) {
+            return "n/a";
+        }
+        return message.replaceAll("[\\r\\n]+", " ");
     }
 }

@@ -111,7 +111,7 @@ Las historias marcadas con 🆕 son funcionalidades nuevas no contempladas en el
 | Área | Tarea |
 |------|-------|
 | **Front-End** | Acción "Cancelar" con diálogo de confirmación. |
-| **Back-End** | `DELETE` o `PATCH /bookings/{id}`: marca la reserva como `Cancelada`. |
+| **Back-End** | `DELETE` o `PATCH /bookings/{id}`: marca la reserva c?mo `Cancelada`. |
 | **Tablas BD** | `bookings.estado {Activa, Cancelada}`. |
 | **Pruebas** | Cancelar y ver estado "Cancelada"; mensaje de confirmación. |
 
@@ -291,7 +291,7 @@ Las historias marcadas con 🆕 son funcionalidades nuevas no contempladas en el
 | Área | Tarea |
 |------|-------|
 | **Front-End** | Sin UI nueva. Backend envía notificación automáticamente. |
-| **Back-End** | Al cancelar una reserva: marcar sala como disponible y enviar correo a estudiantes en lista de espera (si existe) o a los suscritos a esa sala. |
+| **Back-End** | Al cancelar una reserva: marcar sala c?mo disponible y enviar correo a estudiantes en lista de espera (si existe) o a los suscritos a esa sala. |
 | **Tablas BD** | Reutiliza `email_outbox`. Posible tabla `sala_suscripciones(user_id, room_id)` para lista de espera. |
 | **Pruebas** | Cancelar reserva → notificación de sala libre llega a los interesados. |
 
@@ -327,7 +327,7 @@ Las historias marcadas con 🆕 son funcionalidades nuevas no contempladas en el
 | Área | Tarea |
 |------|-------|
 | **Front-End** | Sin UI nueva. Administrador puede ver historial de inasistencias en el perfil del estudiante. |
-| **Back-End** | Job que, pasada la hora de inicio de una reserva sin registro de asistencia, la marca como inasistencia, registra el evento en el historial del estudiante y envía correo de aviso. |
+| **Back-End** | Job que, pasada la hora de inicio de una reserva sin registro de asistencia, la marca c?mo inasistencia, registra el evento en el historial del estudiante y envía correo de aviso. |
 | **Tablas BD** | Agregar `bookings.asistio {null, true, false}`. `historial_inasistencias(id, user_id, booking_id, fecha)`. |
 | **Pruebas** | Reserva sin asistencia → correo enviado; inasistencia registrada en historial. |
 

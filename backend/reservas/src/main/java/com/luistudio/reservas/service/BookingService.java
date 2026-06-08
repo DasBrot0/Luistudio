@@ -14,9 +14,12 @@ import com.luistudio.reservas.service.booking.validation.BookingValidationServic
 import com.luistudio.reservas.service.email.EmailTemplateService;
 import com.luistudio.reservas.util.AppTime;
 import com.luistudio.reservas.util.CalendarUtils;
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.List;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
@@ -25,6 +28,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class BookingService {
+    private static final Logger log = LoggerFactory.getLogger(BookingService.class);
 
     private final ReservationRepository reservationRepository;
     private final RoomService roomService;
@@ -59,6 +63,13 @@ public class BookingService {
     public BookingResponse createBooking(Long userId, BookingUpsertRequest request) {
         UserEntity user = userService.getById(userId);
         RoomEntity room = roomService.getRoomEntity(request.roomId());
+        log.info(
+            "booking_create_started roomId={} date={} start={} durationMinutes={}",
+            room.getId(),
+            request.date(),
+            request.start(),
+            durationMinutes(request)
+        );
 
         ReservationEntity saved = reservationRepository
             .findTopByUsuarioAndSalaAndFechaAndHoraInicioAndHoraFinOrderByIdDesc(
@@ -87,6 +98,15 @@ public class BookingService {
         String body = emailTemplateService.bookingStatus(saved, title, "confirmada", null);
         String ics = getIcsContent(saved.getId());
         emailOutboxService.enqueue(user, title, body, "{\"notificationType\":\"BOOKING_CONFIRMATION\",\"ics\":\"" + ics.replace("\n", "\\n") + "\"}");
+        log.info(
+            "booking_create_completed bookingId={} roomId={} status={} date={} start={} durationMinutes={}",
+            saved.getId(),
+            saved.getSala().getId(),
+            saved.getEstado(),
+            saved.getFecha(),
+            saved.getHoraInicio(),
+            Duration.between(saved.getHoraInicio(), saved.getHoraFin()).toMinutes()
+        );
 
         return dtoMapper.toBooking(saved);
     }
@@ -96,6 +116,14 @@ public class BookingService {
         ReservationEntity current = getBookingEntity(bookingId);
         RoomEntity room = roomService.getRoomEntity(request.roomId());
         UserEntity actor = userService.getById(actorUserId);
+        log.info(
+            "booking_update_started bookingId={} roomId={} date={} start={} durationMinutes={}",
+            bookingId,
+            room.getId(),
+            request.date(),
+            request.start(),
+            durationMinutes(request)
+        );
 
         bookingValidationService.validate(current.getUsuario(), room, request, bookingId);
 
@@ -120,6 +148,15 @@ public class BookingService {
             "{\"notificationType\":\"BOOKING_UPDATE\"}"
         );
         auditService.record(actor, "BOOKING_UPDATED", "reserva", String.valueOf(saved.getId()), "from=" + previous + ";to=" + next);
+        log.info(
+            "booking_update_completed bookingId={} roomId={} status={} date={} start={} durationMinutes={}",
+            saved.getId(),
+            saved.getSala().getId(),
+            saved.getEstado(),
+            saved.getFecha(),
+            saved.getHoraInicio(),
+            Duration.between(saved.getHoraInicio(), saved.getHoraFin()).toMinutes()
+        );
 
         return dtoMapper.toBooking(saved);
     }
@@ -127,7 +164,15 @@ public class BookingService {
     @Transactional
     public BookingResponse cancelBooking(Long bookingId, Long actorUserId, boolean adminCancel) {
         ReservationEntity booking = getBookingEntity(bookingId);
+        log.info(
+            "booking_cancel_started bookingId={} roomId={} status={} adminCancel={}",
+            booking.getId(),
+            booking.getSala().getId(),
+            booking.getEstado(),
+            adminCancel
+        );
         if (booking.getEstado() == ReservationStatus.CANCELADA) {
+            log.info("booking_cancel_skipped bookingId={} status={}", booking.getId(), booking.getEstado());
             return dtoMapper.toBooking(booking);
         }
         if (!booking.getFecha().atTime(booking.getHoraFin()).isAfter(AppTime.nowDateTime())) {
@@ -145,6 +190,15 @@ public class BookingService {
             "Reserva cancelada",
             emailTemplateService.bookingStatus(saved, "Reserva cancelada", "cancelada", "Estado: " + reason + ". Puedes reservar nuevamente."),
             "{\"notificationType\":\"BOOKING_CANCELLATION\"}"
+        );
+        log.info(
+            "booking_cancel_completed bookingId={} roomId={} status={} date={} start={} durationMinutes={}",
+            saved.getId(),
+            saved.getSala().getId(),
+            saved.getEstado(),
+            saved.getFecha(),
+            saved.getHoraInicio(),
+            Duration.between(saved.getHoraInicio(), saved.getHoraFin()).toMinutes()
         );
         return dtoMapper.toBooking(saved);
     }
@@ -265,5 +319,9 @@ public class BookingService {
         booking.setObservacion(request.observation());
         booking.setEstado(ReservationStatus.ACTIVA);
         return booking;
+    }
+
+    private long durationMinutes(BookingUpsertRequest request) {
+        return Duration.between(request.start(), request.end()).toMinutes();
     }
 }

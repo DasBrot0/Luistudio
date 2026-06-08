@@ -54,14 +54,14 @@ public class TwoFactorService {
     public LoginResponse verifyLoginCode(Long userId, String code) {
         UserEntity user = findUser(userId);
         TwoFactorCodeEntity latest = twoFactorCodeRepository.findTopByUsuarioAndUsadoFalseOrderByIdDesc(user)
-            .orElseThrow(() -> new BusinessException(HttpStatus.BAD_REQUEST, "No existe codigo 2FA activo"));
+            .orElseThrow(() -> new BusinessException(HttpStatus.BAD_REQUEST, "No existe código 2FA activo"));
 
         if (latest.getExpiraAt().isBefore(OffsetDateTime.now())) {
-            throw new BusinessException(HttpStatus.BAD_REQUEST, "Codigo 2FA expirado");
+            throw new BusinessException(HttpStatus.BAD_REQUEST, "Código 2FA expirado");
         }
 
         if (!secretHashService.matches(code, latest.getCode())) {
-            throw new BusinessException(HttpStatus.BAD_REQUEST, "Codigo 2FA invalido");
+            throw new BusinessException(HttpStatus.BAD_REQUEST, "Código 2FA inválido");
         }
 
         latest.setUsado(true);
@@ -79,10 +79,10 @@ public class TwoFactorService {
 
         emailOutboxService.enqueueSecurity(
             user,
-            "Codigo de verificacion 2FA",
+            "Código de verificación 2FA",
             emailTemplateService.securityCode(
-                "Codigo de verificacion 2FA",
-                "Usa este codigo para completar tu inicio de sesion.",
+                "Código de verificación 2FA",
+                "Usa este código para completar tu inicio de sesión.",
                 generatedTwoFactor.rawCode()
             )
         );
@@ -92,16 +92,16 @@ public class TwoFactorService {
     public void enroll(Long userId) {
         UserEntity user = findUser(userId);
         if (Boolean.TRUE.equals(user.getHas2fa())) {
-            throw new BusinessException(HttpStatus.BAD_REQUEST, "2FA ya esta activado");
+            throw new BusinessException(HttpStatus.BAD_REQUEST, "2FA ya está activado");
         }
         SecurityCodeService.GeneratedTwoFactorCode generatedTwoFactor = securityCodeService.createTwoFactorCode(user, 10);
         twoFactorCodeRepository.save(generatedTwoFactor.entity());
         emailOutboxService.enqueueSecurity(
             user,
-            "Confirmacion de activacion de 2FA",
+            "Confirmación de activación de 2FA",
             emailTemplateService.securityCode(
-                "Confirmacion de activacion de 2FA",
-                "Recibimos una solicitud para activar la autenticacion en dos pasos.",
+                "Confirmación de activación de 2FA",
+                "Recibimos una solicitud para activar la autenticación en dos pasos.",
                 generatedTwoFactor.rawCode()
             )
         );
@@ -113,7 +113,7 @@ public class TwoFactorService {
         TwoFactorCodeEntity latest = findLatestCode(user);
 
         if (latest.getExpiraAt().isBefore(OffsetDateTime.now()) || !secretHashService.matches(request.code(), latest.getCode())) {
-            throw new BusinessException(HttpStatus.BAD_REQUEST, "Codigo invalido o expirado");
+            throw new BusinessException(HttpStatus.BAD_REQUEST, "Código inválido o expirado");
         }
 
         latest.setUsado(true);
@@ -126,16 +126,16 @@ public class TwoFactorService {
     public void requestDisable(Long userId) {
         UserEntity user = findUser(userId);
         if (!Boolean.TRUE.equals(user.getHas2fa())) {
-            throw new BusinessException(HttpStatus.BAD_REQUEST, "2FA ya esta desactivado");
+            throw new BusinessException(HttpStatus.BAD_REQUEST, "2FA ya está desactivado");
         }
         SecurityCodeService.GeneratedTwoFactorCode generatedTwoFactor = securityCodeService.createTwoFactorCode(user, 10);
         twoFactorCodeRepository.save(generatedTwoFactor.entity());
         emailOutboxService.enqueueSecurity(
             user,
-            "Confirmacion de desactivacion de 2FA",
+            "Confirmación de desactivación de 2FA",
             emailTemplateService.securityCode(
-                "Confirmacion de desactivacion de 2FA",
-                "Recibimos una solicitud para desactivar la autenticacion en dos pasos.",
+                "Confirmación de desactivación de 2FA",
+                "Recibimos una solicitud para desactivar la autenticación en dos pasos.",
                 generatedTwoFactor.rawCode()
             )
         );
@@ -145,12 +145,12 @@ public class TwoFactorService {
     public void confirmDisable(Long userId, TwoFactorCodeInput request) {
         UserEntity user = findUser(userId);
         if (!Boolean.TRUE.equals(user.getHas2fa())) {
-            throw new BusinessException(HttpStatus.BAD_REQUEST, "2FA ya esta desactivado");
+            throw new BusinessException(HttpStatus.BAD_REQUEST, "2FA ya está desactivado");
         }
         TwoFactorCodeEntity latest = findLatestCode(user);
 
         if (latest.getExpiraAt().isBefore(OffsetDateTime.now()) || !secretHashService.matches(request.code(), latest.getCode())) {
-            throw new BusinessException(HttpStatus.BAD_REQUEST, "Codigo invalido o expirado");
+            throw new BusinessException(HttpStatus.BAD_REQUEST, "Código inválido o expirado");
         }
 
         latest.setUsado(true);
@@ -165,6 +165,6 @@ public class TwoFactorService {
 
     private TwoFactorCodeEntity findLatestCode(UserEntity user) {
         return twoFactorCodeRepository.findTopByUsuarioAndUsadoFalseOrderByIdDesc(user)
-            .orElseThrow(() -> new BusinessException(HttpStatus.BAD_REQUEST, "No existe codigo 2FA"));
+            .orElseThrow(() -> new BusinessException(HttpStatus.BAD_REQUEST, "No existe código 2FA"));
     }
 }

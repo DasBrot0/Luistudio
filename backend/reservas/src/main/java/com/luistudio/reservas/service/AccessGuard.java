@@ -27,10 +27,10 @@ public class AccessGuard {
         UserEntity user = userRepository.findById(principal.userId())
             .orElseThrow(() -> new BusinessException(HttpStatus.UNAUTHORIZED, "Tu sesión ya no es válida. Vuelve a iniciar sesión."));
         if (user.getEstado() != UserStatus.HABILITADO) {
-            throw new BusinessException(HttpStatus.FORBIDDEN, "Tu cuenta esta deshabilitada. Contacta al administrador.");
+            throw new BusinessException(HttpStatus.FORBIDDEN, "Tu cuenta está deshabilitada. Contacta al administrador.");
         }
         if (user.getLockedUntil() != null && user.getLockedUntil().isAfter(OffsetDateTime.now())) {
-            throw new BusinessException(HttpStatus.FORBIDDEN, "Tu cuenta esta bloqueada temporalmente. Intenta mas tarde.");
+            throw new BusinessException(HttpStatus.FORBIDDEN, "Tu cuenta está bloqueada temporalmente. Intenta más tarde.");
         }
         return principal;
     }

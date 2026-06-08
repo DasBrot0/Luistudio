@@ -8,7 +8,7 @@
 - Spring Data JPA + Hibernate
 - PostgreSQL (o H2 en memoria para desarrollo rapido)
 
-## Ejecucion local
+## Ejecución local
 
 1. Asegura `JAVA_HOME` apuntando a Java 21.
 2. (Opcional recomendado) crear BD PostgreSQL `luistudio_db` y ejecutar `database/001_init.sql`.
@@ -18,13 +18,14 @@
    - `DB_PASSWORD`
    - `DB_DRIVER` (por defecto H2)
    - `JWT_SECRET`
-   - `BCRYPT_STRENGTH` (`10` por defecto; puede subirse a `11` o `12` en produccion real)
+   - `BCRYPT_STRENGTH` (`10` por defecto; puede subirse a `11` o `12` en producción real)
    - `CORS_ORIGINS`
    - `AUTH_COOKIE_SECURE` (`false` en local, `true` en despliegue HTTPS)
    - `AUTH_COOKIE_SAME_SITE` (`Lax` por defecto)
    - `EMAIL_PROVIDER` (`log` por defecto, `resend` para envío real por API HTTP)
    - `EMAIL_FROM` (ej. `Luistudio <no-reply@tu-dominio.com>`)
-   - `RESEND_API_KEY` (requerida si `EMAIL_PROVIDER=resend`)
+  - `RESEND_API_KEY` (requerida si `EMAIL_PROVIDER=resend`)
+  - `APP_LOG_LEVEL` (`DEBUG` por defecto para `com.luistudio.reservas` en desarrollo; usar `INFO` en produccion)
 4. Ejecuta:
 
 ```bash
@@ -41,7 +42,7 @@ En este proyecto puedes desplegar el backend usando:
 - `backend/reservas/Dockerfile`
 - `backend/reservas/.dockerignore`
 
-Sugerencias de configuracion en Render:
+Sugerencias de configuración en Render:
 - `Root Directory`: `backend/reservas`
 - Runtime: `Docker`
 - Variables de entorno minimas:
@@ -55,10 +56,16 @@ Sugerencias de configuracion en Render:
 
 Memoria (500 MB):
 - El Dockerfile ya incluye ajustes JVM para memoria limitada (`MaxRAMPercentage=70`, `SerialGC`).
-- Con trafico bajo/moderado suele funcionar bien en 500 MB.
-- Si sube la concurrencia, exportaciones pesadas o procesos simultaneos, puede haber reinicios por OOM; en ese caso conviene subir a 1 GB.
+- Con tráfico bajo/moderado suele funcionar bien en 500 MB.
+- Si sube la concurrencia, exportaciones pesadas o procesos simultáneos, puede haber reinicios por OOM; en ese caso conviene subir a 1 GB.
 
 ## Endpoints principales (Release 01)
+
+## Observabilidad
+
+- Cada request recibe o reutiliza `X-Request-Id`; el valor se agrega al MDC c?mo `requestId` y se devuelve en la respuesta.
+- El patron de logs incluye `requestId`.
+- Los logs evitan correos, códigos, tokens, cookies, cuerpos completos y datos personales; para flujos de usuario se usan rol o hashes técnicos.
 
 ### Auth y seguridad
 
@@ -95,7 +102,7 @@ Memoria (500 MB):
 - `GET /api/bookings/{id}/ics` descarga un archivo calendario para reservas confirmadas propias del estudiante autenticado. Convierte horarios locales con zona `America/Lima` a UTC.
 - `GET /api/admin/bookings`
 
-### Administracion
+### Administración
 
 - `GET /api/admin/users`
   - Soporta `query` por código/correo/nombres/apellidos, `year`, `status` (`HABILITADO`, `DESHABILITADO`, `BLOQUEADO`), `sortBy` (`firstName`, `lastName`, `code`, `status`) y `sortDir`.
@@ -105,9 +112,9 @@ Memoria (500 MB):
 - `PUT /api/admin/config`
 - `GET /api/admin/campus-schedules`
 - `PUT /api/admin/campus-schedules`
-  - En días cerrados (`closed=true`), `openTime` y `closeTime` pueden enviarse como `null`.
+  - En días cerrados (`closed=true`), `openTime` y `closeTime` pueden enviarse c?mo `null`.
   - En días abiertos, `openTime` y `closeTime` deben alinearse con la duración por reserva del campus (30/45/60/120 min).
-  - Los errores de validacion incluyen el campo que fallo.
+  - Los errores de validación incluyen el campo que falló.
 - `GET /api/campus/map`
 
 ### Preferencias
@@ -127,7 +134,7 @@ Memoria (500 MB):
 
 - Se implementa bloqueo temporal tras intentos fallidos de login.
 - El costo BCrypt es configurable con `BCRYPT_STRENGTH`; para demo/nube barata se usa `10` por defecto.
-- El login usa busqueda por correo con indice funcional `LOWER(email)` y evita escrituras/flushes innecesarios en el flujo exitoso.
+- El login usa búsqueda por correo con índice funcional `LOWER(email)` y evita escrituras/flushes innecesarios en el flujo exitoso.
 - CORS cachea preflight por 3600 segundos; los `GET` simples del frontend no envian `Content-Type` para evitar `OPTIONS` innecesarios.
 - Para bases existentes, aplicar `database/004_optimize_auth_indexes.sql` para crear los índices de autenticación.
 - El listado administrativo de usuarios expone si una cuenta sigue bloqueada temporalmente y permite desbloquearla al volver a `HABILITADO`.
@@ -144,16 +151,16 @@ Memoria (500 MB):
 - Los tests de backend incluyen un contrato que compara entidades JPA contra `database/001_init.sql` para detectar tablas/columnas desalineadas antes de desplegar.
 - Para bases existentes, aplicar los scripts incrementales disponibles en `/database` antes de levantar el backend.
 - Las salas almacenan data de catalogo en espanol (`code`, `name`, `campus`, `venue`, `location`).
-- El listado de salas usa paginacion y respuesta ligera por defecto; la creacion/edicion conserva horario completo en la respuesta.
+- El listado de salas usa paginación y respuesta ligera por defecto; la creación/edición conserva horario completo en la respuesta.
 - Los listados de reservas que se mapean a DTO cargan usuario y sala con `EntityGraph` para evitar N+1.
-- El mapa de campus agrupa salas por pabellon desde una carga unica y resuelve ocupacion/mantenimiento con sets por id.
-- El scheduler de `email_outbox` procesa como maximo 50 correos listos por ciclo.
-- Se agregan horarios por campus (`campus_schedules`) y override por sala (`room_schedules`) para validar reservas por dia/hora.
+- El mapa de campus agrupa salas por pabellón desde una carga única y resuelve ocupación/mantenimiento con sets por id.
+- El scheduler de `email_outbox` procesa c?mo máximo 50 correos listos por ciclo.
+- Se agregan horarios por campus (`campus_schedules`) y override por sala (`room_schedules`) para validar reservas por día/hora.
 - Se agregan reglas por sala de personas: `minPeople`, `minPeopleRequired`, `maxPeople`.
 - Se agrega configuración de duración por reserva por campus (Monterrico 60 min, Mayorazgo 45 min por defecto).
 - Las reservas solo aceptan fechas/horas dentro de la ventana permitida (semana actual; fin de semana habilita también la siguiente semana) y siempre en horas futuras del día actual.
-- Las reglas de negocio de reservas usan la zona `America/Lima` para comparar fecha/hora actual en produccion.
-- No se permite cancelar reservas que ya finalizaron (validacion en backend).
+- Las reglas de negocio de reservas usan la zona `America/Lima` para comparar fecha/hora actual en producción.
+- No se permite cancelar reservas que ya finalizaron (validaci?n en backend).
 - La cancelación administrativa reutiliza `PATCH /api/bookings/{id}/cancel`; el frontend ahora agrega confirmación previa y el backend mantiene el envío de correo automático.
 - Se agrega preferencia por usuario `login_landing_view` para definir la vista inicial al iniciar sesión (validada por rol).
 - Para bases ya existentes, aplicar `database/004_add_login_landing_view.sql`.
@@ -166,7 +173,7 @@ Si despliegas en Render y quieres evitar que el backend entre en reposo por inac
 1. Verifica endpoint de salud publico:
    - URL recomendada: `GET /actuator/health`
    - En este proyecto:
-     - Actuator esta habilitado.
+     - Actuator está habilitado.
      - Solo se expone `health`.
      - `GET /actuator/health` y `HEAD /actuator/health` están permitidos sin autenticación.
 2. Crea cuenta gratuita en UptimeRobot (hasta 50 monitores, intervalo mínimo 5 min).
@@ -175,7 +182,7 @@ Si despliegas en Render y quieres evitar que el backend entre en reposo por inac
    - `Friendly Name`: `Luistudio Backend`
    - `URL`: `https://<tu-servicio-render>.onrender.com/actuator/health`
    - `Monitoring Interval`: `5 minutes`
-4. Guarda el monitor y valida que reciba `200 OK`.
+4. Guarda el monitor y v?lida que reciba `200 OK`.
 
 Nota:
 - No uses `GET /api/rooms` para keep-alive si no mandas token, porque ese endpoint requiere autenticación.
@@ -186,21 +193,21 @@ Nota:
 - `Strategy`:
   - Login con `LoginContext`, `LoginStrategy`, `StandardLoginStrategy` y `TwoFactorLoginStrategy`.
 - `Adapter`:
-  - Email con `EmailGateway` como target, `GmailEmailAdapter`/`ResendEmailAdapter` como adapters y adaptees explicitos para Gmail/Resend.
+  - Email con `EmailGateway` c?mo target, `GmailEmailAdapter`/`ResendEmailAdapter` c?mo adapters y adaptees explicitos para Gmail/Resend.
   - `LogEmailGateway` es fallback local, no adapter externo.
 - `Command`:
   - Recordatorios con `BookingReminderCommand`, comandos concretos, `BookingReminderCommandManager` y scheduler.
 - `Facade`:
-  - `AuthService` conserva el contrato de autenticacion y delega en `LoginService`, `PasswordResetService`, `TwoFactorService` y `LoginAttemptService`.
+  - `AuthService` conserva el contrato de autenticación y delega en `LoginService`, `PasswordResetService`, `TwoFactorService` y `LoginAttemptService`.
 
-Como arquitectura, no como GoF: `BookingValidationService` concentra validaciones de reserva; `repository/*Repository.java` usa Spring Data JPA; `DtoMapper` y `dto/**` manejan DTOs. No se implementa Factory Method ni Singleton manual.
+Como arquitectura, no c?mo GoF: `BookingValidationService` concentra validaciones de reserva; `repository/*Repository.java` usa Spring Data JPA; `DtoMapper` y `dto/**` manejan DTOs. No se implementa Factory Method ni Singleton manual.
 
 
-- Regla de no duplicacion de reservas: si el usuario vuelve a reservar exactamente el mismo recurso, fecha y horario (misma identidad logica), se reutiliza el mismo registro en BD y se actualiza su estado/datos; no se crea una fila adicional. La cantidad de personas no define identidad para esta regla.
+- Regla de no duplicación de reservas: si el usuario vuelve a reservar exactamente el mismo recurso, fecha y horario (misma identidad lógica), se reutiliza el mismo registro en BD y se actualiza su estado/datos; no se crea una fila adicional. La cantidad de personas no define identidad para est? regla.
 
 ## Envío de correo por Gmail API (sin SMTP)
 
-Configura estas variables de entorno para usar Gmail como proveedor de correo:
+Configura estas variables de entorno para usar Gmail c?mo proveedor de correo:
 
 - EMAIL_PROVIDER=gmail
 - EMAIL_FROM=Luistudio <iaboysender@gmail.com>
@@ -210,7 +217,7 @@ Configura estas variables de entorno para usar Gmail como proveedor de correo:
 
 Si falta alguna credencial, el sistema hace fallback a `log` y deja warning en logs.
 - Correos de reservas (confirmación, edición, cancelación) se generan en HTML con estilo Luistudio e incluyen: sala, campus, recinto, ubicación, fecha, horario, personas e integrantes.
-- La duración máxima de reserva se valida por bloque configurado del campus de la sala (no por un límite global único).
+- La duración máxima de reserva se v?lida por bloque configurado del campus de la sala (no por un límite global único).
 - El admin puede cambiar la duración por campus, pero el sistema bloquea el cambio si existen reservas futuras activas en ese campus para evitar conflictos.
 - Los endpoints de escritura validan longitudes y formatos de entrada alineados con los tamaños de columna (ej. estado VARCHAR(20), observaciones/motivos VARCHAR(255), textos de sala VARCHAR(120/160)), para evitar errores SQL por datos demasiado largos.
 

@@ -1,6 +1,6 @@
 # Principios
 
-Este documento resume los principios y patrones vistos en las diapositivas de Ingeniería de Software 2. Está redactado como guía práctica para que un agente de IA pueda identificar el problema de diseño, seleccionar una solución y proponer una implementación orientada a objetos.
+Este documento resume los principios y patrones vistos en las diapositivas de Ingeniería de Software 2. Está redactado c?mo guía práctica para que un agente de IA pueda identificar el problema de diseño, seleccionar una solución y proponer una implementación orientada a objetos.
 
 ---
 
@@ -119,7 +119,7 @@ Evita que una clase dependa de la estructura interna de otras clases. Si el clie
 Una clase debería comunicarse principalmente con:
 
 - Sus propios métodos.
-- Objetos recibidos como parámetro.
+- Objetos recibidos c?mo parámetro.
 - Objetos creados localmente.
 - Objetos asociados directamente.
 
@@ -234,7 +234,7 @@ Construir solo lo necesario para los requerimientos actuales.
 
 ### Duck Typing
 
-Duck Typing es un concepto usado en lenguajes dinámicos como Python, Ruby o JavaScript. La idea es que no importa tanto la clase concreta de un objeto, sino si tiene los métodos o atributos necesarios.
+Duck Typing es un concepto usado en lenguajes dinámicos c?mo Python, Ruby o JavaScript. La idea es que no importa tanto la clase concreta de un objeto, sino si tiene los métodos o atributos necesarios.
 
 **Problema que resuelve:**
 
@@ -384,7 +384,7 @@ Evita herencias incorrectas donde una subclase no cumple el contrato de la super
 
 - Una subclase sobrescribe un método para no hacer nada.
 - Una subclase lanza excepciones en métodos heredados porque “no aplica”.
-- Se necesitan condicionales para tratar subclases como casos especiales.
+- Se necesitan condicionales para tratar subclases c?mo casos especiales.
 
 **Mal diseño:**
 
@@ -432,7 +432,7 @@ Ninguna clase debería depender de métodos que no usa.
 
 **Problema que resuelve:**
 
-Evita interfaces demasiado grandes, conocidas como `fat interfaces`, que obligan a las clases a implementar métodos vacíos o lanzar errores.
+Evita interfaces demasiado grandes, conocidas c?mo `fat interfaces`, que obligan a las clases a implementar métodos vacíos o lanzar errores.
 
 **Regla para implementar:**
 
@@ -498,7 +498,7 @@ Depende de abstracciones, no de clases concretas.
 
 **Problema que resuelve:**
 
-Evita que la lógica importante del sistema quede acoplada a detalles de implementación como bases de datos, archivos, APIs externas, frameworks o servicios concretos.
+Evita que la lógica importante del sistema quede acoplada a detalles de implementación c?mo bases de datos, archivos, APIs externas, frameworks o servicios concretos.
 
 **Mal diseño:**
 
@@ -578,7 +578,7 @@ Garantizar que una clase tenga una sola instancia y proporcionar un punto de acc
 
 - Cuando debe existir exactamente una instancia de una clase.
 - Cuando esa instancia debe ser accesible desde un punto conocido.
-- Cuando la clase administra un recurso compartido, como configuración, logger o gestor central.
+- Cuando la clase administra un recurso compartido, c?mo configuración, logger o gestor central.
 
 **Estructura:**
 
@@ -933,7 +933,7 @@ Usar Facade cuando el cliente debe realizar una operación de alto nivel que inv
 
 **Propósito:**
 
-Agregar responsabilidades adicionales a un objeto de forma dinámica, como alternativa flexible a la herencia.
+Agregar responsabilidades adicionales a un objeto de forma dinámica, c?mo alternativa flexible a la herencia.
 
 **Problema que resuelve:**
 
@@ -1268,7 +1268,7 @@ class Button {
 
 **Instrucción para agente de IA:**
 
-Usar Command cuando una acción debe tratarse como objeto. Si el sistema necesita botones, menús, consola, historial o deshacer, Command suele ser adecuado.
+Usar Command cuando una acción debe tratarse c?mo objeto. Si el sistema necesita botones, menús, consola, historial o deshacer, Command suele ser adecuado.
 
 **Ejemplos:**
 
@@ -1299,7 +1299,7 @@ El cliente necesita recorrer una colección, pero no debe conocer si internament
 
 - `Aggregate`: interfaz para colecciones iterables.
 - `ConcreteAggregate`: colección concreta.
-- `Iterator`: interfaz con métodos como `hasNext()` y `next()`.
+- `Iterator`: interfaz con métodos c?mo `hasNext()` y `next()`.
 - `ConcreteIterator`: implementación concreta del recorrido.
 - `Client`: usa el iterador para recorrer.
 
@@ -1383,5 +1383,5 @@ Usar Iterator cuando el cliente no debe depender de cómo se almacena la colecci
 | Se agregan responsabilidades acumulables a un objeto | Decorator |
 | Hay dos jerarquías que varían independientemente | Bridge |
 | Se intercambian algoritmos o comportamientos | Strategy |
-| Se quiere encapsular una acción como objeto | Command |
+| Se quiere encapsular una acción c?mo objeto | Command |
 | Se recorre una colección sin exponer su estructura | Iterator |

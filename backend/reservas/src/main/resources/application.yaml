@@ -56,3 +56,10 @@ management:
   endpoint:
     health:
       show-details: never
+
+logging:
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} %-5level [%X{requestId}] %logger{36} - %msg%n"
+  level:
+    root: INFO
+    com.luistudio.reservas: ${APP_LOG_LEVEL:DEBUG}

@@ -1,4 +1,4 @@
-package com.luistudio.reservas.security;
+﻿package com.luistudio.reservas.security;
 
 import com.luistudio.reservas.exception.BusinessException;
 import org.springframework.http.HttpStatus;
@@ -27,7 +27,7 @@ public class CurrentUserProvider {
     public void requireProvisionalToken() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication == null || !Boolean.TRUE.equals(authentication.getDetails())) {
-            throw new BusinessException(HttpStatus.FORBIDDEN, "Se requiere un token provisional valido");
+            throw new BusinessException(HttpStatus.FORBIDDEN, "Se requiere un token provisional válido");
         }
     }
 
@@ -35,3 +35,4 @@ public class CurrentUserProvider {
         return "ADMIN".equalsIgnoreCase(principal.role());
     }
 }
+
