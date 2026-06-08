@@ -197,13 +197,16 @@ const readErrorMessage = async (response: Response) => {
 }
 
 async function http<T>(path: string, options: RequestInit = {}, _token?: string): Promise<T> {
+  const headers = new Headers(options.headers)
+
+  if (options.body && !headers.has('Content-Type')) {
+    headers.set('Content-Type', 'application/json')
+  }
+
   const response = await fetch(`${API_BASE}${path}`, {
     ...options,
     credentials: 'include',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(options.headers ?? {}),
-    },
+    headers,
   })
 
   if (!response.ok) {
@@ -280,15 +283,26 @@ export const api = {
 
   getRooms(
     token: string,
-    params?: { campus?: string; venue?: string; location?: string; query?: string },
+    params?: {
+      page?: number
+      size?: number
+      includeSchedule?: boolean
+      campus?: string
+      venue?: string
+      location?: string
+      query?: string
+    },
   ) {
     const queryParams = new URLSearchParams()
+    queryParams.set('page', String(params?.page ?? 0))
+    queryParams.set('size', String(params?.size ?? 50))
+    queryParams.set('includeSchedule', String(params?.includeSchedule ?? false))
     if (params?.campus && params.campus !== 'Todas') queryParams.set('campus', params.campus)
     if (params?.venue && params.venue !== 'Todos') queryParams.set('recinto', params.venue)
     if (params?.location && params.location !== 'Todas') queryParams.set('ubicacion', params.location)
     if (params?.query?.trim()) queryParams.set('q', params.query.trim())
     const query = queryParams.toString() ? `?${queryParams.toString()}` : ''
-    return http<ApiRoom[]>(`/rooms${query}`, {}, token)
+    return http<ApiPage<ApiRoom>>(`/rooms${query}`, {}, token)
   },
 
   getAvailableRooms(token: string, date: string, start: string, end: string) {
@@ -347,8 +361,12 @@ export const api = {
     return http<void>(`/rooms/${roomId}`, { method: 'DELETE' }, token)
   },
 
-  getBookingsMe(token: string) {
-    return http<ApiBooking[]>('/bookings/me', {}, token)
+  getBookingsMe(token: string, page = 0, size = 10) {
+    const params = new URLSearchParams({
+      page: String(Math.max(page, 0)),
+      size: String(Math.min(Math.max(size, 1), 50)),
+    })
+    return http<ApiPage<ApiBooking>>(`/bookings/me?${params.toString()}`, {}, token)
   },
 
   getRoomBookings(token: string, roomId: number, fromDate: string, toDate: string) {
@@ -408,10 +426,10 @@ export const api = {
     return response.blob()
   },
 
-  getAdminBookings(token: string, _page: number, status: string, date: string) {
+  getAdminBookings(token: string, page: number, status: string, date: string) {
     const params = new URLSearchParams({
-      page: '0',
-      size: '200',
+      page: String(Math.max(page - 1, 0)),
+      size: '10',
     })
     if (status && status !== 'Todos') params.set('status', status === 'Confirmado' ? 'ACTIVA' : 'CANCELADA')
     if (date) params.set('fecha', date)

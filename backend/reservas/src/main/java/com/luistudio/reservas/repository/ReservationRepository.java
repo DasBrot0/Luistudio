@@ -10,13 +10,15 @@ import java.util.List;
 import java.util.Optional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface ReservationRepository extends JpaRepository<ReservationEntity, Long> {
 
-    List<ReservationEntity> findByUsuarioOrderByFechaDescHoraInicioDesc(UserEntity usuario);
+    @EntityGraph(attributePaths = {"usuario", "sala"})
+    Page<ReservationEntity> findByUsuarioOrderByFechaDescHoraInicioDesc(UserEntity usuario, Pageable pageable);
 
     Optional<ReservationEntity> findTopByUsuarioAndSalaAndFechaAndHoraInicioAndHoraFinOrderByIdDesc(
         UserEntity usuario,
@@ -26,6 +28,7 @@ public interface ReservationRepository extends JpaRepository<ReservationEntity, 
         LocalTime horaFin
     );
 
+    @EntityGraph(attributePaths = {"usuario", "sala"})
     @Query("""
         SELECT r FROM ReservationEntity r
         WHERE r.sala = :room
@@ -41,12 +44,16 @@ public interface ReservationRepository extends JpaRepository<ReservationEntity, 
 
     long countByUsuarioAndEstado(UserEntity usuario, ReservationStatus estado);
 
+    @EntityGraph(attributePaths = {"usuario", "sala"})
     Page<ReservationEntity> findByEstadoOrderByFechaDescHoraInicioDesc(ReservationStatus estado, Pageable pageable);
 
+    @EntityGraph(attributePaths = {"usuario", "sala"})
     Page<ReservationEntity> findByFechaOrderByHoraInicioDesc(LocalDate fecha, Pageable pageable);
 
+    @EntityGraph(attributePaths = {"usuario", "sala"})
     Page<ReservationEntity> findAllByOrderByFechaDescHoraInicioDesc(Pageable pageable);
 
+    @EntityGraph(attributePaths = {"usuario", "sala"})
     Page<ReservationEntity> findByEstadoAndFechaOrderByHoraInicioDesc(
         ReservationStatus estado,
         LocalDate fecha,
@@ -94,6 +101,7 @@ public interface ReservationRepository extends JpaRepository<ReservationEntity, 
         @Param("nowTime") LocalTime nowTime
     );
 
+    @EntityGraph(attributePaths = {"usuario", "sala"})
     @Query("""
         SELECT r FROM ReservationEntity r
         WHERE r.estado = com.luistudio.reservas.model.ReservationStatus.ACTIVA
@@ -103,6 +111,7 @@ public interface ReservationRepository extends JpaRepository<ReservationEntity, 
     """)
     List<ReservationEntity> findActiveAt(@Param("date") LocalDate date, @Param("time") LocalTime time);
 
+    @EntityGraph(attributePaths = {"usuario", "sala"})
     @Query("""
         SELECT r FROM ReservationEntity r
         WHERE r.estado = com.luistudio.reservas.model.ReservationStatus.ACTIVA
@@ -116,6 +125,7 @@ public interface ReservationRepository extends JpaRepository<ReservationEntity, 
         @Param("futureTime") LocalTime futureTime
     );
 
+    @EntityGraph(attributePaths = {"usuario", "sala"})
     @Query("""
         SELECT r FROM ReservationEntity r
         WHERE r.estado = com.luistudio.reservas.model.ReservationStatus.ACTIVA

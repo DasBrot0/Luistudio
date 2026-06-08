@@ -56,9 +56,12 @@ public class BookingController {
     }
 
     @GetMapping("/bookings/me")
-    public List<BookingResponse> getMyBookings() {
+    public PageResponse<BookingResponse> getMyBookings(
+        @RequestParam(defaultValue = "0") int page,
+        @RequestParam(defaultValue = "10") int size
+    ) {
         AuthPrincipal principal = accessGuard.requireUser();
-        return bookingService.listMyBookings(principal.userId());
+        return bookingService.listMyBookings(principal.userId(), page, size);
     }
 
     @GetMapping("/bookings/{bookingId}/ics")

@@ -31,6 +31,7 @@ npm run dev
 
 - Login con roles (admin/estudiante) y flujo 2FA.
 - Restauración de sesión con pantalla de carga breve para evitar el flash del login al recargar una ruta protegida.
+- Tras login, la app navega despues de cargar preferencias y deja la data de la pantalla inicial en background para reducir latencia percibida.
 - Verificación 2FA mediante modal propio (sin depender de `window.prompt`).
 - Solicitud y confirmación de restablecimiento de contraseña.
 - Reserva, edición y cancelación de reservas.
@@ -65,7 +66,8 @@ npm run dev
 Notas recientes:
 
 - `FilterBar` reutilizable para Salas, Reservas registradas y Perfiles, con comportamiento consistente entre modulos.
-- Salas consume filtros de backend por campus, recinto, ubicación y texto en `GET /api/rooms`.
+- Salas consume `GET /api/rooms` paginado y por defecto sin horarios completos (`includeSchedule=false`) para acelerar listados.
+- Reservas registradas consume paginacion real del backend (`size=10`) y usa `totalPages` de la API.
 - Perfiles muestra apellidos completos, distingue cuentas bloqueadas temporalmente y permite desbloqueo manual.
 - Cancelar una reserva ahora solicita confirmación previa mostrando el detalle y el aviso de notificación automática.
 
@@ -73,6 +75,7 @@ Notas recientes:
 
 - Archivo principal: `src/services/api.ts`
 - La sesión autenticada se consume por cookie `HttpOnly`; el frontend no persiste tokens de acceso en `localStorage`.
+- Los `GET` no envian `Content-Type` cuando no hay body, evitando preflight innecesario con cookies `HttpOnly`.
 - Solo se guarda una marca no sensible para restaurar sesión y decidir si mostrar la pantalla breve de carga al recargar.
 
 ## Deploy en Vercel (SPA)

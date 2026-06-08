@@ -74,8 +74,8 @@ Memoria (500 MB):
 
 ### Salas y disponibilidad
 
-- `GET /api/rooms`
-- `GET /api/rooms?campus&recinto&ubicacion&q`
+- `GET /api/rooms?page&size&includeSchedule&campus&recinto&ubicacion&q`
+  - Devuelve `PageResponse<RoomResponse>`. Por defecto `includeSchedule=false` para listar salas sin cargar horarios completos.
 - `GET /api/rooms/available?fecha&horaInicio&horaFin`
 - `GET /api/rooms/{id}/bookings?desde&hasta`
 - `POST /api/rooms`
@@ -90,7 +90,8 @@ Memoria (500 MB):
 - `POST /api/bookings`
 - `PUT /api/bookings/{id}`
 - `PATCH /api/bookings/{id}/cancel`
-- `GET /api/bookings/me`
+- `GET /api/bookings/me?page&size`
+  - Devuelve `PageResponse<BookingResponse>`.
 - `GET /api/bookings/{id}/ics` descarga un archivo calendario para reservas confirmadas propias del estudiante autenticado. Convierte horarios locales con zona `America/Lima` a UTC.
 - `GET /api/admin/bookings`
 
@@ -127,6 +128,7 @@ Memoria (500 MB):
 - Se implementa bloqueo temporal tras intentos fallidos de login.
 - El costo BCrypt es configurable con `BCRYPT_STRENGTH`; para demo/nube barata se usa `10` por defecto.
 - El login usa busqueda por correo con indice funcional `LOWER(email)` y evita escrituras/flushes innecesarios en el flujo exitoso.
+- CORS cachea preflight por 3600 segundos; los `GET` simples del frontend no envian `Content-Type` para evitar `OPTIONS` innecesarios.
 - Para bases existentes, aplicar `database/004_optimize_auth_indexes.sql` para crear los índices de autenticación.
 - El listado administrativo de usuarios expone si una cuenta sigue bloqueada temporalmente y permite desbloquearla al volver a `HABILITADO`.
 - Se implementa 2FA por código temporal.
@@ -142,6 +144,10 @@ Memoria (500 MB):
 - Los tests de backend incluyen un contrato que compara entidades JPA contra `database/001_init.sql` para detectar tablas/columnas desalineadas antes de desplegar.
 - Para bases existentes, aplicar los scripts incrementales disponibles en `/database` antes de levantar el backend.
 - Las salas almacenan data de catalogo en espanol (`code`, `name`, `campus`, `venue`, `location`).
+- El listado de salas usa paginacion y respuesta ligera por defecto; la creacion/edicion conserva horario completo en la respuesta.
+- Los listados de reservas que se mapean a DTO cargan usuario y sala con `EntityGraph` para evitar N+1.
+- El mapa de campus agrupa salas por pabellon desde una carga unica y resuelve ocupacion/mantenimiento con sets por id.
+- El scheduler de `email_outbox` procesa como maximo 50 correos listos por ciclo.
 - Se agregan horarios por campus (`campus_schedules`) y override por sala (`room_schedules`) para validar reservas por dia/hora.
 - Se agregan reglas por sala de personas: `minPeople`, `minPeopleRequired`, `maxPeople`.
 - Se agrega configuración de duración por reserva por campus (Monterrico 60 min, Mayorazgo 45 min por defecto).

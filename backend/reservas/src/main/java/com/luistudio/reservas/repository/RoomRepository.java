@@ -5,6 +5,9 @@ import com.luistudio.reservas.model.RoomEntity;
 import com.luistudio.reservas.model.RoomState;
 import java.util.List;
 import java.util.Optional;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -12,6 +15,7 @@ import org.springframework.data.repository.query.Param;
 public interface RoomRepository extends JpaRepository<RoomEntity, Long> {
     Optional<RoomEntity> findByCodigo(String codigo);
 
+    @EntityGraph(attributePaths = "pabellon")
     List<RoomEntity> findByEstadoNot(RoomState estado);
 
     List<RoomEntity> findByUbicacionIgnoreCaseAndEstadoNot(String ubicacion, RoomState estado);
@@ -20,6 +24,7 @@ public interface RoomRepository extends JpaRepository<RoomEntity, Long> {
 
     List<RoomEntity> findByPabellonAndEstadoNot(PabellonEntity pabellon, RoomState estado);
 
+    @EntityGraph(attributePaths = "pabellon")
     @Query("""
         SELECT r FROM RoomEntity r
         WHERE r.estado <> :excludedState
@@ -32,13 +37,13 @@ public interface RoomRepository extends JpaRepository<RoomEntity, Long> {
             OR LOWER(r.nombre) LIKE LOWER(CONCAT('%', :query, '%'))
             OR LOWER(r.ubicacion) LIKE LOWER(CONCAT('%', :query, '%'))
           )
-        ORDER BY r.codigo ASC
     """)
-    List<RoomEntity> searchActiveRooms(
+    Page<RoomEntity> searchActiveRooms(
         @Param("campus") String campus,
         @Param("venue") String venue,
         @Param("location") String location,
         @Param("query") String query,
-        @Param("excludedState") RoomState excludedState
+        @Param("excludedState") RoomState excludedState,
+        Pageable pageable
     );
 }

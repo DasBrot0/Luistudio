@@ -58,9 +58,4 @@ public class SendUpcomingReservationReminderCommand implements BookingReminderCo
             );
         }
     }
-
-    @Override
-    public void deshacer() {
-        // No aplica reversion: el comando solo encola recordatorios si todavia no existen.
-    }
 }

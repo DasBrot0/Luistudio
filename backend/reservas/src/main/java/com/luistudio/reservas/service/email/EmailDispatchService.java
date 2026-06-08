@@ -7,6 +7,7 @@ import com.luistudio.reservas.service.email.gateway.EmailGatewayResolver;
 import java.time.OffsetDateTime;
 import java.util.List;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -27,7 +28,11 @@ public class EmailDispatchService {
 
     @Transactional
     public void processPendingEmails() {
-        List<EmailOutboxEntity> pending = emailOutboxRepository.findReadyToProcess(EmailStatus.PENDIENTE, OffsetDateTime.now());
+        List<EmailOutboxEntity> pending = emailOutboxRepository.findReadyToProcess(
+            EmailStatus.PENDIENTE,
+            OffsetDateTime.now(),
+            PageRequest.of(0, 50)
+        );
         for (EmailOutboxEntity email : pending) {
             try {
                 sendEmail(email);

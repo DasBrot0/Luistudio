@@ -5,6 +5,7 @@ import com.luistudio.reservas.model.MaintenanceEntity;
 import com.luistudio.reservas.model.PabellonEntity;
 import com.luistudio.reservas.model.ReservationEntity;
 import com.luistudio.reservas.model.RoomEntity;
+import com.luistudio.reservas.model.RoomState;
 import com.luistudio.reservas.repository.MaintenanceRepository;
 import com.luistudio.reservas.repository.PabellonRepository;
 import com.luistudio.reservas.repository.ReservationRepository;
@@ -14,6 +15,9 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -46,13 +50,20 @@ public class CampusMapService {
         List<MaintenanceEntity> activeMaintenances = maintenanceRepository.findActiveAt(OffsetDateTime.now());
 
         List<PabellonEntity> pabellones = pabellonRepository.findAll();
+        List<RoomEntity> rooms = roomRepository.findByEstadoNot(RoomState.INACTIVA);
+        Set<Long> occupiedRoomIds = activeNow.stream()
+            .map(reservation -> reservation.getSala().getId())
+            .collect(Collectors.toSet());
+        Set<Long> maintenanceRoomIds = activeMaintenances.stream()
+            .map(maintenance -> maintenance.getSala().getId())
+            .collect(Collectors.toSet());
+        Map<Long, List<RoomEntity>> roomsByBuilding = rooms.stream()
+            .filter(room -> room.getPabellon() != null)
+            .collect(Collectors.groupingBy(room -> room.getPabellon().getId()));
 
         List<CampusMapResponse.PabellonMapItem> mapped = pabellones.stream().map(p -> {
-            List<CampusMapResponse.RoomMapItem> rooms = roomRepository.findByPabellonAndEstadoNot(
-                p,
-                com.luistudio.reservas.model.RoomState.INACTIVA
-            ).stream().map(room -> {
-                String status = resolveStatus(room, activeNow, activeMaintenances);
+            List<CampusMapResponse.RoomMapItem> buildingRooms = roomsByBuilding.getOrDefault(p.getId(), List.of()).stream().map(room -> {
+                String status = resolveStatus(room, occupiedRoomIds, maintenanceRoomIds);
                 return new CampusMapResponse.RoomMapItem(
                     room.getId(),
                     room.getCodigo(),
@@ -63,19 +74,17 @@ public class CampusMapService {
                 );
             }).toList();
 
-            return new CampusMapResponse.PabellonMapItem(p.getCodigo(), p.getNombre(), rooms);
+            return new CampusMapResponse.PabellonMapItem(p.getCodigo(), p.getNombre(), buildingRooms);
         }).toList();
 
         return new CampusMapResponse(mapped);
     }
 
-    private String resolveStatus(RoomEntity room, List<ReservationEntity> activeNow, List<MaintenanceEntity> activeMaintenances) {
-        boolean inMaintenance = activeMaintenances.stream().anyMatch(m -> m.getSala().getId().equals(room.getId()));
-        if (inMaintenance) {
+    private String resolveStatus(RoomEntity room, Set<Long> occupiedRoomIds, Set<Long> maintenanceRoomIds) {
+        if (maintenanceRoomIds.contains(room.getId())) {
             return "mantenimiento";
         }
 
-        boolean occupied = activeNow.stream().anyMatch(r -> r.getSala().getId().equals(room.getId()));
-        return occupied ? "ocupada" : "libre";
+        return occupiedRoomIds.contains(room.getId()) ? "ocupada" : "libre";
     }
 }

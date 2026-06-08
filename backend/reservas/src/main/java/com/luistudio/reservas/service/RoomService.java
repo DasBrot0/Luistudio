@@ -3,6 +3,7 @@ package com.luistudio.reservas.service;
 import com.luistudio.reservas.dto.room.MaintenanceRequest;
 import com.luistudio.reservas.dto.room.MaintenanceResponse;
 import com.luistudio.reservas.dto.room.RoomResponse;
+import com.luistudio.reservas.dto.common.PageResponse;
 import com.luistudio.reservas.dto.room.RoomUpsertRequest;
 import com.luistudio.reservas.exception.BusinessException;
 import com.luistudio.reservas.exception.NotFoundException;
@@ -20,6 +21,9 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.OffsetDateTime;
 import java.util.List;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -53,15 +57,40 @@ public class RoomService {
     }
 
     @Transactional(readOnly = true)
-    public List<RoomResponse> listRooms(String campus, String venue, String location, String query) {
-        List<RoomEntity> rooms = roomRepository.searchActiveRooms(campus, venue, location, query, RoomState.INACTIVA);
-        return rooms.stream().map(this::toRoomResponse).toList();
+    public PageResponse<RoomResponse> listRooms(
+        int page,
+        int size,
+        boolean includeSchedule,
+        String campus,
+        String venue,
+        String location,
+        String query
+    ) {
+        int safePage = Math.max(page, 0);
+        int safeSize = Math.min(Math.max(size, 1), 50);
+        PageRequest pageRequest = PageRequest.of(safePage, safeSize, Sort.by(Sort.Direction.ASC, "codigo"));
+        Page<RoomEntity> roomPage = roomRepository.searchActiveRooms(
+            campus,
+            venue,
+            location,
+            query,
+            RoomState.INACTIVA,
+            pageRequest
+        );
+
+        return new PageResponse<>(
+            roomPage.getContent().stream().map(room -> toRoomResponse(room, includeSchedule)).toList(),
+            roomPage.getNumber(),
+            roomPage.getSize(),
+            roomPage.getTotalElements(),
+            roomPage.getTotalPages()
+        );
     }
 
     @Transactional(readOnly = true)
     public List<RoomResponse> listAvailableRooms(LocalDate date, LocalTime start, LocalTime end) {
         List<RoomEntity> rooms = roomRepository.findByEstadoNot(RoomState.INACTIVA);
-        return rooms.stream().filter(room -> isRoomAvailable(room, date, start, end, null)).map(this::toRoomResponse).toList();
+        return rooms.stream().filter(room -> isRoomAvailable(room, date, start, end, null)).map(room -> toRoomResponse(room, true)).toList();
     }
 
     @Transactional
@@ -86,7 +115,7 @@ public class RoomService {
         );
         RoomEntity saved = roomRepository.save(room);
         roomScheduleService.saveRoomSchedule(saved, request.schedule());
-        return toRoomResponse(saved);
+        return toRoomResponse(saved, true);
     }
 
     @Transactional
@@ -109,7 +138,7 @@ public class RoomService {
         room.setEstado(requestedStatus);
         RoomEntity saved = roomRepository.save(room);
         roomScheduleService.saveRoomSchedule(saved, request.schedule());
-        return toRoomResponse(saved);
+        return toRoomResponse(saved, true);
     }
 
     @Transactional
@@ -185,8 +214,9 @@ public class RoomService {
         return prefix + "-" + String.format("%04d", seed);
     }
 
-    private RoomResponse toRoomResponse(RoomEntity room) {
+    private RoomResponse toRoomResponse(RoomEntity room, boolean includeSchedule) {
         RoomResponse base = dtoMapper.toRoom(room);
+        int slotMinutes = includeSchedule ? roomScheduleService.getCampusSlotMinutes(room.getCampus()) : 0;
         return new RoomResponse(
             base.id(),
             base.code(),
@@ -201,8 +231,8 @@ public class RoomService {
             base.minPeople(),
             base.minPeopleRequired(),
             base.maxPeople(),
-            roomScheduleService.getCampusSlotMinutes(room.getCampus()),
-            roomScheduleService.getEffectiveWeeklySchedule(room),
+            slotMinutes,
+            includeSchedule ? roomScheduleService.getEffectiveWeeklySchedule(room) : List.of(),
             base.status(),
             base.pabellonCode()
         );

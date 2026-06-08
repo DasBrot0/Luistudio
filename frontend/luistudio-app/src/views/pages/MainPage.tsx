@@ -538,6 +538,7 @@ export function MainPage() {
   const [adminDateQuickFilter, setAdminDateQuickFilter] = useState<'none' | 'today' | 'week'>('none')
   const [adminSort, setAdminSort] = useState('date:desc')
   const [adminPage, setAdminPage] = useState(1)
+  const [adminTotalPages, setAdminTotalPages] = useState(1)
   const [profilesQuery, setProfilesQuery] = useState('')
   const [profilesYearFilter, setProfilesYearFilter] = useState('')
   const [profilesStatusFilter, setProfilesStatusFilter] = useState<'Todos' | 'Habilitado' | 'Deshabilitado' | 'Bloqueado'>('Todos')
@@ -645,9 +646,8 @@ export function MainPage() {
         return `${b.date} ${b.start}`.localeCompare(`${a.date} ${a.start}`)
       })
   }, [activeRooms, adminCampusFilter, adminDateFilter, adminDateQuickFilter, adminSearchQuery, adminSort, adminStatusFilter, bookings])
-  const pageSize = 5
-  const totalAdminPages = Math.max(1, Math.ceil(adminBookings.length / pageSize))
-  const adminBookingsPage = adminBookings.slice((adminPage - 1) * pageSize, adminPage * pageSize)
+  const totalAdminPages = adminTotalPages
+  const adminBookingsPage = adminBookings
   const filteredRooms = useMemo(() => {
     return roomDirectory.filter((room) => {
       const normalizedQuery = roomSearchQuery.trim().toLowerCase()
@@ -814,25 +814,32 @@ export function MainPage() {
   }
 
   const loadRooms = async (authToken: string) => {
-    const result = await api.getRooms(authToken)
-    const mapped = result.map(toUiRoom)
+    const result = await api.getRooms(authToken, { size: 50, includeSchedule: false })
+    const mapped = result.content.map(toUiRoom)
     setRooms(mapped)
     setRoomDirectory(mapped)
   }
 
   const loadRoomDirectory = async (authToken: string) => {
-    const result = await api.getRooms(authToken)
-    setRoomDirectory(result.map(toUiRoom))
+    const result = await api.getRooms(authToken, { size: 50, includeSchedule: false })
+    setRoomDirectory(result.content.map(toUiRoom))
   }
 
   const loadMyBookings = async (authToken: string) => {
     const result = await api.getBookingsMe(authToken)
-    setBookings(dedupeBookingsByIdentity(result.map(toUiBooking)))
+    setBookings(dedupeBookingsByIdentity(result.content.map(toUiBooking)))
   }
 
   const loadAdminBookings = async (authToken: string) => {
-    const result = await api.getAdminBookings(authToken, adminPage, adminStatusFilter, adminDateFilter)
+    const effectiveDate =
+      adminDateQuickFilter === 'today'
+        ? getTodayIso()
+        : adminDateQuickFilter === 'none'
+          ? adminDateFilter
+          : ''
+    const result = await api.getAdminBookings(authToken, adminPage, adminStatusFilter, effectiveDate)
     setBookings(dedupeBookingsByIdentity(result.content.map(toUiBooking)))
+    setAdminTotalPages(Math.max(1, result.totalPages))
   }
 
   const loadAdminConfig = async (authToken: string) => {
@@ -881,20 +888,37 @@ export function MainPage() {
     setRoomBookingsWindow(result.map(toUiBooking))
   }
 
-  const bootstrap = async (authToken: string, user: AuthUser) => {
-    await loadRooms(authToken)
-    const landingRoute = await loadUserPreferences(authToken, user)
+  const loadInitialDataForRoute = async (authToken: string, user: AuthUser, targetRoute: RouteKey) => {
     if (user.role === 'admin') {
-      await Promise.all([
-        loadAdminBookings(authToken),
-        loadAdminConfig(authToken),
-        loadProfiles(authToken),
-        loadCampusSchedules(authToken),
-      ])
-    } else {
-      await loadMyBookings(authToken)
+      if (targetRoute === 'salas') {
+        await loadRoomDirectory(authToken)
+        return
+      }
+      if (targetRoute === 'perfiles') {
+        await loadProfiles(authToken)
+        return
+      }
+      if (targetRoute === 'admin-reservas') {
+        await Promise.all([
+          loadAdminBookings(authToken),
+          loadAdminConfig(authToken),
+          loadCampusSchedules(authToken),
+          loadRoomDirectory(authToken),
+        ])
+      }
+      return
     }
-    return landingRoute
+
+    if (targetRoute === 'misreservas') {
+      await Promise.all([
+        loadMyBookings(authToken),
+        loadRooms(authToken),
+      ])
+      return
+    }
+    if (targetRoute === 'reservas') {
+      await loadRooms(authToken)
+    }
   }
 
   const loadUserPreferences = async (authToken: string, user: AuthUser) => {
@@ -1096,7 +1120,12 @@ export function MainPage() {
         setAuthenticatedUser(user)
         setToken('session')
         setHasStoredSession(true)
-        bootstrap('session', user).catch(() => undefined)
+        loadUserPreferences('session', user)
+          .then((landingRoute) => {
+            navigateToRoute(landingRoute, { replace: true })
+            return loadInitialDataForRoute('session', user, landingRoute)
+          })
+          .catch(() => undefined)
       })
       .catch(() => {
         clearSessionHint()
@@ -1107,23 +1136,23 @@ export function MainPage() {
   }, [authenticatedUser, hasStoredSession])
 
   useEffect(() => {
-    if (!token || authenticatedUser?.role !== 'admin') return
+    if (!token || authenticatedUser?.role !== 'admin' || effectiveRoute !== 'admin-reservas') return
     loadAdminBookings(token).catch((error) => {
       const message = error instanceof Error ? error.message : 'No se pudieron cargar las reservas registradas.'
       setToastMessage(message)
     })
-  }, [adminPage, adminCampusFilter, adminSearchQuery, adminStatusFilter, adminDateFilter, token, authenticatedUser])
+  }, [adminPage, adminCampusFilter, adminSearchQuery, adminStatusFilter, adminDateFilter, adminDateQuickFilter, token, authenticatedUser, effectiveRoute])
 
   useEffect(() => {
-    if (!token || authenticatedUser?.role !== 'admin') return
+    if (!token || authenticatedUser?.role !== 'admin' || !['salas', 'admin-reservas'].includes(effectiveRoute)) return
     loadRoomDirectory(token).catch((error) => {
       const message = error instanceof Error ? error.message : 'No se pudo cargar el directorio de salas.'
       setToastMessage(message)
     })
-  }, [authenticatedUser, token])
+  }, [authenticatedUser, token, effectiveRoute])
 
   useEffect(() => {
-    if (!token || authenticatedUser?.role !== 'admin') return
+    if (!token || authenticatedUser?.role !== 'admin' || effectiveRoute !== 'perfiles') return
     loadProfiles(token).catch((error) => {
       const message = error instanceof Error ? error.message : 'No se pudieron cargar los perfiles.'
       setToastMessage(message)
@@ -1137,6 +1166,7 @@ export function MainPage() {
     profilesSortDir,
     token,
     authenticatedUser,
+    effectiveRoute,
   ])
 
   useEffect(() => {
@@ -1205,8 +1235,12 @@ export function MainPage() {
       setToken('session')
       persistSessionHint(rememberMe)
       setHasStoredSession(true)
-      const landingRoute = await bootstrap('session', user)
+      const landingRoute = await loadUserPreferences('session', user)
       navigateToRoute(landingRoute)
+      loadInitialDataForRoute('session', user, landingRoute).catch((error) => {
+        const message = error instanceof Error ? error.message : 'No se pudieron cargar los datos iniciales.'
+        setToastMessage(message)
+      })
     } catch (error) {
       setLoginError(error instanceof Error ? error.message : 'Error al iniciar sesión')
     }
@@ -1267,8 +1301,12 @@ export function MainPage() {
       setHasStoredSession(true)
       setShowTwoFactorModal(false)
       setTwoFactorCode('')
-      const landingRoute = await bootstrap('session', user)
+      const landingRoute = await loadUserPreferences('session', user)
       navigateToRoute(landingRoute)
+      loadInitialDataForRoute('session', user, landingRoute).catch((error) => {
+        const message = error instanceof Error ? error.message : 'No se pudieron cargar los datos iniciales.'
+        setToastMessage(message)
+      })
     } catch (error) {
       setTwoFactorError(error instanceof Error ? error.message : 'No se pudo verificar el código 2FA.')
     }

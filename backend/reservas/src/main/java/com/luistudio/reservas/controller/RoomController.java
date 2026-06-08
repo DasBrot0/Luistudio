@@ -1,6 +1,7 @@
 package com.luistudio.reservas.controller;
 
 import com.luistudio.reservas.dto.booking.BookingResponse;
+import com.luistudio.reservas.dto.common.PageResponse;
 import com.luistudio.reservas.dto.room.MaintenanceRequest;
 import com.luistudio.reservas.dto.room.MaintenanceResponse;
 import com.luistudio.reservas.dto.room.RoomResponse;
@@ -39,14 +40,17 @@ public class RoomController {
     }
 
     @GetMapping
-    public List<RoomResponse> listRooms(
+    public PageResponse<RoomResponse> listRooms(
+        @RequestParam(defaultValue = "0") int page,
+        @RequestParam(defaultValue = "50") int size,
+        @RequestParam(defaultValue = "false") boolean includeSchedule,
         @RequestParam(required = false) String campus,
         @RequestParam(required = false) String recinto,
         @RequestParam(required = false) String ubicacion,
         @RequestParam(required = false, name = "q") String query
     ) {
         accessGuard.requireUser();
-        return roomService.listRooms(campus, recinto, ubicacion, query);
+        return roomService.listRooms(page, size, includeSchedule, campus, recinto, ubicacion, query);
     }
 
     @GetMapping("/available")

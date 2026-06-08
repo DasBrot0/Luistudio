@@ -150,12 +150,21 @@ public class BookingService {
     }
 
     @Transactional(readOnly = true)
-    public List<BookingResponse> listMyBookings(Long userId) {
+    public PageResponse<BookingResponse> listMyBookings(Long userId, int page, int size) {
         UserEntity user = userService.getById(userId);
-        return reservationRepository.findByUsuarioOrderByFechaDescHoraInicioDesc(user)
-            .stream()
-            .map(dtoMapper::toBooking)
-            .toList();
+        int safePage = Math.max(page, 0);
+        int safeSize = Math.min(Math.max(size, 1), 50);
+        Page<ReservationEntity> bookingPage = reservationRepository.findByUsuarioOrderByFechaDescHoraInicioDesc(
+            user,
+            PageRequest.of(safePage, safeSize)
+        );
+        return new PageResponse<>(
+            bookingPage.getContent().stream().map(dtoMapper::toBooking).toList(),
+            bookingPage.getNumber(),
+            bookingPage.getSize(),
+            bookingPage.getTotalElements(),
+            bookingPage.getTotalPages()
+        );
     }
 
     @Transactional(readOnly = true)
@@ -175,6 +184,8 @@ public class BookingService {
 
     @Transactional(readOnly = true)
     public PageResponse<BookingResponse> listAdminBookings(int page, int size, String status, LocalDate date) {
+        int safePage = Math.max(page, 0);
+        int safeSize = Math.min(Math.max(size, 1), 50);
         ReservationStatus parsedStatus = null;
         if (status != null && !status.isBlank()) {
             parsedStatus = ReservationStatus.valueOf(status.toUpperCase());
@@ -182,13 +193,13 @@ public class BookingService {
 
         Page<ReservationEntity> bookingPage;
         if (parsedStatus != null && date != null) {
-            bookingPage = reservationRepository.findByEstadoAndFechaOrderByHoraInicioDesc(parsedStatus, date, PageRequest.of(page, size));
+            bookingPage = reservationRepository.findByEstadoAndFechaOrderByHoraInicioDesc(parsedStatus, date, PageRequest.of(safePage, safeSize));
         } else if (parsedStatus != null) {
-            bookingPage = reservationRepository.findByEstadoOrderByFechaDescHoraInicioDesc(parsedStatus, PageRequest.of(page, size));
+            bookingPage = reservationRepository.findByEstadoOrderByFechaDescHoraInicioDesc(parsedStatus, PageRequest.of(safePage, safeSize));
         } else if (date != null) {
-            bookingPage = reservationRepository.findByFechaOrderByHoraInicioDesc(date, PageRequest.of(page, size));
+            bookingPage = reservationRepository.findByFechaOrderByHoraInicioDesc(date, PageRequest.of(safePage, safeSize));
         } else {
-            bookingPage = reservationRepository.findAllByOrderByFechaDescHoraInicioDesc(PageRequest.of(page, size));
+            bookingPage = reservationRepository.findAllByOrderByFechaDescHoraInicioDesc(PageRequest.of(safePage, safeSize));
         }
         return new PageResponse<>(
             bookingPage.getContent().stream().map(dtoMapper::toBooking).toList(),

@@ -4,6 +4,7 @@ import com.luistudio.reservas.model.MaintenanceEntity;
 import com.luistudio.reservas.model.RoomEntity;
 import java.time.OffsetDateTime;
 import java.util.List;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -23,6 +24,7 @@ public interface MaintenanceRepository extends JpaRepository<MaintenanceEntity, 
         @Param("toTime") OffsetDateTime toTime
     );
 
+    @EntityGraph(attributePaths = "sala")
     @Query("""
         SELECT m FROM MaintenanceEntity m
         WHERE m.inicio <= :nowValue AND m.fin >= :nowValue
