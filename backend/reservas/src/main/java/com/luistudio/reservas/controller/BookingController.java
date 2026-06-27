@@ -9,7 +9,6 @@ import com.luistudio.reservas.service.AccessGuard;
 import com.luistudio.reservas.service.BookingService;
 import jakarta.validation.Valid;
 import java.time.LocalDate;
-import java.util.List;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;

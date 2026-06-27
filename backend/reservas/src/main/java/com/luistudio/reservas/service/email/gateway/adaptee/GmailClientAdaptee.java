@@ -13,7 +13,6 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.client.RestClient;
 import jakarta.mail.internet.MimeUtility;
 import java.io.UnsupportedEncodingException;
-import java.nio.charset.StandardCharsets;
 
 @Component
 public class GmailClientAdaptee {
