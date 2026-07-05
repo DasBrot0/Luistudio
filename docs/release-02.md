@@ -1,9 +1,5 @@
 # Release 02 – Sprints 5 y 6
 
-Documento ajustado para incluir únicamente historias de usuario pendientes o incompletas al cierre del Release 1.
-
----
-
 ## Tabla de historias del Release 2
 
 | ID     | Épica                 | Historia de usuario                                                                                                                                                                 | Criterios de aceptación (Definición de Listo / QA)                                                                                                                                                                                                 | Sprint   |
