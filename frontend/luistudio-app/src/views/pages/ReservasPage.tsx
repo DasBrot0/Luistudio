@@ -3,6 +3,16 @@ import type { FormEvent } from 'react'
 import { AppHeader } from '../components/layout/AppHeader'
 import type { AuthUser, Booking, ReservationCompanion, ReservationForm, Room } from '../../models/types'
 
+export interface AvailabilitySubscription {
+  id: number
+  roomId: number
+  roomName: string
+  targetDate: string
+  startTime: string
+  endTime: string
+  status: string
+}
+
 interface ReservasPageProps {
   reservationForm: ReservationForm
   reservationError: string
@@ -15,6 +25,7 @@ interface ReservasPageProps {
   currentUser: AuthUser | null
   companions: ReservationCompanion[]
   companionCodeInput: string
+  mySubscriptions: AvailabilitySubscription[]
   onReservationChange: (next: ReservationForm) => void
   onAddCompanion: () => void
   onCompanionCodeInputChange: (value: string) => void
@@ -22,6 +33,8 @@ interface ReservasPageProps {
   onWeekOffsetChange: (value: number) => void
   onClearReservationForm: () => void
   onSubmitReservation: (event: FormEvent<HTMLFormElement>) => void
+  onSubscribeToSlot: (roomId: number, date: string, start: string, end: string) => void
+  onUnsubscribeFromSlot: (subscriptionId: number) => void
 }
 
 interface CalendarDay {
@@ -141,6 +154,7 @@ export function ReservasPage({
   currentUser,
   companions,
   companionCodeInput,
+  mySubscriptions,
   onReservationChange,
   onAddCompanion,
   onCompanionCodeInputChange,
@@ -148,6 +162,8 @@ export function ReservasPage({
   onWeekOffsetChange,
   onClearReservationForm,
   onSubmitReservation,
+  onSubscribeToSlot,
+  onUnsubscribeFromSlot,
 }: ReservasPageProps) {
   const roomsByCampus = useMemo(
     () => activeRooms.filter((room) => room.campusLabel === reservationForm.campus),
@@ -510,6 +526,37 @@ export function ReservasPage({
                           const occupied = overlapsBooking(day.isoDate, slot, slotEnd)
                           const selected = reservationForm.date === day.isoDate && reservationForm.start === slot
                           const disabled = blockedBySchedule || occupied
+
+                          if (occupied && selectedRoom) {
+                            const existingSub = mySubscriptions.find(
+                              (s) =>
+                                s.roomId === selectedRoom.backendId &&
+                                s.targetDate === day.isoDate &&
+                                s.startTime === slot &&
+                                s.endTime === slotEnd,
+                            )
+                            return (
+                              <td key={`${day.isoDate}-${slot}`}>
+                                <button
+                                  type="button"
+                                  className={`calendar-cell-btn blocked calendar-cell-btn-notify ${existingSub ? 'subscribed' : ''}`}
+                                  title={existingSub ? 'Cancelar aviso de disponibilidad' : 'Avisarme cuando esté disponible'}
+                                  aria-label={existingSub ? `Cancelar suscripción ${day.weekdayLabel} ${day.dateLabel} ${slot}` : `Suscribirse a disponibilidad ${day.weekdayLabel} ${day.dateLabel} ${slot}`}
+                                  onClick={() => {
+                                    if (existingSub) {
+                                      onUnsubscribeFromSlot(existingSub.id)
+                                    } else {
+                                      onSubscribeToSlot(selectedRoom.backendId, day.isoDate, slot, slotEnd)
+                                    }
+                                  }}
+                                >
+                                  <span className="calendar-cell-notify-icon" aria-hidden="true">
+                                    {existingSub ? '🔔' : '🔕'}
+                                  </span>
+                                </button>
+                              </td>
+                            )
+                          }
 
                           return (
                             <td key={`${day.isoDate}-${slot}`}>

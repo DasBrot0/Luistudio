@@ -21,11 +21,19 @@ import type {
 import { buildPabellonCode, getDefaultReservationForm, minutesBetween } from '../../utils/helpers'
 import { LoginPage } from './LoginPage'
 import { ResetPasswordPage } from './ResetPasswordPage'
+import { ConfirmSensitiveChangePage } from './ConfirmSensitiveChangePage'
 import { ReservasPage } from './ReservasPage'
+import type { AvailabilitySubscription } from './ReservasPage'
 import { MisReservasPage } from './MisReservasPage'
 import { SalasPage } from './SalasPage'
 import { PerfilesPage } from './PerfilesPage'
 import { AdminReservasPage } from './AdminReservasPage'
+import { ProfilePage } from './ProfilePage'
+import type { SessionItem, ActivityItem } from './ProfilePage'
+import { SecurityPage } from './SecurityPage'
+import type { LoginAttemptItem } from './SecurityPage'
+import { ComunicadosPage } from './ComunicadosPage'
+import type { AnnouncementItem } from './ComunicadosPage'
 import { BookingSuccessModal } from '../components/modals/BookingSuccessModal'
 import { EditBookingModal } from '../components/modals/EditBookingModal'
 import { RoomFormModal } from '../components/modals/RoomFormModal'
@@ -50,6 +58,7 @@ type NotificationPreferenceKey =
   | 'BOOKING_CANCELLATION'
   | 'BOOKING_REMINDER'
   | 'ROOM_MAINTENANCE'
+  | 'ROOM_AVAILABLE'
   | 'PROFILE_STATUS'
 
 type NotificationChannelSettings = { app: boolean; email: boolean }
@@ -545,6 +554,19 @@ export function MainPage() {
   const [profilesSortBy, setProfilesSortBy] = useState('firstName')
   const [profilesSortDir, setProfilesSortDir] = useState<'asc' | 'desc'>('asc')
 
+  const [securityAttempts, setSecurityAttempts] = useState<LoginAttemptItem[]>([])
+  const [securityLoading, setSecurityLoading] = useState(false)
+  const [securityEmailFilter, setSecurityEmailFilter] = useState('')
+  const [securityStatusFilter, setSecurityStatusFilter] = useState<'todos' | 'fallido' | 'exitoso'>('todos')
+  const [securityFromFilter, setSecurityFromFilter] = useState('')
+  const [securityToFilter, setSecurityToFilter] = useState('')
+  const [securityPage, setSecurityPage] = useState(1)
+  const [securityTotalPages, setSecurityTotalPages] = useState(1)
+  const [securityTotalElements, setSecurityTotalElements] = useState(0)
+
+  const [announcements, setAnnouncements] = useState<AnnouncementItem[]>([])
+  const [announcementSending, setAnnouncementSending] = useState(false)
+
   const [toastMessage, setToastMessage] = useState('')
   const [modalMessage, setModalMessage] = useState<{ title: string; message: string; variant: 'error' | 'success' } | null>(null)
   const [pendingCancelBooking, setPendingCancelBooking] = useState<{ bookingId: string; actor: Role } | null>(null)
@@ -566,6 +588,13 @@ export function MainPage() {
   })
   const [loginLandingRoute, setLoginLandingRoute] = useState<RouteKey | null>(null)
   const [campusSchedules, setCampusSchedules] = useState<CampusSchedule[]>([])
+  const [mySubscriptions, setMySubscriptions] = useState<AvailabilitySubscription[]>([])
+
+  // ProfilePage state
+  const [profileSessions, setProfileSessions] = useState<SessionItem[]>([])
+  const [profileSessionsLoading, setProfileSessionsLoading] = useState(false)
+  const [profileActivity, setProfileActivity] = useState<ActivityItem[]>([])
+  const [profileActivityLoading, setProfileActivityLoading] = useState(false)
 
   const effectiveRoute = useMemo(
     () => resolveRouteByAuth(route, authenticatedUser, loginLandingRoute),
@@ -814,10 +843,29 @@ export function MainPage() {
   }
 
   const loadRooms = async (authToken: string) => {
-    const result = await api.getRooms(authToken, { size: 50, includeSchedule: false })
+    const result = await api.getRooms(authToken, { size: 50, includeSchedule: true })
     const mapped = result.content.map(toUiRoom)
     setRooms(mapped)
     setRoomDirectory(mapped)
+  }
+
+  const loadMySubscriptions = async (authToken: string) => {
+    try {
+      const result = await api.getMyAvailabilitySubscriptions(authToken)
+      setMySubscriptions(
+        result.subscriptions.map((s) => ({
+          id: s.id,
+          roomId: s.roomId,
+          roomName: s.roomName,
+          targetDate: s.targetDate,
+          startTime: s.startTime,
+          endTime: s.endTime,
+          status: s.status,
+        })),
+      )
+    } catch {
+      // non-critical, ignore
+    }
   }
 
   const loadRoomDirectory = async (authToken: string) => {
@@ -869,6 +917,50 @@ export function MainPage() {
     setProfilesTotalPages(Math.max(1, result.totalPages))
   }
 
+  const loadSecurityAttempts = async (authToken: string) => {
+    setSecurityLoading(true)
+    try {
+      const successParam = securityStatusFilter === 'todos' ? undefined : securityStatusFilter === 'exitoso'
+      const fromParam = securityFromFilter ? securityFromFilter + 'T00:00:00-05:00' : undefined
+      const toParam = securityToFilter ? securityToFilter + 'T23:59:59-05:00' : undefined
+      const result = await api.getLoginAttempts(
+        authToken,
+        { email: securityEmailFilter || undefined, from: fromParam, to: toParam, success: successParam },
+        securityPage - 1,
+        20,
+      )
+      setSecurityAttempts(result.content.map((a) => ({
+        id: a.id,
+        userId: a.userId,
+        userEmail: a.userEmail,
+        ip: a.ip,
+        userAgent: a.userAgent,
+        attemptedAt: a.attemptedAt,
+        success: a.success,
+        lockedUntil: a.lockedUntil,
+      })))
+      setSecurityTotalPages(Math.max(1, result.totalPages))
+      setSecurityTotalElements(result.totalElements)
+    } finally {
+      setSecurityLoading(false)
+    }
+  }
+
+  const handlePublishAnnouncement = async (title: string, content: string, announcementType: string) => {
+    if (!token) return
+    setAnnouncementSending(true)
+    try {
+      const result = await api.publishAnnouncement(token, { title, content, announcementType })
+      setAnnouncements((current) => [
+        { id: result.id, title: result.title, announcementType: result.announcementType, createdAt: result.createdAt, recipientCount: result.recipientCount },
+        ...current,
+      ])
+      pushNotification(`Comunicado "${result.title}" enviado a ${result.recipientCount} estudiante(s).`, 'BOOKING_CONFIRMATION')
+    } finally {
+      setAnnouncementSending(false)
+    }
+  }
+
   const toIsoDate = (date: Date) =>
     `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
 
@@ -905,6 +997,10 @@ export function MainPage() {
           loadCampusSchedules(authToken),
           loadRoomDirectory(authToken),
         ])
+        return
+      }
+      if (targetRoute === 'seguridad') {
+        await loadSecurityAttempts(authToken)
       }
       return
     }
@@ -913,11 +1009,12 @@ export function MainPage() {
       await Promise.all([
         loadMyBookings(authToken),
         loadRooms(authToken),
+        loadMySubscriptions(authToken),
       ])
       return
     }
     if (targetRoute === 'reservas') {
-      await loadRooms(authToken)
+      await Promise.all([loadRooms(authToken), loadMySubscriptions(authToken)])
     }
   }
 
@@ -986,7 +1083,7 @@ export function MainPage() {
   useEffect(() => {
     const expectedPath = routePaths[effectiveRoute]
     if (route === 'login' && authenticatedUser && !preferencesLoaded) return
-    if (!authHydrated && route !== 'login' && route !== 'reset-password') return
+    if (!authHydrated && route !== 'login' && route !== 'reset-password' && route !== 'confirm-change') return
     if (location.pathname !== expectedPath) navigate(expectedPath, { replace: true })
   }, [authHydrated, effectiveRoute, route, authenticatedUser, preferencesLoaded, location.pathname, navigate])
 
@@ -1184,6 +1281,23 @@ export function MainPage() {
     profilesStatusFilter,
     profilesSortBy,
     profilesSortDir,
+    token,
+    authenticatedUser,
+    effectiveRoute,
+  ])
+
+  useEffect(() => {
+    if (!token || authenticatedUser?.role !== 'admin' || effectiveRoute !== 'seguridad') return
+    loadSecurityAttempts(token).catch((error) => {
+      const message = error instanceof Error ? error.message : 'No se pudo cargar el historial de seguridad.'
+      setToastMessage(message)
+    })
+  }, [
+    securityPage,
+    securityEmailFilter,
+    securityStatusFilter,
+    securityFromFilter,
+    securityToFilter,
     token,
     authenticatedUser,
     effectiveRoute,
@@ -1963,20 +2077,61 @@ export function MainPage() {
     }
   }
 
+  useEffect(() => {
+    if (effectiveRoute !== 'profile' || !token) return
+    setProfileSessionsLoading(true)
+    api.getSessions(token)
+      .then((data) => setProfileSessions(data.sessions))
+      .catch(() => {})
+      .finally(() => setProfileSessionsLoading(false))
+    setProfileActivityLoading(true)
+    api.getMyActivity(token)
+      .then((data) => setProfileActivity(data.content))
+      .catch(() => {})
+      .finally(() => setProfileActivityLoading(false))
+  }, [effectiveRoute, token])
+
   const roomBookingsForSelectedRoom = useMemo(
     () => roomBookingsWindow.filter((booking) => booking.roomId === reservationForm.roomId),
     [roomBookingsWindow, reservationForm.roomId],
   )
 
+  const handleSubscribeToSlot = async (roomId: number, date: string, start: string, end: string) => {
+    if (!token) return
+    try {
+      await api.subscribeToRoom(token, roomId, date, start, end)
+      await loadMySubscriptions(token)
+      pushNotification('Te avisaremos cuando el horario quede disponible.', 'ROOM_AVAILABLE')
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'No se pudo registrar la suscripción'
+      setModalMessage({ title: 'Error al suscribirse', message, variant: 'error' })
+    }
+  }
+
+  const handleUnsubscribeFromSlot = async (subscriptionId: number) => {
+    if (!token) return
+    try {
+      // find the roomId from the subscription
+      const sub = mySubscriptions.find((s) => s.id === subscriptionId)
+      if (!sub) return
+      await api.unsubscribeFromRoom(token, sub.roomId)
+      setMySubscriptions((current) => current.filter((s) => s.id !== subscriptionId))
+      pushNotification('Suscripción de disponibilidad cancelada.', 'ROOM_AVAILABLE')
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'No se pudo cancelar la suscripción'
+      setModalMessage({ title: 'Error al cancelar suscripción', message, variant: 'error' })
+    }
+  }
+
   const showGlobalTopbar =
-    Boolean(authenticatedUser) && effectiveRoute !== 'login' && effectiveRoute !== 'reset-password'
+    Boolean(authenticatedUser) && effectiveRoute !== 'login' && effectiveRoute !== 'reset-password' && effectiveRoute !== 'confirm-change'
   const contentOffsetClass = showGlobalTopbar
     ? isSidebarCollapsed
       ? 'md:pl-24'
       : 'md:pl-64'
     : ''
   const mobileNavPaddingClass = showGlobalTopbar ? 'pt-16 md:pt-0 pb-20 md:pb-0' : ''
-  const shouldShowAuthRestoreScreen = hasStoredSession && !authHydrated && route !== 'reset-password'
+  const shouldShowAuthRestoreScreen = hasStoredSession && !authHydrated && route !== 'reset-password' && route !== 'confirm-change'
   const settingsRole = authenticatedUser?.role ?? 'student'
   const settingsNotificationOptions = notificationPreferenceOptions(settingsRole)
   const settingsNotificationGroups = settingsNotificationOptions.reduce<Record<string, NotificationPreferenceOption[]>>((acc, option) => {
@@ -1997,6 +2152,7 @@ export function MainPage() {
           {showGlobalTopbar && authenticatedUser && (
             <GlobalTopbar
               role={authenticatedUser.role}
+              user={authenticatedUser}
               activeRoute={effectiveRoute}
               notifications={notifications}
               isSidebarCollapsed={isSidebarCollapsed}
@@ -2041,6 +2197,9 @@ export function MainPage() {
                 onBackToLogin={() => navigateToRoute('login')}
               />
             )}
+            {effectiveRoute === 'confirm-change' && (
+              <ConfirmSensitiveChangePage />
+            )}
             {effectiveRoute === 'reservas' && (
               <ReservasPage
                 reservationForm={reservationForm}
@@ -2056,6 +2215,7 @@ export function MainPage() {
                 currentUser={authenticatedUser}
                 companions={reservationCompanions}
                 companionCodeInput={reservationCompanionCodeInput}
+                mySubscriptions={mySubscriptions}
                 onCompanionCodeInputChange={setReservationCompanionCodeInput}
                 onRemoveCompanion={handleRemoveReservationCompanion}
                 onWeekOffsetChange={setReservationWeekOffset}
@@ -2065,16 +2225,85 @@ export function MainPage() {
                   setReservationCompanionCodeInput('')
                 }}
                 onSubmitReservation={handleCreateReservation}
+                onSubscribeToSlot={handleSubscribeToSlot}
+                onUnsubscribeFromSlot={handleUnsubscribeFromSlot}
               />
             )}
             {effectiveRoute === 'misreservas' && (
               <MisReservasPage
                 myBookings={myBookings}
                 activeRooms={activeRooms}
+                mySubscriptions={mySubscriptions}
                 onEditBooking={openEditBooking}
                 onCancelBooking={(bookingId) => requestCancelBooking(bookingId, 'student')}
                 onCreateFirstReservation={() => navigateToRoute('reservas')}
                 onDownloadIcs={downloadBookingIcs}
+                onUnsubscribeFromSlot={handleUnsubscribeFromSlot}
+              />
+            )}
+            {effectiveRoute === 'profile' && authenticatedUser && (
+              <ProfilePage
+                user={authenticatedUser}
+                sessions={profileSessions}
+                sessionsLoading={profileSessionsLoading}
+                activity={profileActivity}
+                activityLoading={profileActivityLoading}
+                onRevokeSession={async (sessionId) => {
+                  if (!token) return
+                  try {
+                    await api.revokeSession(token, sessionId)
+                    setProfileSessions((current) => current.filter((s) => s.id !== sessionId))
+                    setToastMessage('Sesión revocada')
+                  } catch {
+                    setModalMessage({ title: 'Error', message: 'No se pudo revocar la sesión', variant: 'error' })
+                  }
+                }}
+                onRevokeAllSessions={async () => {
+                  if (!token) return
+                  try {
+                    await api.revokeAllSessions(token)
+                    setProfileSessions([])
+                    setToastMessage('Todas las sesiones fueron revocadas')
+                  } catch {
+                    setModalMessage({ title: 'Error', message: 'No se pudo revocar las sesiones', variant: 'error' })
+                  }
+                }}
+                onRequestChangePassword={async () => {
+                  if (!token) return
+                  try {
+                    await api.requestSensitiveChange(token, 'CHANGE_PASSWORD')
+                    setModalMessage({ title: 'Correo enviado', message: 'Revisa tu correo para confirmar el cambio de contraseña.', variant: 'success' })
+                  } catch {
+                    setModalMessage({ title: 'Error', message: 'No se pudo enviar el correo de confirmación', variant: 'error' })
+                  }
+                }}
+                onRequestDisable2fa={async () => {
+                  if (!token) return
+                  try {
+                    await api.requestSensitiveChange(token, 'DISABLE_2FA')
+                    setModalMessage({ title: 'Correo enviado', message: 'Revisa tu correo para confirmar la desactivación de 2FA.', variant: 'success' })
+                  } catch {
+                    setModalMessage({ title: 'Error', message: 'No se pudo enviar el correo de confirmación', variant: 'error' })
+                  }
+                }}
+                onRequestEnable2fa={async () => {
+                  if (!token) return
+                  try {
+                    await api.enroll2fa(token)
+                    setModalMessage({ title: 'Correo enviado', message: 'Revisa tu correo con el código para activar 2FA.', variant: 'success' })
+                  } catch {
+                    setModalMessage({ title: 'Error', message: 'No se pudo enviar el código', variant: 'error' })
+                  }
+                }}
+                onRequestRevokeAll={async () => {
+                  if (!token) return
+                  try {
+                    await api.requestSensitiveChange(token, 'REVOKE_ALL_SESSIONS')
+                    setModalMessage({ title: 'Correo enviado', message: 'Revisa tu correo para confirmar el cierre de todas las sesiones.', variant: 'success' })
+                  } catch {
+                    setModalMessage({ title: 'Error', message: 'No se pudo enviar el correo de confirmación', variant: 'error' })
+                  }
+                }}
               />
             )}
             {effectiveRoute === 'salas' && (
@@ -2229,6 +2458,39 @@ export function MainPage() {
                   )
                 }
                 onSaveCampusSchedule={saveCampusSchedule}
+              />
+            )}
+            {effectiveRoute === 'seguridad' && (
+              <SecurityPage
+                attempts={securityAttempts}
+                loading={securityLoading}
+                emailFilter={securityEmailFilter}
+                statusFilter={securityStatusFilter}
+                fromFilter={securityFromFilter}
+                toFilter={securityToFilter}
+                page={securityPage}
+                totalPages={securityTotalPages}
+                totalElements={securityTotalElements}
+                onEmailFilterChange={(value) => { setSecurityEmailFilter(value); setSecurityPage(1) }}
+                onStatusFilterChange={(value) => { setSecurityStatusFilter(value); setSecurityPage(1) }}
+                onFromFilterChange={(value) => { setSecurityFromFilter(value); setSecurityPage(1) }}
+                onToFilterChange={(value) => { setSecurityToFilter(value); setSecurityPage(1) }}
+                onPrevPage={() => setSecurityPage((current) => current - 1)}
+                onNextPage={() => setSecurityPage((current) => current + 1)}
+                onClearFilters={() => {
+                  setSecurityEmailFilter('')
+                  setSecurityStatusFilter('todos')
+                  setSecurityFromFilter('')
+                  setSecurityToFilter('')
+                  setSecurityPage(1)
+                }}
+              />
+            )}
+            {effectiveRoute === 'comunicados' && (
+              <ComunicadosPage
+                published={announcements}
+                sending={announcementSending}
+                onPublish={handlePublishAnnouncement}
               />
             )}
           </div>

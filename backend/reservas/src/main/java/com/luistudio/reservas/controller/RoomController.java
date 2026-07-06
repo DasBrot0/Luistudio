@@ -1,12 +1,17 @@
 package com.luistudio.reservas.controller;
 
 import com.luistudio.reservas.dto.booking.BookingResponse;
+import com.luistudio.reservas.dto.common.MessageResponse;
 import com.luistudio.reservas.dto.common.PageResponse;
+import com.luistudio.reservas.dto.room.AvailabilitySubscriptionRequest;
+import com.luistudio.reservas.dto.room.AvailabilitySubscriptionResponse;
 import com.luistudio.reservas.dto.room.MaintenanceRequest;
 import com.luistudio.reservas.dto.room.MaintenanceResponse;
 import com.luistudio.reservas.dto.room.RoomResponse;
 import com.luistudio.reservas.dto.room.RoomUpsertRequest;
+import com.luistudio.reservas.security.AuthPrincipal;
 import com.luistudio.reservas.service.AccessGuard;
+import com.luistudio.reservas.service.AvailabilitySubscriptionService;
 import com.luistudio.reservas.service.BookingService;
 import com.luistudio.reservas.service.RoomService;
 import jakarta.validation.Valid;
@@ -14,6 +19,7 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -32,11 +38,18 @@ public class RoomController {
     private final RoomService roomService;
     private final BookingService bookingService;
     private final AccessGuard accessGuard;
+    private final AvailabilitySubscriptionService subscriptionService;
 
-    public RoomController(RoomService roomService, BookingService bookingService, AccessGuard accessGuard) {
+    public RoomController(
+        RoomService roomService,
+        BookingService bookingService,
+        AccessGuard accessGuard,
+        AvailabilitySubscriptionService subscriptionService
+    ) {
         this.roomService = roomService;
         this.bookingService = bookingService;
         this.accessGuard = accessGuard;
+        this.subscriptionService = subscriptionService;
     }
 
     @GetMapping
@@ -110,5 +123,21 @@ public class RoomController {
     public List<MaintenanceResponse> listUnavailability(@PathVariable Long roomId) {
         accessGuard.requireUser();
         return roomService.getRoomUnavailability(roomId);
+    }
+
+    @PostMapping("/{roomId}/availability-subscriptions")
+    public AvailabilitySubscriptionResponse subscribeToRoom(
+        @PathVariable Long roomId,
+        @RequestBody AvailabilitySubscriptionRequest request
+    ) {
+        AuthPrincipal principal = accessGuard.requireUser();
+        return subscriptionService.subscribe(principal.userId(), roomId, request);
+    }
+
+    @DeleteMapping("/{roomId}/availability-subscriptions/me")
+    public ResponseEntity<MessageResponse> unsubscribeFromRoom(@PathVariable Long roomId) {
+        AuthPrincipal principal = accessGuard.requireUser();
+        subscriptionService.unsubscribe(principal.userId(), roomId);
+        return ResponseEntity.ok(new MessageResponse("Suscripción cancelada"));
     }
 }

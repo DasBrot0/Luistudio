@@ -2,22 +2,36 @@ package com.luistudio.reservas.controller;
 
 import com.luistudio.reservas.dto.admin.AdminConfigResponse;
 import com.luistudio.reservas.dto.admin.AdminConfigUpdateRequest;
+import com.luistudio.reservas.dto.admin.AnnouncementRequest;
+import com.luistudio.reservas.dto.admin.AnnouncementResponse;
 import com.luistudio.reservas.dto.admin.CampusScheduleListResponse;
 import com.luistudio.reservas.dto.admin.CampusMapResponse;
 import com.luistudio.reservas.dto.admin.CampusScheduleResponse;
 import com.luistudio.reservas.dto.admin.CampusScheduleUpdateRequest;
+import com.luistudio.reservas.dto.admin.LoginAttemptAdminResponse;
 import com.luistudio.reservas.dto.common.PageResponse;
 import com.luistudio.reservas.dto.user.UserResponse;
 import com.luistudio.reservas.dto.user.UserStatusUpdateRequest;
+import com.luistudio.reservas.model.LoginAttemptEntity;
+import com.luistudio.reservas.repository.LoginAttemptRepository;
 import com.luistudio.reservas.service.AccessGuard;
+import com.luistudio.reservas.service.AnnouncementService;
 import com.luistudio.reservas.service.CampusMapService;
 import com.luistudio.reservas.service.RoomScheduleService;
 import com.luistudio.reservas.service.SystemConfigService;
 import com.luistudio.reservas.service.UserService;
+import jakarta.persistence.criteria.Predicate;
 import jakarta.validation.Valid;
+import java.time.OffsetDateTime;
+import java.util.ArrayList;
+import java.util.List;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -33,19 +47,25 @@ public class AdminController {
     private final SystemConfigService systemConfigService;
     private final CampusMapService campusMapService;
     private final RoomScheduleService roomScheduleService;
+    private final LoginAttemptRepository loginAttemptRepository;
+    private final AnnouncementService announcementService;
 
     public AdminController(
         AccessGuard accessGuard,
         UserService userService,
         SystemConfigService systemConfigService,
         CampusMapService campusMapService,
-        RoomScheduleService roomScheduleService
+        RoomScheduleService roomScheduleService,
+        LoginAttemptRepository loginAttemptRepository,
+        AnnouncementService announcementService
     ) {
         this.accessGuard = accessGuard;
         this.userService = userService;
         this.systemConfigService = systemConfigService;
         this.campusMapService = campusMapService;
         this.roomScheduleService = roomScheduleService;
+        this.loginAttemptRepository = loginAttemptRepository;
+        this.announcementService = announcementService;
     }
 
     @GetMapping("/admin/users")
@@ -99,5 +119,69 @@ public class AdminController {
     public CampusScheduleResponse updateCampusSchedule(@Valid @RequestBody CampusScheduleUpdateRequest request) {
         accessGuard.requireAdmin();
         return roomScheduleService.updateCampusSchedule(request);
+    }
+
+    @GetMapping("/admin/security/login-attempts")
+    public PageResponse<LoginAttemptAdminResponse> getLoginAttempts(
+        @RequestParam(required = false) String email,
+        @RequestParam(required = false) String from,
+        @RequestParam(required = false) String to,
+        @RequestParam(required = false) Boolean success,
+        @RequestParam(defaultValue = "0") int page,
+        @RequestParam(defaultValue = "20") int size
+    ) {
+        accessGuard.requireAdmin();
+        int safePage = Math.max(page, 0);
+        int safeSize = Math.min(Math.max(size, 1), 50);
+        OffsetDateTime fromDt = from != null && !from.isBlank() ? OffsetDateTime.parse(from) : null;
+        OffsetDateTime toDt = to != null && !to.isBlank() ? OffsetDateTime.parse(to) : null;
+
+        Specification<LoginAttemptEntity> spec = (root, query, cb) -> {
+            List<Predicate> predicates = new ArrayList<>();
+            var usuario = root.join("usuario");
+            if (query != null && Long.class != query.getResultType()) {
+                root.fetch("usuario");
+            }
+            if (email != null && !email.isBlank()) {
+                predicates.add(cb.like(cb.lower(usuario.get("correo")), "%" + email.toLowerCase() + "%"));
+            }
+            if (fromDt != null) {
+                predicates.add(cb.greaterThanOrEqualTo(root.get("fechaIntento"), fromDt));
+            }
+            if (toDt != null) {
+                predicates.add(cb.lessThanOrEqualTo(root.get("fechaIntento"), toDt));
+            }
+            if (success != null) {
+                predicates.add(cb.equal(root.get("exito"), success));
+            }
+            if (query != null) {
+                query.orderBy(cb.desc(root.get("fechaIntento")));
+            }
+            return cb.and(predicates.toArray(new Predicate[0]));
+        };
+
+        Page<LoginAttemptEntity> result = loginAttemptRepository.findAll(spec, PageRequest.of(safePage, safeSize));
+        return new PageResponse<>(
+            result.getContent().stream().map(a -> new LoginAttemptAdminResponse(
+                a.getId(),
+                a.getUsuario().getId(),
+                a.getUsuario().getCorreo(),
+                a.getIpOrigen(),
+                a.getUserAgent(),
+                a.getFechaIntento(),
+                Boolean.TRUE.equals(a.getExito()),
+                a.getUsuario().getLockedUntil()
+            )).toList(),
+            result.getNumber(),
+            result.getSize(),
+            result.getTotalElements(),
+            result.getTotalPages()
+        );
+    }
+
+    @PostMapping("/admin/announcements")
+    public AnnouncementResponse publishAnnouncement(@Valid @RequestBody AnnouncementRequest request) {
+        var principal = accessGuard.requireAdmin();
+        return announcementService.publish(principal.userId(), request);
     }
 }

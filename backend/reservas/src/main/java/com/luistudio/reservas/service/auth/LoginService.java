@@ -41,7 +41,7 @@ public class LoginService {
     }
 
     @Transactional(noRollbackFor = BusinessException.class)
-    public LoginResponse login(LoginRequest request, String ipAddress) {
+    public LoginResponse login(LoginRequest request, String ipAddress, String userAgent) {
         String email = request.email().trim();
 
         long t0 = System.currentTimeMillis();
@@ -62,7 +62,7 @@ public class LoginService {
         log.info("[PERF][LOGIN] bcrypt matches: {} ms", System.currentTimeMillis() - t1);
 
         if (!passwordOk) {
-            loginAttemptService.registerFailedAttemptOrLock(user, ipAddress);
+            loginAttemptService.registerFailedAttemptOrLock(user, ipAddress, userAgent);
             throw new BusinessException(HttpStatus.UNAUTHORIZED, "Credenciales incorrectas");
         }
 
@@ -78,7 +78,7 @@ public class LoginService {
         }
 
         long t3 = System.currentTimeMillis();
-        LoginResponse response = loginContext.login(user);
+        LoginResponse response = loginContext.login(user, ipAddress, userAgent);
         log.info("[PERF][LOGIN] strategy response: {} ms", System.currentTimeMillis() - t3);
 
         return response;

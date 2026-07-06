@@ -14,6 +14,7 @@ import com.luistudio.reservas.service.booking.validation.BookingValidationServic
 import com.luistudio.reservas.service.email.EmailTemplateService;
 import com.luistudio.reservas.util.AppTime;
 import com.luistudio.reservas.util.CalendarUtils;
+import org.springframework.context.annotation.Lazy;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
@@ -38,6 +39,7 @@ public class BookingService {
     private final DtoMapper dtoMapper;
     private final BookingValidationService bookingValidationService;
     private final EmailTemplateService emailTemplateService;
+    private final AvailabilitySubscriptionService availabilitySubscriptionService;
 
     public BookingService(
         ReservationRepository reservationRepository,
@@ -47,7 +49,8 @@ public class BookingService {
         AuditService auditService,
         DtoMapper dtoMapper,
         BookingValidationService bookingValidationService,
-        EmailTemplateService emailTemplateService
+        EmailTemplateService emailTemplateService,
+        @Lazy AvailabilitySubscriptionService availabilitySubscriptionService
     ) {
         this.reservationRepository = reservationRepository;
         this.roomService = roomService;
@@ -57,6 +60,7 @@ public class BookingService {
         this.dtoMapper = dtoMapper;
         this.bookingValidationService = bookingValidationService;
         this.emailTemplateService = emailTemplateService;
+        this.availabilitySubscriptionService = availabilitySubscriptionService;
     }
 
     @Transactional
@@ -190,6 +194,10 @@ public class BookingService {
             "Reserva cancelada",
             emailTemplateService.bookingStatus(saved, "Reserva cancelada", "cancelada", "Estado: " + reason + ". Puedes reservar nuevamente."),
             "{\"notificationType\":\"BOOKING_CANCELLATION\"}"
+        );
+        // Notify availability subscribers
+        availabilitySubscriptionService.notifySubscribers(
+            saved.getSala(), saved.getFecha(), saved.getHoraInicio(), saved.getHoraFin()
         );
         log.info(
             "booking_cancel_completed bookingId={} roomId={} status={} date={} start={} durationMinutes={}",

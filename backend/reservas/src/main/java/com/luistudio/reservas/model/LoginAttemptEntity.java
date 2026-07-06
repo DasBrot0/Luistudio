@@ -35,4 +35,7 @@ public class LoginAttemptEntity {
 
     @Column(name = "source_ip", length = 64)
     private String ipOrigen;
+
+    @Column(name = "user_agent", length = 512)
+    private String userAgent;
 }

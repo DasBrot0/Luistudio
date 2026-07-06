@@ -3,22 +3,30 @@ import type { AuthUser, RouteKey } from '../models/types'
 export const routePaths: Record<RouteKey, string> = {
   login: '/',
   'reset-password': '/restablecer-contrasena',
+  'confirm-change': '/confirmar-cambio',
   reservas: '/reservas',
   misreservas: '/misreservas',
   salas: '/salas',
   perfiles: '/perfiles',
   'admin-reservas': '/admin/reservas',
+  seguridad: '/admin/seguridad',
+  comunicados: '/admin/comunicados',
+  profile: '/perfil',
 }
 
 export function getRouteFromPath(pathname: string): RouteKey {
   const normalized = pathname.replace(/\/+$/, '') || '/'
 
   if (normalized === routePaths['reset-password']) return 'reset-password'
+  if (normalized === routePaths['confirm-change']) return 'confirm-change'
   if (normalized === routePaths.reservas) return 'reservas'
   if (normalized === routePaths.misreservas) return 'misreservas'
   if (normalized === routePaths.salas) return 'salas'
   if (normalized === routePaths.perfiles) return 'perfiles'
   if (normalized === routePaths['admin-reservas']) return 'admin-reservas'
+  if (normalized === routePaths.seguridad) return 'seguridad'
+  if (normalized === routePaths.comunicados) return 'comunicados'
+  if (normalized === routePaths.profile) return 'profile'
 
   return 'login'
 }
@@ -30,7 +38,7 @@ export function resolveRouteByAuth(route: RouteKey, user: AuthUser | null, prefe
   const adminLanding = (preferred: RouteKey | null) =>
     preferred === 'admin-reservas' || preferred === 'salas' ? preferred : 'salas'
 
-  if (route === 'reset-password') {
+  if (route === 'reset-password' || route === 'confirm-change') {
     return route
   }
 
@@ -47,13 +55,13 @@ export function resolveRouteByAuth(route: RouteKey, user: AuthUser | null, prefe
   }
 
   if (user.role === 'student') {
-    if (route === 'reservas' || route === 'misreservas') {
+    if (route === 'reservas' || route === 'misreservas' || route === 'profile') {
       return route
     }
     return studentLanding(preferredLanding)
   }
 
-  if (route === 'salas' || route === 'perfiles' || route === 'admin-reservas') {
+  if (route === 'salas' || route === 'perfiles' || route === 'admin-reservas' || route === 'seguridad' || route === 'comunicados' || route === 'profile') {
     return route
   }
 

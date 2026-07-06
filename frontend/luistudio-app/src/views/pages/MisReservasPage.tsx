@@ -1,15 +1,18 @@
 import { useState } from 'react'
 import { AppHeader } from '../components/layout/AppHeader'
 import type { Booking, Room } from '../../models/types'
+import type { AvailabilitySubscription } from './ReservasPage'
 import { formatDate } from '../../utils/helpers'
 
 interface MisReservasPageProps {
   myBookings: Booking[]
   activeRooms: Room[]
+  mySubscriptions: AvailabilitySubscription[]
   onEditBooking: (booking: Booking) => void
   onCancelBooking: (bookingId: string) => void
   onCreateFirstReservation: () => void
   onDownloadIcs: (booking: Booking) => void
+  onUnsubscribeFromSlot: (subscriptionId: number) => void
 }
 
 function PanelIcon() {
@@ -50,13 +53,25 @@ const buildGoogleCalendarUrl = (booking: Booking, roomName: string) => {
   return `https://calendar.google.com/calendar/render?${params.toString()}`
 }
 
+function BellSlashIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M5.5 9.5A6.5 6.5 0 0 1 18 8.5v3.5l2 3H4l2-3V9.5" />
+      <path d="M9.5 20a2.5 2.5 0 0 0 5 0" />
+      <path d="M3 3l18 18" />
+    </svg>
+  )
+}
+
 export function MisReservasPage({
   myBookings,
   activeRooms,
+  mySubscriptions,
   onEditBooking,
   onCancelBooking,
   onCreateFirstReservation,
   onDownloadIcs,
+  onUnsubscribeFromSlot,
 }: MisReservasPageProps) {
   const [showDetailedView, setShowDetailedView] = useState(false)
   const [mobileExpanded, setMobileExpanded] = useState<Record<string, boolean>>({})
@@ -278,6 +293,63 @@ export function MisReservasPage({
           )}
         </article>
       </section>
+
+      {mySubscriptions.length > 0 && (
+        <section className="dashboard-grid single-grid">
+          <article className="card">
+            <div className="card-head slim-head">
+              <h2>Avisos de disponibilidad</h2>
+            </div>
+            <p className="text-xs text-slate-500 mb-3">
+              Recibirás un correo cuando el horario ocupado quede disponible.
+            </p>
+            <div className="table-wrap">
+              <table className="bookings-table">
+                <colgroup>
+                  <col style={{ width: '30%' }} />
+                  <col style={{ width: '15%' }} />
+                  <col style={{ width: '18%' }} />
+                  <col style={{ width: '12%' }} />
+                  <col style={{ width: '15%' }} />
+                </colgroup>
+                <thead>
+                  <tr>
+                    <th>Sala</th>
+                    <th>Fecha</th>
+                    <th>Horario</th>
+                    <th>Estado</th>
+                    <th>Acción</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {mySubscriptions.map((sub) => (
+                    <tr key={sub.id}>
+                      <td data-label="Sala">{sub.roomName}</td>
+                      <td data-label="Fecha">{formatDate(sub.targetDate)}</td>
+                      <td data-label="Horario">{sub.startTime}–{sub.endTime}</td>
+                      <td data-label="Estado">
+                        <span className="status-pill ok">{sub.status}</span>
+                      </td>
+                      <td data-label="Acción" className="actions-cell">
+                        <button
+                          type="button"
+                          className="inline-flex min-h-8 items-center justify-center gap-2 rounded-md bg-red-100 px-3 text-xs font-semibold text-red-700 transition hover:-translate-y-px hover:bg-red-200"
+                          onClick={() => onUnsubscribeFromSlot(sub.id)}
+                        >
+                          <span className="btn-icon" aria-hidden="true">
+                            <BellSlashIcon />
+                          </span>
+                          Cancelar aviso
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </article>
+        </section>
+      )}
 
       {exportModalOpen && (
         <section className="modal-layer" role="dialog" aria-modal="true" aria-labelledby="export-bookings-title">

@@ -12,6 +12,10 @@ public class LoginContext {
     }
 
     public LoginResponse login(UserEntity user) {
-        return loginStrategy.buildResponse(user);
+        return loginStrategy.buildResponse(user, null, null);
+    }
+
+    public LoginResponse login(UserEntity user, String ip, String userAgent) {
+        return loginStrategy.buildResponse(user, ip, userAgent);
     }
 }

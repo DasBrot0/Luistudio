@@ -1,4 +1,4 @@
-import type { Role, RouteKey } from '../../../models/types'
+import type { Role, AuthUser, RouteKey } from '../../../models/types'
 import logoModoClaro from '../../../assets/logos/logo_modo_claro.png'
 import logoModoOscuro from '../../../assets/logos/logo_modo_oscuro.png'
 import logoHorizontalClaro from '../../../assets/logos/logo_horizontal_modo_claro.png'
@@ -13,11 +13,12 @@ interface NotificationItem {
 interface NavItem {
   route: RouteKey
   label: string
-  icon: 'calendar' | 'list' | 'rooms' | 'users' | 'bookings'
+  icon: 'calendar' | 'list' | 'rooms' | 'users' | 'bookings' | 'security' | 'megaphone'
 }
 
 interface GlobalTopbarProps {
   role: Role
+  user: AuthUser | null
   activeRoute: RouteKey
   notifications: NotificationItem[]
   isSidebarCollapsed: boolean
@@ -36,9 +37,14 @@ const adminItems: NavItem[] = [
   { route: 'salas', label: 'Salas', icon: 'rooms' },
   { route: 'perfiles', label: 'Perfiles', icon: 'users' },
   { route: 'admin-reservas', label: 'Reservas', icon: 'bookings' },
+  { route: 'seguridad', label: 'Seguridad', icon: 'security' },
+  { route: 'comunicados', label: 'Comunicados', icon: 'megaphone' },
 ]
 
-function NavIcon({ type }: { type: NavItem['icon'] | 'bell' | 'collapse' | 'settings' }) {
+function NavIcon({ type }: { type: NavItem['icon'] | 'bell' | 'collapse' | 'settings' | 'profile' }) {
+  if (type === 'megaphone') return <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 11V13a2 2 0 0 0 2 2h1l2 4h2l-2-4h1a2 2 0 0 0 2-2v-2" /><path d="M11 11V7.5L21 5v14l-10-2.5V13" /><path d="M11 11H3" /></svg>
+  if (type === 'security') return <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /></svg>
+  if (type === 'profile') return <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="8" r="4" /><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" /></svg>
   if (type === 'calendar') return <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M16 3v4M8 3v4M3 10h18" /></svg>
   if (type === 'list') return <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" /></svg>
   if (type === 'rooms') return <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 21V8a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v13M3 21h18M8 11h2M8 15h2M16 3h3a2 2 0 0 1 2 2v16" /></svg>
@@ -51,6 +57,7 @@ function NavIcon({ type }: { type: NavItem['icon'] | 'bell' | 'collapse' | 'sett
 
 export function GlobalTopbar({
   role,
+  user,
   activeRoute,
   notifications,
   isSidebarCollapsed,
@@ -105,6 +112,15 @@ export function GlobalTopbar({
         </nav>
 
         <div className="border-t border-primary-light px-3 pb-4 pt-3">
+          <button
+            type="button"
+            className={`mb-2 flex w-full items-center gap-3 rounded-lg border border-transparent px-3 py-2 text-sm font-semibold text-accent-muted transition hover:border-primary-light hover:bg-bg-active hover:text-accent ${activeRoute === 'profile' ? 'active border-primary-light bg-bg-active text-accent' : ''} ${isSidebarCollapsed ? 'justify-center' : 'justify-start'}`}
+            onClick={() => onNavigate('profile')}
+            title="Mi perfil"
+          >
+            <NavIcon type="profile" />
+            {!isSidebarCollapsed && <span>{user ? `${user.firstName} ${user.lastName}` : 'Mi perfil'}</span>}
+          </button>
           <button type="button" className={`mb-2 flex w-full items-center gap-3 rounded-lg border border-transparent px-3 py-2 text-sm font-semibold text-accent-muted transition hover:border-primary-light hover:bg-bg-active hover:text-accent ${isSidebarCollapsed ? 'justify-center' : 'justify-start'}`} onClick={onOpenNotifications} title="Notificaciones"><NavIcon type="bell" />{!isSidebarCollapsed && <span>Notificaciones ({notifications.length})</span>}</button>
           <button type="button" className={`flex w-full items-center gap-3 rounded-lg border border-transparent px-3 py-2 text-sm font-semibold text-accent-muted transition hover:border-primary-light hover:bg-bg-active hover:text-accent ${isSidebarCollapsed ? 'justify-center' : 'justify-start'}`} onClick={onOpenSettings} title="Configuración"><NavIcon type="settings" />{!isSidebarCollapsed && <span>Configuración</span>}</button>
         </div>

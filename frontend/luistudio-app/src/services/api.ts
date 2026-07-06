@@ -517,4 +517,75 @@ export const api = {
     const query = `?code=${encodeURIComponent(code)}`
     return http<ApiUserLookup>(`/users/lookup${query}`, {}, token)
   },
+
+  // ST-02 Sessions
+  getSessions(token: string) {
+    return http<{ sessions: Array<{ id: number; ip: string | null; userAgent: string | null; deviceLabel: string | null; createdAt: string; lastSeenAt: string; current: boolean }> }>('/me/sessions', {}, token)
+  },
+
+  revokeSession(token: string, sessionId: number) {
+    return http<{ message: string }>(`/me/sessions/${sessionId}`, { method: 'DELETE' }, token)
+  },
+
+  revokeAllSessions(token: string) {
+    return http<{ message: string }>('/me/sessions', { method: 'DELETE' }, token)
+  },
+
+  // ST-04 Activity
+  getMyActivity(token: string, page = 0, size = 20) {
+    return http<{ content: Array<{ id: number; action: string; detail: string | null; createdAt: string }>; page: number; totalPages: number }>(`/me/activity?page=${page}&size=${size}`, {}, token)
+  },
+
+  // ST-06 Sensitive change
+  requestSensitiveChange(token: string, actionType: string, payload?: string) {
+    return http<{ message: string }>('/auth/sensitive-change/request', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ actionType, payload }),
+    }, token)
+  },
+
+  confirmSensitiveChange(token: string, confirmToken: string) {
+    return http<{ message: string }>('/auth/sensitive-change/confirm', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token: confirmToken }),
+    }, token)
+  },
+
+  // ST-07 Admin login attempts
+  getLoginAttempts(token: string, filters: { userId?: number; email?: string; from?: string; to?: string; success?: boolean }, page = 0, size = 20) {
+    const params = new URLSearchParams({ page: String(page), size: String(size) })
+    if (filters.email) params.set('email', filters.email)
+    if (filters.from) params.set('from', filters.from)
+    if (filters.to) params.set('to', filters.to)
+    if (filters.success !== undefined) params.set('success', String(filters.success))
+    return http<{ content: Array<{ id: number; userId: number; userEmail: string; ip: string | null; userAgent: string | null; attemptedAt: string; success: boolean; lockedUntil: string | null }>; page: number; totalPages: number; totalElements: number }>(`/admin/security/login-attempts?${params.toString()}`, {}, token)
+  },
+
+  // ST-08 Room availability subscriptions
+  subscribeToRoom(token: string, roomId: number, targetDate: string, startTime: string, endTime: string) {
+    return http<{ message: string }>(`/rooms/${roomId}/availability-subscriptions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ targetDate, startTime, endTime }),
+    }, token)
+  },
+
+  unsubscribeFromRoom(token: string, roomId: number) {
+    return http<{ message: string }>(`/rooms/${roomId}/availability-subscriptions/me`, { method: 'DELETE' }, token)
+  },
+
+  getMyAvailabilitySubscriptions(token: string) {
+    return http<{ subscriptions: Array<{ id: number; roomId: number; roomName: string; targetDate: string; startTime: string; endTime: string; status: string; createdAt: string }> }>('/me/availability-subscriptions', {}, token)
+  },
+
+  // ST-09 Announcements
+  publishAnnouncement(token: string, request: { title: string; content: string; announcementType: string }) {
+    return http<{ id: number; title: string; announcementType: string; createdAt: string; recipientCount: number }>('/admin/announcements', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(request),
+    }, token)
+  },
 }

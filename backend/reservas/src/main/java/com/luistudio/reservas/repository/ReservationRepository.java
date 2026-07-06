@@ -150,4 +150,17 @@ public interface ReservationRepository extends JpaRepository<ReservationEntity, 
         @Param("today") LocalDate today,
         @Param("nowTime") LocalTime nowTime
     );
+
+    @EntityGraph(attributePaths = {"usuario", "sala"})
+    @Query("""
+        SELECT r FROM ReservationEntity r
+        WHERE r.estado = com.luistudio.reservas.model.ReservationStatus.ACTIVA
+          AND r.fecha = :today
+          AND r.horaInicio <= :cutoff
+          AND r.attendanceStatus IS NULL
+    """)
+    List<ReservationEntity> findActiveBookingsMissedBefore(
+        @Param("today") LocalDate today,
+        @Param("cutoff") LocalTime cutoff
+    );
 }

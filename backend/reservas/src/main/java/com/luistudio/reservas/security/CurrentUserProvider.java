@@ -19,16 +19,32 @@ public class CurrentUserProvider {
 
     public void requireNotProvisionalToken() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication != null && Boolean.TRUE.equals(authentication.getDetails())) {
+        if (authentication != null && isProvisional(authentication)) {
             throw new BusinessException(HttpStatus.FORBIDDEN, "Se requiere validar 2FA");
         }
     }
 
     public void requireProvisionalToken() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication == null || !Boolean.TRUE.equals(authentication.getDetails())) {
+        if (authentication == null || !isProvisional(authentication)) {
             throw new BusinessException(HttpStatus.FORBIDDEN, "Se requiere un token provisional válido");
         }
+    }
+
+    public String currentJti() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication != null && authentication.getDetails() instanceof JwtService.ParsedToken parsed) {
+            return parsed.jti();
+        }
+        return null;
+    }
+
+    private boolean isProvisional(Authentication authentication) {
+        if (authentication.getDetails() instanceof JwtService.ParsedToken parsed) {
+            return parsed.provisional();
+        }
+        // Legacy fallback
+        return Boolean.TRUE.equals(authentication.getDetails());
     }
 
     public boolean isAdmin(AuthPrincipal principal) {

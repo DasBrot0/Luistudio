@@ -25,9 +25,10 @@ public class TwoFactorLoginStrategy implements LoginStrategy {
     }
 
     @Override
-    public LoginResponse buildResponse(UserEntity user) {
+    public LoginResponse buildResponse(UserEntity user, String ip, String userAgent) {
         twoFactorService.sendLoginCode(user);
         String provisionalToken = jwtService.generateProvisionalToken(user.getId(), user.getRol().getNombre());
+        // Session will be created in TwoFactorService.verifyLoginCode once 2FA is verified
         return new LoginResponse(null, provisionalToken, true, dtoMapper.toAuthUser(user), "Código 2FA enviado");
     }
 }

@@ -15,6 +15,7 @@ import com.luistudio.reservas.service.auth.TwoFactorService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+
 @Service
 public class AuthService {
 
@@ -23,27 +24,37 @@ public class AuthService {
     private final TwoFactorService twoFactorService;
     private final UserRepository userRepository;
     private final DtoMapper dtoMapper;
+    private final SessionService sessionService;
 
     public AuthService(
         LoginService loginService,
         PasswordResetService passwordResetService,
         TwoFactorService twoFactorService,
         UserRepository userRepository,
-        DtoMapper dtoMapper
+        DtoMapper dtoMapper,
+        SessionService sessionService
     ) {
         this.loginService = loginService;
         this.passwordResetService = passwordResetService;
         this.twoFactorService = twoFactorService;
         this.userRepository = userRepository;
         this.dtoMapper = dtoMapper;
+        this.sessionService = sessionService;
     }
 
-    public LoginResponse login(LoginRequest request, String ipAddress) {
-        return loginService.login(request, ipAddress);
+    public LoginResponse login(LoginRequest request, String ipAddress, String userAgent) {
+        return loginService.login(request, ipAddress, userAgent);
     }
 
-    public LoginResponse verify2fa(Long userId, String code) {
-        return twoFactorService.verifyLoginCode(userId, code);
+    public LoginResponse verify2fa(Long userId, String code, String ip, String userAgent) {
+        return twoFactorService.verifyLoginCode(userId, code, ip, userAgent);
+    }
+
+    @Transactional
+    public void logoutCurrent(Long userId, String jti) {
+        UserEntity user = userRepository.findById(userId)
+            .orElseThrow(() -> new NotFoundException("Usuario no encontrado"));
+        sessionService.revokeCurrentSession(user, jti);
     }
 
     @Transactional(readOnly = true)
