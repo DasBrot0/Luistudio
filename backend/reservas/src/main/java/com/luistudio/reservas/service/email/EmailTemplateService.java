@@ -24,6 +24,56 @@ public class EmailTemplateService {
         return branded(subject, summary, List.of(), List.of(), null, null);
     }
 
+    public String absenceNotice(ReservationEntity booking) {
+        RoomEntity room = booking.getSala();
+        List<Detail> details = List.of(
+            new Detail("Sala", room.getNombre()),
+            new Detail("Campus", room.getCampus()),
+            new Detail("Fecha", String.valueOf(booking.getFecha())),
+            new Detail("Horario", booking.getHoraInicio() + " - " + booking.getHoraFin())
+        );
+        return branded(
+            "Inasistencia registrada",
+            "No registramos tu presencia en la siguiente reserva. Si fue un error, contacta al administrador.",
+            details,
+            List.of(),
+            null,
+            null
+        );
+    }
+
+    public String roomAvailableAlert(String roomName, java.time.LocalDate date, java.time.LocalTime startTime, java.time.LocalTime endTime) {
+        List<Detail> details = List.of(
+            new Detail("Sala", roomName),
+            new Detail("Fecha", String.valueOf(date)),
+            new Detail("Horario", startTime + " - " + endTime)
+        );
+        return branded(
+            "Sala disponible: " + roomName,
+            "Una sala que estabas siguiendo quedó disponible para el horario que solicitaste.",
+            details,
+            List.of(),
+            null,
+            null
+        );
+    }
+
+    public String accessAlert(String ip, String userAgent, String when) {
+        List<Detail> details = List.of(
+            new Detail("IP", ip != null ? ip : "Desconocida"),
+            new Detail("Dispositivo", userAgent != null ? userAgent : "Desconocido"),
+            new Detail("Fecha y hora", when)
+        );
+        return branded(
+            "Acceso inusual detectado",
+            "Se detectó un inicio de sesión desde un dispositivo o ubicación que no reconocemos. Si no fuiste tú, cambia tu contraseña de inmediato.",
+            details,
+            List.of(),
+            null,
+            null
+        );
+    }
+
     public String bookingStatus(ReservationEntity booking, String subject, String action, String extraInfo) {
         RoomEntity room = booking.getSala();
         List<String> participants = extractParticipants(booking.getObservacion());
@@ -116,7 +166,7 @@ public class EmailTemplateService {
         if (ctaUrl != null && !ctaUrl.isBlank()) {
             String safeUrl = escapeHtml(ctaUrl);
             actionHtml = "<div style=\"margin-top:16px;\">"
-                + "<a href=\"" + safeUrl + "\" style=\"display:inline-block;background:#2563eb;color:#ffffff;text-decoration:none;font-weight:700;padding:11px 16px;border-radius:10px;\">Abrir enlace</a>"
+                + "<a href=\"" + safeUrl + "\" style=\"display:inline-block;background:#2563eb;color:#ffffff;text-decoration:none;font-weight:700;padding:11px 16px;border-radius:10px;\">Confirmar cambio</a>"
                 + "</div>";
         }
 

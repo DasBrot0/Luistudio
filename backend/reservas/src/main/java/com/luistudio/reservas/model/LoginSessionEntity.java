@@ -16,8 +16,8 @@ import lombok.Setter;
 @Getter
 @Setter
 @Entity
-@Table(name = "login_attempts")
-public class LoginAttemptEntity {
+@Table(name = "login_sessions")
+public class LoginSessionEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -27,15 +27,27 @@ public class LoginAttemptEntity {
     @JoinColumn(name = "user_id", nullable = false)
     private UserEntity usuario;
 
-    @Column(name = "attempted_at", nullable = false)
-    private OffsetDateTime fechaIntento = OffsetDateTime.now();
+    @Column(name = "jti", nullable = false, unique = true, length = 36)
+    private String jti;
 
-    @Column(name = "success", nullable = false)
-    private Boolean exito;
-
-    @Column(name = "source_ip", length = 64)
-    private String ipOrigen;
+    @Column(name = "ip", length = 64)
+    private String ip;
 
     @Column(name = "user_agent", length = 512)
     private String userAgent;
+
+    @Column(name = "device_label", length = 120)
+    private String deviceLabel;
+
+    @Column(name = "created_at", nullable = false)
+    private OffsetDateTime createdAt = OffsetDateTime.now();
+
+    @Column(name = "last_seen_at", nullable = false)
+    private OffsetDateTime lastSeenAt = OffsetDateTime.now();
+
+    @Column(name = "revoked_at")
+    private OffsetDateTime revokedAt;
+
+    @Column(name = "current", nullable = false)
+    private Boolean current = false;
 }

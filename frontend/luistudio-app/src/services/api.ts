@@ -45,13 +45,28 @@ export interface ApiRoom {
   equipment: string[]
 }
 
+export interface ApiRoomSearchIntent {
+  roomType: string
+  minimumCapacity: number
+  maximumNoise: 'BAJO' | 'MEDIO' | 'ALTO'
+  requiresConcentration: boolean
+  requiredEquipment: string[]
+}
+
 export interface ApiIntelligentRoomSearchResponse {
-  intent: { roomType: string; minimumCapacity: number; maximumNoise: 'BAJO' | 'MEDIO' | 'ALTO'; requiresConcentration: boolean; requiredEquipment: string[] }
+  intent: ApiRoomSearchIntent
   recommendations: Array<{ room: ApiRoom; score: number; reasons: string[] }>
 }
 
 export interface ApiAdminDashboard {
-  from: string; to: string; totalReservations: number; absenceRate: number; absenceCount: number; attendanceEligibleCount: number; attendanceCount: number; pendingAttendanceCount: number
+  from: string
+  to: string
+  totalReservations: number
+  absenceRate: number
+  absenceCount: number
+  attendanceEligibleCount: number
+  attendanceCount: number
+  pendingAttendanceCount: number
   occupancyByRoom: Array<{ roomId: number; roomCode: string; roomName: string; reservedMinutes: number; availableMinutes: number; occupancyRate: number }>
   peakHours: Array<{ hour: number; reservedMinutes: number; reservationCount: number }>
   dailyOccupancy: Array<{ date: string; reservedMinutes: number; availableMinutes: number; occupancyRate: number }>
@@ -80,6 +95,7 @@ interface ApiBooking {
   start: string
   end: string
   status: 'ACTIVA' | 'CANCELADA' | 'COMPLETADA'
+  attendanceStatus?: 'ASISTIO' | 'INASISTIO' | null
   observation?: string
   googleCalendarUrl: string
   icsUrl: string
@@ -135,7 +151,7 @@ export interface ApiPreferences {
   notificationSettings: Record<string, { app: boolean; email: boolean }>
   themeMode: 'LIGHT' | 'DARK'
   fontScale: number
-  loginLandingView: 'STUDENT_MY_BOOKINGS' | 'STUDENT_RESERVE' | 'ADMIN_ROOMS' | 'ADMIN_PROFILES' | 'ADMIN_BOOKINGS'
+  loginLandingView: 'STUDENT_MY_BOOKINGS' | 'STUDENT_RESERVE' | 'ADMIN_DASHBOARD' | 'ADMIN_ROOMS' | 'ADMIN_PROFILES' | 'ADMIN_BOOKINGS'
 }
 
 const fieldLabels: Record<string, string> = {
@@ -215,6 +231,7 @@ const readErrorMessage = async (response: Response) => {
 }
 
 async function http<T>(path: string, options: RequestInit = {}, _token?: string): Promise<T> {
+  void _token
   const headers = new Headers(options.headers)
 
   if (options.body && !headers.has('Content-Type')) {
@@ -331,7 +348,11 @@ export const api = {
   },
 
   intelligentRoomSearch(token: string, payload: { query: string; date: string; start: string; end: string; limit?: number }) {
-    return http<ApiIntelligentRoomSearchResponse>('/rooms/intelligent-search', { method: 'POST', body: JSON.stringify(payload) }, token)
+    return http<ApiIntelligentRoomSearchResponse>(
+      '/rooms/intelligent-search',
+      { method: 'POST', body: JSON.stringify(payload) },
+      token,
+    )
   },
 
   createRoom(
@@ -463,7 +484,8 @@ export const api = {
   },
 
   getAdminDashboard(token: string, from: string, to: string) {
-    return http<ApiAdminDashboard>(`/admin/dashboard?${new URLSearchParams({ from, to })}`, {}, token)
+    const params = new URLSearchParams({ from, to })
+    return http<ApiAdminDashboard>(`/admin/dashboard?${params.toString()}`, {}, token)
   },
 
   updateAdminConfig(token: string, config: ApiConfig) {
@@ -541,11 +563,86 @@ export const api = {
   },
 
   updateBuildingLocation(token: string, buildingId: number, latitude: number, longitude: number) {
-    return http<import('../models/campusMap').CampusMapPavilion>(`/admin/buildings/${buildingId}/location`, { method: 'PUT', body: JSON.stringify({ latitude, longitude }) }, token)
+    return http<import('../models/campusMap').CampusMapPavilion>(`/admin/buildings/${buildingId}/location`, {
+      method: 'PUT', body: JSON.stringify({ latitude, longitude }),
+    }, token)
   },
 
   lookupUserByCode(token: string, code: string) {
     const query = `?code=${encodeURIComponent(code)}`
     return http<ApiUserLookup>(`/users/lookup${query}`, {}, token)
+  },
+
+  // ST-02 Sessions
+  getSessions(token: string) {
+    return http<{ sessions: Array<{ id: number; ip: string | null; userAgent: string | null; deviceLabel: string | null; createdAt: string; lastSeenAt: string; current: boolean }> }>('/me/sessions', {}, token)
+  },
+
+  revokeSession(token: string, sessionId: number) {
+    return http<{ message: string }>(`/me/sessions/${sessionId}`, { method: 'DELETE' }, token)
+  },
+
+  revokeAllSessions(token: string) {
+    return http<{ message: string }>('/me/sessions', { method: 'DELETE' }, token)
+  },
+
+  // ST-04 Activity
+  getMyActivity(token: string, page = 0, size = 20) {
+    return http<{ content: Array<{ id: number; action: string; detail: string | null; createdAt: string }>; page: number; totalPages: number }>(`/me/activity?page=${page}&size=${size}`, {}, token)
+  },
+
+  // ST-06 Sensitive change
+  requestSensitiveChange(token: string, actionType: string, payload?: string) {
+    return http<{ message: string }>('/auth/sensitive-change/request', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ actionType, payload }),
+    }, token)
+  },
+
+  confirmSensitiveChange(token: string, confirmToken: string) {
+    return http<{ message: string }>('/auth/sensitive-change/confirm', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token: confirmToken }),
+    }, token)
+  },
+
+  // ST-07 Admin login attempts
+  getLoginAttempts(token: string, filters: { user?: string; email?: string; from?: string; to?: string; success?: boolean; blocked?: boolean }, page = 0, size = 10) {
+    const params = new URLSearchParams({ page: String(page), size: String(size) })
+    if (filters.user) params.set('user', filters.user)
+    if (filters.email) params.set('email', filters.email)
+    if (filters.from) params.set('from', filters.from)
+    if (filters.to) params.set('to', filters.to)
+    if (filters.success !== undefined) params.set('success', String(filters.success))
+    if (filters.blocked !== undefined) params.set('blocked', String(filters.blocked))
+    return http<{ content: Array<{ id: number; userId: number; userEmail: string; ip: string | null; userAgent: string | null; attemptedAt: string; success: boolean; lockedUntil: string | null }>; page: number; totalPages: number; totalElements: number }>(`/admin/security/login-attempts?${params.toString()}`, {}, token)
+  },
+
+  // ST-08 Room availability subscriptions
+  subscribeToRoom(token: string, roomId: number, targetDate: string, startTime: string, endTime: string) {
+    return http<{ message: string }>(`/rooms/${roomId}/availability-subscriptions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ targetDate, startTime, endTime }),
+    }, token)
+  },
+
+  unsubscribeFromRoom(token: string, roomId: number) {
+    return http<{ message: string }>(`/rooms/${roomId}/availability-subscriptions/me`, { method: 'DELETE' }, token)
+  },
+
+  getMyAvailabilitySubscriptions(token: string) {
+    return http<{ subscriptions: Array<{ id: number; roomId: number; roomName: string; targetDate: string; startTime: string; endTime: string; status: string; createdAt: string }> }>('/me/availability-subscriptions', {}, token)
+  },
+
+  // ST-09 Announcements
+  publishAnnouncement(token: string, request: { title: string; content: string; announcementType: string }) {
+    return http<{ id: number; title: string; announcementType: string; createdAt: string; recipientCount: number }>('/admin/announcements', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(request),
+    }, token)
   },
 }

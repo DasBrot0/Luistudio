@@ -21,14 +21,22 @@ import type {
 import { buildPabellonCode, getDefaultReservationForm, minutesBetween } from '../../utils/helpers'
 import { LoginPage } from './LoginPage'
 import { ResetPasswordPage } from './ResetPasswordPage'
+import { ConfirmSensitiveChangePage } from './ConfirmSensitiveChangePage'
 import { ReservasPage } from './ReservasPage'
+import type { AvailabilitySubscription } from './ReservasPage'
+import { SmartSearchPage } from './SmartSearchPage'
 import { MisReservasPage } from './MisReservasPage'
+import { CampusMapPage } from './CampusMapPage'
 import { SalasPage } from './SalasPage'
 import { PerfilesPage } from './PerfilesPage'
 import { AdminReservasPage } from './AdminReservasPage'
+import { ProfilePage } from './ProfilePage'
+import type { SessionItem, ActivityItem } from './ProfilePage'
+import { SecurityPage } from './SecurityPage'
+import type { LoginAttemptItem } from './SecurityPage'
+import { ComunicadosPage } from './ComunicadosPage'
 import { AdminDashboardPage } from './AdminDashboardPage'
-import { CampusMapPage } from './CampusMapPage'
-import { SmartSearchPage } from './SmartSearchPage'
+import type { AnnouncementItem } from './ComunicadosPage'
 import { BookingSuccessModal } from '../components/modals/BookingSuccessModal'
 import { EditBookingModal } from '../components/modals/EditBookingModal'
 import { RoomFormModal } from '../components/modals/RoomFormModal'
@@ -39,7 +47,7 @@ import { TwoFactorModal } from '../components/modals/TwoFactorModal'
 import { MessageModal } from '../components/modals/MessageModal'
 import { ConfirmCancelBookingModal } from '../components/modals/ConfirmCancelBookingModal'
 import { GlobalTopbar } from '../components/layout/GlobalTopbar'
-import { api, type ApiCampusSchedule, type ApiPreferences } from '../../services/api'
+import { api, type ApiAdminDashboard, type ApiCampusSchedule, type ApiIntelligentRoomSearchResponse, type ApiPreferences } from '../../services/api'
 
 interface NotificationItem {
   id: number
@@ -53,6 +61,7 @@ type NotificationPreferenceKey =
   | 'BOOKING_CANCELLATION'
   | 'BOOKING_REMINDER'
   | 'ROOM_MAINTENANCE'
+  | 'ROOM_AVAILABLE'
   | 'PROFILE_STATUS'
 
 type NotificationChannelSettings = { app: boolean; email: boolean }
@@ -69,6 +78,7 @@ interface NotificationPreferenceOption {
 type LoginLandingViewCode =
   | 'STUDENT_MY_BOOKINGS'
   | 'STUDENT_RESERVE'
+  | 'ADMIN_DASHBOARD'
   | 'ADMIN_ROOMS'
   | 'ADMIN_PROFILES'
   | 'ADMIN_BOOKINGS'
@@ -127,6 +137,7 @@ const toUiUser = (user: {
   lastName: string
   email: string
   role: 'ADMIN' | 'ESTUDIANTE'
+  status: string
   has2fa: boolean
 }): AuthUser => ({
   id: user.id,
@@ -135,6 +146,7 @@ const toUiUser = (user: {
   firstName: user.firstName,
   lastName: user.lastName,
   email: user.email,
+  status: user.status,
   has2fa: user.has2fa,
 })
 
@@ -155,6 +167,10 @@ const toUiRoom = (room: {
   slotMinutes: number
   schedule: ScheduleDay[]
   status: string
+  noiseLevel?: 'BAJO' | 'MEDIO' | 'ALTO'
+  supportsConcentration?: boolean
+  roomType?: string
+  equipment?: string[]
 }): Room => ({
   backendId: room.id,
   id: room.code,
@@ -178,6 +194,10 @@ const toUiRoom = (room: {
       : room.status === 'INACTIVA'
         ? 'Inactiva'
         : 'Disponible',
+  noiseLevel: room.noiseLevel,
+  supportsConcentration: room.supportsConcentration,
+  roomType: room.roomType,
+  equipment: room.equipment,
 })
 
 const toApiRoomStatus = (status: RoomStatus): 'DISPONIBLE' | 'EN_MANTENIMIENTO' | 'INACTIVA' => {
@@ -246,6 +266,7 @@ const toUiBooking = (booking: {
   start: string
   end: string
   status: 'ACTIVA' | 'CANCELADA' | 'COMPLETADA'
+  attendanceStatus?: 'ASISTIO' | 'INASISTIO' | null
   observation?: string
   googleCalendarUrl?: string
   icsUrl?: string
@@ -262,6 +283,7 @@ const toUiBooking = (booking: {
   start: toHourMinute(booking.start),
   end: toHourMinute(booking.end),
   status: booking.status === 'CANCELADA' ? 'Cancelado' : 'Confirmado',
+  attendanceStatus: booking.attendanceStatus,
   observation: booking.observation,
   googleCalendarUrl: booking.googleCalendarUrl,
   icsUrl: booking.icsUrl,
@@ -344,10 +366,11 @@ const toProfile = (user: {
   blocked: user.blocked,
 })
 
-const defaultLandingRoute = (role: Role): RouteKey => (role === 'admin' ? 'salas' : 'misreservas')
+const defaultLandingRoute = (role: Role): RouteKey => (role === 'admin' ? 'dashboard' : 'misreservas')
 
 const routeToLandingViewCode = (role: Role, route: RouteKey): LoginLandingViewCode => {
   if (role === 'admin') {
+    if (route === 'dashboard') return 'ADMIN_DASHBOARD'
     if (route === 'perfiles') return 'ADMIN_PROFILES'
     return route === 'admin-reservas' ? 'ADMIN_BOOKINGS' : 'ADMIN_ROOMS'
   }
@@ -356,6 +379,7 @@ const routeToLandingViewCode = (role: Role, route: RouteKey): LoginLandingViewCo
 
 const landingViewCodeToRoute = (role: Role, code: LoginLandingViewCode): RouteKey => {
   if (role === 'admin') {
+    if (code === 'ADMIN_DASHBOARD') return 'dashboard'
     if (code === 'ADMIN_PROFILES') return 'perfiles'
     return code === 'ADMIN_BOOKINGS' ? 'admin-reservas' : 'salas'
   }
@@ -542,11 +566,33 @@ export function MainPage() {
   const [adminSort, setAdminSort] = useState('date:desc')
   const [adminPage, setAdminPage] = useState(1)
   const [adminTotalPages, setAdminTotalPages] = useState(1)
+  const [dashboardData, setDashboardData] = useState<ApiAdminDashboard | null>(null)
+  const [dashboardLoading, setDashboardLoading] = useState(false)
+  const [dashboardError, setDashboardError] = useState('')
+  const [dashboardFrom, setDashboardFrom] = useState(() => {
+    const date = new Date(); date.setDate(date.getDate() - 29); return date.toISOString().slice(0, 10)
+  })
+  const [dashboardTo, setDashboardTo] = useState(getTodayIso)
   const [profilesQuery, setProfilesQuery] = useState('')
   const [profilesYearFilter, setProfilesYearFilter] = useState('')
   const [profilesStatusFilter, setProfilesStatusFilter] = useState<'Todos' | 'Habilitado' | 'Deshabilitado' | 'Bloqueado'>('Todos')
   const [profilesSortBy, setProfilesSortBy] = useState('firstName')
   const [profilesSortDir, setProfilesSortDir] = useState<'asc' | 'desc'>('asc')
+
+  const [securityAttempts, setSecurityAttempts] = useState<LoginAttemptItem[]>([])
+  const [securityLoading, setSecurityLoading] = useState(false)
+  const [securityUserFilter, setSecurityUserFilter] = useState('')
+  const [securityEmailFilter, setSecurityEmailFilter] = useState('')
+  const [securityStatusFilter, setSecurityStatusFilter] = useState<'todos' | 'fallido' | 'exitoso'>('todos')
+  const [securityBlockFilter, setSecurityBlockFilter] = useState<'todos' | 'bloqueado' | 'sin-bloqueo'>('todos')
+  const [securityFromFilter, setSecurityFromFilter] = useState('')
+  const [securityToFilter, setSecurityToFilter] = useState('')
+  const [securityPage, setSecurityPage] = useState(1)
+  const [securityTotalPages, setSecurityTotalPages] = useState(1)
+  const [securityTotalElements, setSecurityTotalElements] = useState(0)
+
+  const [announcements, setAnnouncements] = useState<AnnouncementItem[]>([])
+  const [announcementSending, setAnnouncementSending] = useState(false)
 
   const [toastMessage, setToastMessage] = useState('')
   const [modalMessage, setModalMessage] = useState<{ title: string; message: string; variant: 'error' | 'success' } | null>(null)
@@ -569,6 +615,16 @@ export function MainPage() {
   })
   const [loginLandingRoute, setLoginLandingRoute] = useState<RouteKey | null>(null)
   const [campusSchedules, setCampusSchedules] = useState<CampusSchedule[]>([])
+  const [mySubscriptions, setMySubscriptions] = useState<AvailabilitySubscription[]>([])
+  const [intelligentSearchResult, setIntelligentSearchResult] = useState<ApiIntelligentRoomSearchResponse | null>(null)
+  const [intelligentSearchLoading, setIntelligentSearchLoading] = useState(false)
+  const [intelligentSearchError, setIntelligentSearchError] = useState('')
+
+  // ProfilePage state
+  const [profileSessions, setProfileSessions] = useState<SessionItem[]>([])
+  const [profileSessionsLoading, setProfileSessionsLoading] = useState(false)
+  const [profileActivity, setProfileActivity] = useState<ActivityItem[]>([])
+  const [profileActivityLoading, setProfileActivityLoading] = useState(false)
 
   const effectiveRoute = useMemo(
     () => resolveRouteByAuth(route, authenticatedUser, loginLandingRoute),
@@ -698,6 +754,7 @@ export function MainPage() {
         firstName: editBookingOwner.fullName,
         lastName: '',
         email: '',
+        status: 'HABILITADO',
         has2fa: false,
       }
     : authenticatedUser
@@ -763,6 +820,35 @@ export function MainPage() {
     }
   }
 
+  const handleIntelligentSearch = async (query: string, date: string, start: string, end: string) => {
+    if (!token) return
+    setIntelligentSearchLoading(true)
+    setIntelligentSearchError('')
+    try {
+      setIntelligentSearchResult(await api.intelligentRoomSearch(token, { query, date, start, end, limit: 3 }))
+    } catch (error) {
+      setIntelligentSearchResult(null)
+      setIntelligentSearchError(error instanceof Error ? error.message : 'No se pudo interpretar tu búsqueda.')
+    } finally {
+      setIntelligentSearchLoading(false)
+    }
+  }
+
+  const handleSelectRecommendation = (roomBackendId: number) => {
+    const recommendation = intelligentSearchResult?.recommendations.find((item) => item.room.id === roomBackendId)
+    if (!recommendation) return
+    const room = toUiRoom(recommendation.room)
+    setRooms((current) => current.some((item) => item.backendId === roomBackendId) ? current : [...current, room])
+    handleReservationChange({
+      ...reservationForm,
+      campus: room.campusLabel,
+      location: room.venueLabel,
+      roomId: room.id,
+      people: 1,
+    })
+    setIntelligentSearchError('')
+  }
+
   const handleAddReservationCompanion = async () => {
     if (!token || !authenticatedUser || !selectedReservationRoom) return
     const code = reservationCompanionCodeInput.trim()
@@ -817,10 +903,29 @@ export function MainPage() {
   }
 
   const loadRooms = async (authToken: string) => {
-    const result = await api.getRooms(authToken, { size: 50, includeSchedule: false })
+    const result = await api.getRooms(authToken, { size: 50, includeSchedule: true })
     const mapped = result.content.map(toUiRoom)
     setRooms(mapped)
     setRoomDirectory(mapped)
+  }
+
+  const loadMySubscriptions = async (authToken: string) => {
+    try {
+      const result = await api.getMyAvailabilitySubscriptions(authToken)
+      setMySubscriptions(
+        result.subscriptions.map((s) => ({
+          id: s.id,
+          roomId: s.roomId,
+          roomName: s.roomName,
+          targetDate: s.targetDate,
+          startTime: s.startTime,
+          endTime: s.endTime,
+          status: s.status,
+        })),
+      )
+    } catch {
+      // non-critical, ignore
+    }
   }
 
   const loadRoomDirectory = async (authToken: string) => {
@@ -872,6 +977,63 @@ export function MainPage() {
     setProfilesTotalPages(Math.max(1, result.totalPages))
   }
 
+  const loadSecurityAttempts = async (authToken: string) => {
+    setSecurityLoading(true)
+    try {
+      const successParam = securityStatusFilter === 'todos' ? undefined : securityStatusFilter === 'exitoso'
+      const blockedParam = securityBlockFilter === 'todos' ? undefined : securityBlockFilter === 'bloqueado'
+      const fromParam = securityFromFilter ? securityFromFilter + 'T00:00:00-05:00' : undefined
+      const toParam = securityToFilter ? securityToFilter + 'T23:59:59-05:00' : undefined
+      const result = await api.getLoginAttempts(
+        authToken,
+        { user: securityUserFilter || undefined, email: securityEmailFilter || undefined, from: fromParam, to: toParam, success: successParam, blocked: blockedParam },
+        securityPage - 1,
+        10,
+      )
+      setSecurityAttempts(result.content.map((a) => ({
+        id: a.id,
+        userId: a.userId,
+        userEmail: a.userEmail,
+        ip: a.ip,
+        userAgent: a.userAgent,
+        attemptedAt: a.attemptedAt,
+        success: a.success,
+        lockedUntil: a.lockedUntil,
+      })))
+      setSecurityTotalPages(Math.max(1, result.totalPages))
+      setSecurityTotalElements(result.totalElements)
+    } finally {
+      setSecurityLoading(false)
+    }
+  }
+
+  const loadDashboard = async (authToken: string, from = dashboardFrom, to = dashboardTo) => {
+    setDashboardLoading(true)
+    setDashboardError('')
+    try {
+      setDashboardData(await api.getAdminDashboard(authToken, from, to))
+    } catch (error) {
+      setDashboardError(error instanceof Error ? error.message : 'No se pudieron cargar las métricas.')
+    } finally {
+      setDashboardLoading(false)
+    }
+  }
+
+  const handlePublishAnnouncement = async (title: string, content: string, announcementType: string) => {
+    if (!token) return
+    setAnnouncementSending(true)
+    try {
+      const result = await api.publishAnnouncement(token, { title, content, announcementType })
+      setAnnouncements((current) => [
+        { id: result.id, title: result.title, announcementType: result.announcementType, createdAt: result.createdAt, recipientCount: result.recipientCount },
+        ...current,
+      ])
+      pushNotification(`Comunicado "${result.title}" enviado a ${result.recipientCount} estudiante(s).`, 'BOOKING_CONFIRMATION')
+    } finally {
+      setAnnouncementSending(false)
+    }
+  }
+
   const toIsoDate = (date: Date) =>
     `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
 
@@ -893,6 +1055,10 @@ export function MainPage() {
 
   const loadInitialDataForRoute = async (authToken: string, user: AuthUser, targetRoute: RouteKey) => {
     if (user.role === 'admin') {
+      if (targetRoute === 'dashboard') {
+        await loadDashboard(authToken)
+        return
+      }
       if (targetRoute === 'salas') {
         await loadRoomDirectory(authToken)
         return
@@ -908,6 +1074,10 @@ export function MainPage() {
           loadCampusSchedules(authToken),
           loadRoomDirectory(authToken),
         ])
+        return
+      }
+      if (targetRoute === 'seguridad') {
+        await loadSecurityAttempts(authToken)
       }
       return
     }
@@ -916,11 +1086,12 @@ export function MainPage() {
       await Promise.all([
         loadMyBookings(authToken),
         loadRooms(authToken),
+        loadMySubscriptions(authToken),
       ])
       return
     }
-    if (targetRoute === 'reservas') {
-      await loadRooms(authToken)
+    if (targetRoute === 'reservas' || targetRoute === 'busqueda-inteligente') {
+      await Promise.all([loadRooms(authToken), loadMySubscriptions(authToken)])
     }
   }
 
@@ -958,7 +1129,7 @@ export function MainPage() {
       const cachedLanding = localStorage.getItem(LOCAL_STORAGE_LANDING_KEY) as RouteKey | null
       const allowedRoutes =
         user.role === 'admin'
-          ? (['salas', 'admin-reservas'] as RouteKey[])
+          ? (['dashboard', 'salas', 'perfiles', 'admin-reservas'] as RouteKey[])
           : (['misreservas', 'reservas'] as RouteKey[])
       const fallbackLanding =
         cachedLanding && allowedRoutes.includes(cachedLanding)
@@ -989,7 +1160,7 @@ export function MainPage() {
   useEffect(() => {
     const expectedPath = routePaths[effectiveRoute]
     if (route === 'login' && authenticatedUser && !preferencesLoaded) return
-    if (!authHydrated && route !== 'login' && route !== 'reset-password') return
+    if (!authHydrated && route !== 'login' && route !== 'reset-password' && route !== 'confirm-change') return
     if (location.pathname !== expectedPath) navigate(expectedPath, { replace: true })
   }, [authHydrated, effectiveRoute, route, authenticatedUser, preferencesLoaded, location.pathname, navigate])
 
@@ -1187,6 +1358,25 @@ export function MainPage() {
     profilesStatusFilter,
     profilesSortBy,
     profilesSortDir,
+    token,
+    authenticatedUser,
+    effectiveRoute,
+  ])
+
+  useEffect(() => {
+    if (!token || authenticatedUser?.role !== 'admin' || effectiveRoute !== 'seguridad') return
+    loadSecurityAttempts(token).catch((error) => {
+      const message = error instanceof Error ? error.message : 'No se pudo cargar el historial de seguridad.'
+      setToastMessage(message)
+    })
+  }, [
+    securityPage,
+    securityUserFilter,
+    securityEmailFilter,
+    securityStatusFilter,
+    securityBlockFilter,
+    securityFromFilter,
+    securityToFilter,
     token,
     authenticatedUser,
     effectiveRoute,
@@ -1966,20 +2156,61 @@ export function MainPage() {
     }
   }
 
+  useEffect(() => {
+    if (effectiveRoute !== 'profile' || !token) return
+    setProfileSessionsLoading(true)
+    api.getSessions(token)
+      .then((data) => setProfileSessions(data.sessions))
+      .catch(() => {})
+      .finally(() => setProfileSessionsLoading(false))
+    setProfileActivityLoading(true)
+    api.getMyActivity(token)
+      .then((data) => setProfileActivity(data.content))
+      .catch(() => {})
+      .finally(() => setProfileActivityLoading(false))
+  }, [effectiveRoute, token])
+
   const roomBookingsForSelectedRoom = useMemo(
     () => roomBookingsWindow.filter((booking) => booking.roomId === reservationForm.roomId),
     [roomBookingsWindow, reservationForm.roomId],
   )
 
+  const handleSubscribeToSlot = async (roomId: number, date: string, start: string, end: string) => {
+    if (!token) return
+    try {
+      await api.subscribeToRoom(token, roomId, date, start, end)
+      await loadMySubscriptions(token)
+      pushNotification('Te avisaremos cuando el horario quede disponible.', 'ROOM_AVAILABLE')
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'No se pudo registrar la suscripción'
+      setModalMessage({ title: 'Error al suscribirse', message, variant: 'error' })
+    }
+  }
+
+  const handleUnsubscribeFromSlot = async (subscriptionId: number) => {
+    if (!token) return
+    try {
+      // find the roomId from the subscription
+      const sub = mySubscriptions.find((s) => s.id === subscriptionId)
+      if (!sub) return
+      await api.unsubscribeFromRoom(token, sub.roomId)
+      setMySubscriptions((current) => current.filter((s) => s.id !== subscriptionId))
+      pushNotification('Suscripción de disponibilidad cancelada.', 'ROOM_AVAILABLE')
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'No se pudo cancelar la suscripción'
+      setModalMessage({ title: 'Error al cancelar suscripción', message, variant: 'error' })
+    }
+  }
+
   const showGlobalTopbar =
-    Boolean(authenticatedUser) && effectiveRoute !== 'login' && effectiveRoute !== 'reset-password'
+    Boolean(authenticatedUser) && effectiveRoute !== 'login' && effectiveRoute !== 'reset-password' && effectiveRoute !== 'confirm-change'
   const contentOffsetClass = showGlobalTopbar
     ? isSidebarCollapsed
       ? 'md:pl-24'
       : 'md:pl-64'
     : ''
   const mobileNavPaddingClass = showGlobalTopbar ? 'pt-16 md:pt-0 pb-20 md:pb-0' : ''
-  const shouldShowAuthRestoreScreen = hasStoredSession && !authHydrated && route !== 'reset-password'
+  const shouldShowAuthRestoreScreen = hasStoredSession && !authHydrated && route !== 'reset-password' && route !== 'confirm-change'
   const settingsRole = authenticatedUser?.role ?? 'student'
   const settingsNotificationOptions = notificationPreferenceOptions(settingsRole)
   const settingsNotificationGroups = settingsNotificationOptions.reduce<Record<string, NotificationPreferenceOption[]>>((acc, option) => {
@@ -2000,6 +2231,7 @@ export function MainPage() {
           {showGlobalTopbar && authenticatedUser && (
             <GlobalTopbar
               role={authenticatedUser.role}
+              user={authenticatedUser}
               activeRoute={effectiveRoute}
               notifications={notifications}
               isSidebarCollapsed={isSidebarCollapsed}
@@ -2044,20 +2276,8 @@ export function MainPage() {
                 onBackToLogin={() => navigateToRoute('login')}
               />
             )}
-            {effectiveRoute === 'dashboard' && token && <AdminDashboardPage token={token} />}
-            {effectiveRoute === 'mapa' && token && authenticatedUser && (
-              <CampusMapPage token={token} isDarkMode={isDarkMode} isAdmin={authenticatedUser.role === 'admin'} onReserve={(roomId) => {
-                const room = activeRooms.find((item) => item.backendId === roomId)
-                if (room) setReservationForm((current) => ({ ...current, roomId: room.id, campus: room.campus, location: room.location }))
-                navigateToRoute(authenticatedUser.role === 'student' ? 'reservas' : 'salas')
-              }} />
-            )}
-            {effectiveRoute === 'busqueda-inteligente' && token && (
-              <SmartSearchPage token={token} onChooseRecommendation={(roomId) => {
-                const room = activeRooms.find((item) => item.backendId === roomId)
-                if (room) setReservationForm((current) => ({ ...current, roomId: room.id, campus: room.campus, location: room.location }))
-                navigateToRoute('reservas')
-              }} />
+            {effectiveRoute === 'confirm-change' && (
+              <ConfirmSensitiveChangePage />
             )}
             {effectiveRoute === 'reservas' && (
               <ReservasPage
@@ -2074,6 +2294,7 @@ export function MainPage() {
                 currentUser={authenticatedUser}
                 companions={reservationCompanions}
                 companionCodeInput={reservationCompanionCodeInput}
+                mySubscriptions={mySubscriptions}
                 onCompanionCodeInputChange={setReservationCompanionCodeInput}
                 onRemoveCompanion={handleRemoveReservationCompanion}
                 onWeekOffsetChange={setReservationWeekOffset}
@@ -2083,16 +2304,121 @@ export function MainPage() {
                   setReservationCompanionCodeInput('')
                 }}
                 onSubmitReservation={handleCreateReservation}
+                onSubscribeToSlot={handleSubscribeToSlot}
+                onUnsubscribeFromSlot={handleUnsubscribeFromSlot}
+                intelligentSearchResult={intelligentSearchResult}
+                intelligentSearchLoading={intelligentSearchLoading}
+                intelligentSearchError={intelligentSearchError}
+                onIntelligentSearch={handleIntelligentSearch}
+                onSelectRecommendation={handleSelectRecommendation}
+              />
+            )}
+            {effectiveRoute === 'busqueda-inteligente' && (
+              <SmartSearchPage
+                reservationForm={reservationForm}
+                result={intelligentSearchResult}
+                loading={intelligentSearchLoading}
+                error={intelligentSearchError}
+                onReservationChange={handleReservationChange}
+                onSearch={handleIntelligentSearch}
+                onChooseRecommendation={(roomId) => {
+                  handleSelectRecommendation(roomId)
+                  navigateToRoute('reservas')
+                }}
+              />
+            )}
+            {effectiveRoute === 'dashboard' && (
+              <AdminDashboardPage
+                data={dashboardData}
+                loading={dashboardLoading}
+                error={dashboardError}
+                from={dashboardFrom}
+                to={dashboardTo}
+                onFromChange={setDashboardFrom}
+                onToChange={setDashboardTo}
+                onApply={() => token && void loadDashboard(token)}
+                onReset={() => {
+                  const nextTo = getTodayIso()
+                  const nextFromDate = new Date(); nextFromDate.setDate(nextFromDate.getDate() - 29)
+                  const nextFrom = nextFromDate.toISOString().slice(0, 10)
+                  setDashboardFrom(nextFrom)
+                  setDashboardTo(nextTo)
+                  if (token) void loadDashboard(token, nextFrom, nextTo)
+                }}
+              />
+            )}
+            {effectiveRoute === 'mapa' && token && authenticatedUser && (
+              <CampusMapPage
+                token={token}
+                isDarkMode={isDarkMode}
+                isAdmin={authenticatedUser.role === 'admin'}
+                onReserve={(roomId) => {
+                  navigate(`/reservas?roomId=${roomId}`)
+                  setRoute('reservas')
+                }}
               />
             )}
             {effectiveRoute === 'misreservas' && (
               <MisReservasPage
                 myBookings={myBookings}
                 activeRooms={activeRooms}
+                mySubscriptions={mySubscriptions}
                 onEditBooking={openEditBooking}
                 onCancelBooking={(bookingId) => requestCancelBooking(bookingId, 'student')}
                 onCreateFirstReservation={() => navigateToRoute('reservas')}
                 onDownloadIcs={downloadBookingIcs}
+                onUnsubscribeFromSlot={handleUnsubscribeFromSlot}
+              />
+            )}
+            {effectiveRoute === 'profile' && authenticatedUser && (
+              <ProfilePage
+                user={authenticatedUser}
+                sessions={profileSessions}
+                sessionsLoading={profileSessionsLoading}
+                activity={profileActivity}
+                activityLoading={profileActivityLoading}
+                onRevokeSession={async (sessionId) => {
+                  if (!token) return
+                  try {
+                    const revokingCurrentSession = profileSessions.some((session) => session.id === sessionId && session.current)
+                    await api.revokeSession(token, sessionId)
+                    if (revokingCurrentSession) {
+                      logout()
+                      return
+                    }
+                    setProfileSessions((current) => current.filter((s) => s.id !== sessionId))
+                    setToastMessage('Sesión revocada')
+                  } catch {
+                    setModalMessage({ title: 'Error', message: 'No se pudo revocar la sesión', variant: 'error' })
+                  }
+                }}
+                onRevokeAllSessions={async () => {
+                  if (!token) return
+                  try {
+                    await api.revokeAllSessions(token)
+                    logout()
+                  } catch {
+                    setModalMessage({ title: 'Error', message: 'No se pudo revocar las sesiones', variant: 'error' })
+                  }
+                }}
+                onRequestDisable2fa={async () => {
+                  if (!token) return
+                  try {
+                    await api.requestSensitiveChange(token, 'DISABLE_2FA')
+                    setModalMessage({ title: 'Correo enviado', message: 'Revisa tu correo para confirmar la desactivación de 2FA.', variant: 'success' })
+                  } catch {
+                    setModalMessage({ title: 'Error', message: 'No se pudo enviar el correo de confirmación', variant: 'error' })
+                  }
+                }}
+                onRequestEnable2fa={async () => {
+                  if (!token) return
+                  try {
+                    await api.enroll2fa(token)
+                    setModalMessage({ title: 'Correo enviado', message: 'Revisa tu correo con el código para activar 2FA.', variant: 'success' })
+                  } catch {
+                    setModalMessage({ title: 'Error', message: 'No se pudo enviar el código', variant: 'error' })
+                  }
+                }}
               />
             )}
             {effectiveRoute === 'salas' && (
@@ -2247,6 +2573,45 @@ export function MainPage() {
                   )
                 }
                 onSaveCampusSchedule={saveCampusSchedule}
+              />
+            )}
+            {effectiveRoute === 'seguridad' && (
+              <SecurityPage
+                attempts={securityAttempts}
+                loading={securityLoading}
+                userFilter={securityUserFilter}
+                emailFilter={securityEmailFilter}
+                statusFilter={securityStatusFilter}
+                blockFilter={securityBlockFilter}
+                fromFilter={securityFromFilter}
+                toFilter={securityToFilter}
+                page={securityPage}
+                totalPages={securityTotalPages}
+                totalElements={securityTotalElements}
+                onUserFilterChange={(value) => { setSecurityUserFilter(value); setSecurityPage(1) }}
+                onEmailFilterChange={(value) => { setSecurityEmailFilter(value); setSecurityPage(1) }}
+                onStatusFilterChange={(value) => { setSecurityStatusFilter(value); setSecurityPage(1) }}
+                onBlockFilterChange={(value) => { setSecurityBlockFilter(value); setSecurityPage(1) }}
+                onFromFilterChange={(value) => { setSecurityFromFilter(value); setSecurityPage(1) }}
+                onToFilterChange={(value) => { setSecurityToFilter(value); setSecurityPage(1) }}
+                onPrevPage={() => setSecurityPage((current) => current - 1)}
+                onNextPage={() => setSecurityPage((current) => current + 1)}
+                onClearFilters={() => {
+                  setSecurityUserFilter('')
+                  setSecurityEmailFilter('')
+                  setSecurityStatusFilter('todos')
+                  setSecurityBlockFilter('todos')
+                  setSecurityFromFilter('')
+                  setSecurityToFilter('')
+                  setSecurityPage(1)
+                }}
+              />
+            )}
+            {effectiveRoute === 'comunicados' && (
+              <ComunicadosPage
+                published={announcements}
+                sending={announcementSending}
+                onPublish={handlePublishAnnouncement}
               />
             )}
           </div>
@@ -2532,6 +2897,7 @@ export function MainPage() {
               >
                 {authenticatedUser?.role === 'admin' ? (
                   <>
+                    <option value="dashboard">Dashboard</option>
                     <option value="salas">Salas</option>
                     <option value="perfiles">Perfiles</option>
                     <option value="admin-reservas">Reservas</option>
@@ -2595,9 +2961,10 @@ export function MainPage() {
               </button>
               <button
                 type="button"
-                className={pendingProfileTarget.nextStatus === 'Deshabilitado' ? 'danger-btn' : 'primary-btn'}
+                className={pendingProfileTarget.nextStatus === 'Deshabilitado' ? 'danger-btn' : 'inline-flex min-h-10 items-center justify-center gap-2 rounded-full bg-primary px-4 text-sm font-semibold text-white transition hover:-translate-y-px hover:bg-primary-dark disabled:cursor-not-allowed disabled:opacity-60'}
                 onClick={confirmProfileAction}
               >
+                <span className="btn-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m4.5 12.5 4.6 4.6L19.5 6.8" /></svg></span>
                 Confirmar
               </button>
             </div>
