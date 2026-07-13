@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.luistudio.reservas.model.AuditLogEntity;
 import com.luistudio.reservas.model.CampusScheduleEntity;
+import com.luistudio.reservas.model.CampusEntity;
 import com.luistudio.reservas.model.EmailOutboxEntity;
 import com.luistudio.reservas.model.LoginAttemptEntity;
 import com.luistudio.reservas.model.MaintenanceEntity;
@@ -18,6 +19,7 @@ import com.luistudio.reservas.model.SystemConfigEntity;
 import com.luistudio.reservas.model.TwoFactorCodeEntity;
 import com.luistudio.reservas.model.UserEntity;
 import jakarta.persistence.Column;
+import jakarta.persistence.ElementCollection;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.Table;
 import java.io.IOException;
@@ -39,6 +41,7 @@ class SchemaMappingTest {
 
     private static final Set<Class<?>> ENTITIES = Set.of(
         AuditLogEntity.class,
+        CampusEntity.class,
         CampusScheduleEntity.class,
         EmailOutboxEntity.class,
         LoginAttemptEntity.class,
@@ -77,6 +80,9 @@ class SchemaMappingTest {
         columns.add("id");
 
         for (Field field : entity.getDeclaredFields()) {
+            if (field.isAnnotationPresent(ElementCollection.class)) {
+                continue;
+            }
             Column column = field.getAnnotation(Column.class);
             if (column != null) {
                 columns.add(resolveColumnName(column.name(), field.getName()));

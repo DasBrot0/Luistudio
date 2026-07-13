@@ -21,7 +21,7 @@ interface ApiLoginResponse {
   message: string
 }
 
-interface ApiRoom {
+export interface ApiRoom {
   id: number
   code: string
   name: string
@@ -39,6 +39,24 @@ interface ApiRoom {
   schedule: ApiScheduleDay[]
   status: string
   pabellonCode: string
+  noiseLevel: 'BAJO' | 'MEDIO' | 'ALTO'
+  supportsConcentration: boolean
+  roomType: string
+  equipment: string[]
+}
+
+export interface ApiIntelligentRoomSearchResponse {
+  intent: { roomType: string; minimumCapacity: number; maximumNoise: 'BAJO' | 'MEDIO' | 'ALTO'; requiresConcentration: boolean; requiredEquipment: string[] }
+  recommendations: Array<{ room: ApiRoom; score: number; reasons: string[] }>
+}
+
+export interface ApiAdminDashboard {
+  from: string; to: string; totalReservations: number; absenceRate: number; absenceCount: number; attendanceEligibleCount: number; attendanceCount: number; pendingAttendanceCount: number
+  occupancyByRoom: Array<{ roomId: number; roomCode: string; roomName: string; reservedMinutes: number; availableMinutes: number; occupancyRate: number }>
+  peakHours: Array<{ hour: number; reservedMinutes: number; reservationCount: number }>
+  dailyOccupancy: Array<{ date: string; reservedMinutes: number; availableMinutes: number; occupancyRate: number }>
+  weeklyHeatmap: Array<{ dayOfWeek: number; hour: number; reservedMinutes: number; availableMinutes: number; occupancyRate: number }>
+  topStudents: Array<{ userId: number; code: string; fullName: string; email: string; reservationCount: number; reservedMinutes: number; absenceCount: number }>
 }
 
 export interface ApiScheduleDay {
@@ -312,6 +330,10 @@ export const api = {
     return http<ApiRoom[]>(`/rooms/available${query}`, {}, token)
   },
 
+  intelligentRoomSearch(token: string, payload: { query: string; date: string; start: string; end: string; limit?: number }) {
+    return http<ApiIntelligentRoomSearchResponse>('/rooms/intelligent-search', { method: 'POST', body: JSON.stringify(payload) }, token)
+  },
+
   createRoom(
     token: string,
     payload: {
@@ -440,6 +462,10 @@ export const api = {
     return http<ApiConfig>('/admin/config', {}, token)
   },
 
+  getAdminDashboard(token: string, from: string, to: string) {
+    return http<ApiAdminDashboard>(`/admin/dashboard?${new URLSearchParams({ from, to })}`, {}, token)
+  },
+
   updateAdminConfig(token: string, config: ApiConfig) {
     return http<ApiConfig>('/admin/config', { method: 'PUT', body: JSON.stringify(config) }, token)
   },
@@ -509,8 +535,13 @@ export const api = {
     return http<ApiPreferences>('/me/preferences', { method: 'PUT', body: JSON.stringify(preferences) }, token)
   },
 
-  getCampusMap(token: string) {
-    return http('/campus/map', {}, token)
+  getCampusMap(token: string, campus?: string, signal?: AbortSignal) {
+    const query = campus ? `?campus=${encodeURIComponent(campus)}` : ''
+    return http<import('../models/campusMap').CampusMapResponse>(`/campus/map${query}`, { signal }, token)
+  },
+
+  updateBuildingLocation(token: string, buildingId: number, latitude: number, longitude: number) {
+    return http<import('../models/campusMap').CampusMapPavilion>(`/admin/buildings/${buildingId}/location`, { method: 'PUT', body: JSON.stringify({ latitude, longitude }) }, token)
   },
 
   lookupUserByCode(token: string, code: string) {

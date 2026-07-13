@@ -4,6 +4,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.ZoneId;
+import java.time.OffsetDateTime;
 
 public final class AppTime {
 
@@ -22,5 +23,9 @@ public final class AppTime {
 
     public static LocalDateTime nowDateTime() {
         return LocalDateTime.now(ZONE);
+    }
+
+    public static OffsetDateTime nowOffset() {
+        return OffsetDateTime.now(ZONE);
     }
 }

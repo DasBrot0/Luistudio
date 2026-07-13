@@ -2,19 +2,20 @@ package com.luistudio.reservas.controller;
 
 import com.luistudio.reservas.dto.admin.AdminConfigResponse;
 import com.luistudio.reservas.dto.admin.AdminConfigUpdateRequest;
+import com.luistudio.reservas.dto.admin.AdminDashboardResponse;
 import com.luistudio.reservas.dto.admin.CampusScheduleListResponse;
-import com.luistudio.reservas.dto.admin.CampusMapResponse;
 import com.luistudio.reservas.dto.admin.CampusScheduleResponse;
 import com.luistudio.reservas.dto.admin.CampusScheduleUpdateRequest;
 import com.luistudio.reservas.dto.common.PageResponse;
 import com.luistudio.reservas.dto.user.UserResponse;
 import com.luistudio.reservas.dto.user.UserStatusUpdateRequest;
 import com.luistudio.reservas.service.AccessGuard;
-import com.luistudio.reservas.service.CampusMapService;
+import com.luistudio.reservas.service.AdminDashboardService;
 import com.luistudio.reservas.service.RoomScheduleService;
 import com.luistudio.reservas.service.SystemConfigService;
 import com.luistudio.reservas.service.UserService;
 import jakarta.validation.Valid;
+import java.time.LocalDate;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -31,21 +32,30 @@ public class AdminController {
     private final AccessGuard accessGuard;
     private final UserService userService;
     private final SystemConfigService systemConfigService;
-    private final CampusMapService campusMapService;
     private final RoomScheduleService roomScheduleService;
+    private final AdminDashboardService adminDashboardService;
 
     public AdminController(
         AccessGuard accessGuard,
         UserService userService,
         SystemConfigService systemConfigService,
-        CampusMapService campusMapService,
-        RoomScheduleService roomScheduleService
+        RoomScheduleService roomScheduleService,
+        AdminDashboardService adminDashboardService
     ) {
         this.accessGuard = accessGuard;
         this.userService = userService;
         this.systemConfigService = systemConfigService;
-        this.campusMapService = campusMapService;
         this.roomScheduleService = roomScheduleService;
+        this.adminDashboardService = adminDashboardService;
+    }
+
+    @GetMapping("/admin/dashboard")
+    public AdminDashboardResponse getDashboard(
+        @RequestParam LocalDate from,
+        @RequestParam LocalDate to
+    ) {
+        accessGuard.requireAdmin();
+        return adminDashboardService.getDashboard(from, to);
     }
 
     @GetMapping("/admin/users")
@@ -81,12 +91,6 @@ public class AdminController {
     public AdminConfigResponse updateConfig(@Valid @RequestBody AdminConfigUpdateRequest request) {
         accessGuard.requireAdmin();
         return systemConfigService.updateConfig(request);
-    }
-
-    @GetMapping("/campus/map")
-    public CampusMapResponse getCampusMap() {
-        accessGuard.requireUser();
-        return campusMapService.getCampusMap();
     }
 
     @GetMapping("/admin/campus-schedules")

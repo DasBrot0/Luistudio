@@ -9,11 +9,15 @@ import com.luistudio.reservas.exception.BusinessException;
 import com.luistudio.reservas.exception.NotFoundException;
 import com.luistudio.reservas.model.MaintenanceEntity;
 import com.luistudio.reservas.model.MaintenanceStatus;
+import com.luistudio.reservas.model.CampusEntity;
 import com.luistudio.reservas.model.PabellonEntity;
 import com.luistudio.reservas.model.RoomEntity;
+import com.luistudio.reservas.model.RoomNoiseLevel;
 import com.luistudio.reservas.model.RoomState;
+import com.luistudio.reservas.model.RoomType;
 import com.luistudio.reservas.repository.MaintenanceRepository;
 import com.luistudio.reservas.repository.PabellonRepository;
+import com.luistudio.reservas.repository.CampusRepository;
 import com.luistudio.reservas.repository.ReservationRepository;
 import com.luistudio.reservas.repository.RoomRepository;
 import com.luistudio.reservas.util.AppTime;
@@ -21,6 +25,8 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.LinkedHashSet;
+import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
@@ -38,6 +44,7 @@ public class RoomService {
 
     private final RoomRepository roomRepository;
     private final PabellonRepository pabellonRepository;
+    private final CampusRepository campusRepository;
     private final ReservationRepository reservationRepository;
     private final MaintenanceRepository maintenanceRepository;
     private final DtoMapper dtoMapper;
@@ -46,6 +53,7 @@ public class RoomService {
     public RoomService(
         RoomRepository roomRepository,
         PabellonRepository pabellonRepository,
+        CampusRepository campusRepository,
         ReservationRepository reservationRepository,
         MaintenanceRepository maintenanceRepository,
         DtoMapper dtoMapper,
@@ -53,6 +61,7 @@ public class RoomService {
     ) {
         this.roomRepository = roomRepository;
         this.pabellonRepository = pabellonRepository;
+        this.campusRepository = campusRepository;
         this.reservationRepository = reservationRepository;
         this.maintenanceRepository = maintenanceRepository;
         this.dtoMapper = dtoMapper;
@@ -112,18 +121,20 @@ public class RoomService {
         }
         validatePeopleConstraints(request.capacity(), request.minPeople(), request.minPeopleRequired(), request.maxPeople());
 
-        PabellonEntity pabellon = resolvePabellon(request.pabellonCode(), request.location());
+        PabellonEntity pabellon = resolvePabellon(request.pabellonCode(), request.campus());
         RoomEntity room = buildAvailableRoom(
             request.name(),
-            request.campus(),
-            request.location(),
             request.capacity(),
             resolveMinPeople(request.minPeople()),
             request.minPeopleRequired(),
             request.maxPeople(),
             request.location(),
             pabellon,
-            generateRoomCode(request.campus(), request.location())
+            generateRoomCode(request.campus(), request.location()),
+            request.noiseLevel(),
+            request.supportsConcentration(),
+            request.roomType(),
+            request.equipment()
         );
         RoomEntity saved = roomRepository.save(room);
         roomScheduleService.saveRoomSchedule(saved, request.schedule());
@@ -136,14 +147,24 @@ public class RoomService {
         RoomEntity room = getRoomEntity(roomId);
         validatePeopleConstraints(request.capacity(), request.minPeople(), request.minPeopleRequired(), request.maxPeople());
         room.setNombre(request.name().trim());
-        room.setCampus(request.campus().trim());
-        room.setVenue(request.location().trim());
         room.setCapacidad(request.capacity());
         room.setUbicacion(request.location().trim());
         room.setMinimoPersonas(resolveMinPeople(request.minPeople()));
         room.setMinimoPersonasObligatorio(request.minPeopleRequired());
         room.setMaximoPersonas(request.maxPeople());
-        room.setPabellon(resolvePabellon(request.pabellonCode(), request.location()));
+        room.setPabellon(resolvePabellon(request.pabellonCode(), request.campus()));
+        if (request.noiseLevel() != null) {
+            room.setNivelRuido(request.noiseLevel());
+        }
+        if (request.supportsConcentration() != null) {
+            room.setPermiteConcentracion(request.supportsConcentration());
+        }
+        if (request.roomType() != null) {
+            room.setTipo(request.roomType());
+        }
+        if (request.equipment() != null) {
+            room.setEquipamiento(normalizeEquipment(request.equipment()));
+        }
         RoomState requestedStatus = request.status() == null ? room.getEstado() : request.status();
         if (requestedStatus == RoomState.INACTIVA) {
             ensureRoomCanBeInactivated(room);
@@ -177,8 +198,11 @@ public class RoomService {
         }
 
         MaintenanceEntity maintenance = buildScheduledMaintenance(room, request);
-        room.setEstado(RoomState.EN_MANTENIMIENTO);
-        roomRepository.save(room);
+        OffsetDateTime now = AppTime.nowOffset();
+        if (!request.start().isAfter(now) && request.end().isAfter(now)) {
+            room.setEstado(RoomState.EN_MANTENIMIENTO);
+            roomRepository.save(room);
+        }
 
         return dtoMapper.toMaintenance(maintenanceRepository.save(maintenance));
     }
@@ -207,13 +231,26 @@ public class RoomService {
         return !overlapsBooking && !overlapsMaintenance;
     }
 
-    private PabellonEntity resolvePabellon(String requestedCode, String location) {
-        String pabellonCode = (requestedCode == null || requestedCode.isBlank()) ? location : requestedCode;
+    private PabellonEntity resolvePabellon(String requestedCode, String campusName) {
+        String pabellonCode = requestedCode == null || requestedCode.isBlank() ? null : requestedCode.trim();
+        if (pabellonCode == null) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST, "El código de pabellón es obligatorio");
+        }
+        PabellonEntity existing = pabellonRepository.findByCodigo(pabellonCode).orElse(null);
+        if (existing != null) {
+            if (!existing.getCampus().getNombre().equalsIgnoreCase(campusName.trim())) {
+                throw new BusinessException(HttpStatus.BAD_REQUEST, "El pabellón no pertenece al campus indicado");
+            }
+            return existing;
+        }
         return pabellonRepository.findByCodigo(pabellonCode).orElseGet(() -> {
+            CampusEntity campus = campusRepository.findByNombreIgnoreCase(campusName.trim()).orElseThrow(
+                () -> new BusinessException(HttpStatus.BAD_REQUEST, "Campus no encontrado")
+            );
             PabellonEntity pabellon = new PabellonEntity();
             pabellon.setCodigo(pabellonCode);
             pabellon.setNombre(pabellonCode);
-            pabellon.setUbicacion(location);
+            pabellon.setCampus(campus);
             return pabellonRepository.save(pabellon);
         });
     }
@@ -249,7 +286,11 @@ public class RoomService {
             slotMinutes,
             includeSchedule ? roomScheduleService.getEffectiveWeeklySchedule(room) : List.of(),
             base.status(),
-            base.pabellonCode()
+            base.pabellonCode(),
+            base.noiseLevel(),
+            base.supportsConcentration(),
+            base.roomType(),
+            base.equipment()
         );
     }
 
@@ -259,20 +300,20 @@ public class RoomService {
 
     private RoomEntity buildAvailableRoom(
         String name,
-        String campus,
-        String venue,
         Integer capacity,
         Integer minPeople,
         Boolean minPeopleRequired,
         Integer maxPeople,
         String location,
         PabellonEntity pabellon,
-        String roomCode
+        String roomCode,
+        RoomNoiseLevel noiseLevel,
+        Boolean supportsConcentration,
+        RoomType roomType,
+        Set<String> equipment
     ) {
         RoomEntity room = new RoomEntity();
         room.setNombre(name.trim());
-        room.setCampus(campus.trim());
-        room.setVenue(venue.trim());
         room.setCapacidad(capacity);
         room.setMinimoPersonas(minPeople);
         room.setMinimoPersonasObligatorio(minPeopleRequired);
@@ -281,7 +322,21 @@ public class RoomService {
         room.setEstado(RoomState.DISPONIBLE);
         room.setPabellon(pabellon);
         room.setCodigo(roomCode);
+        room.setNivelRuido(noiseLevel == null ? RoomNoiseLevel.MEDIO : noiseLevel);
+        room.setPermiteConcentracion(Boolean.TRUE.equals(supportsConcentration));
+        room.setTipo(roomType == null ? RoomType.GENERAL : roomType);
+        room.setEquipamiento(normalizeEquipment(equipment));
         return room;
+    }
+
+    private Set<String> normalizeEquipment(Set<String> equipment) {
+        if (equipment == null) {
+            return new LinkedHashSet<>();
+        }
+        return equipment.stream()
+            .filter(item -> item != null && !item.isBlank())
+            .map(String::trim)
+            .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
     }
 
     private MaintenanceEntity buildScheduledMaintenance(RoomEntity room, MaintenanceRequest request) {

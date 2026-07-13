@@ -25,6 +25,8 @@
    - `EMAIL_PROVIDER` (`log` por defecto, `resend` para envío real por API HTTP)
    - `EMAIL_FROM` (ej. `Luistudio <no-reply@tu-dominio.com>`)
   - `RESEND_API_KEY` (requerida si `EMAIL_PROVIDER=resend`)
+  - `GROQ_API_KEY` (requerida para la búsqueda inteligente; no se expone al frontend)
+  - `GROQ_MODEL` (por defecto `openai/gpt-oss-20b`)
   - `APP_LOG_LEVEL` (`DEBUG` por defecto para `com.luistudio.reservas` en desarrollo; usar `INFO` en produccion)
 4. Ejecuta:
 
@@ -35,6 +37,28 @@
 Si usas el script `scripts/start-backend.ps1`, este carga variables automáticamente desde:
 - `/.env` (raiz del proyecto), o
 - `/backend/reservas/.env` (si no existe el de raiz).
+
+## Desarrollo con Docker
+
+Desde la raíz del proyecto ejecuta:
+
+```bash
+docker compose up
+```
+
+El servicio `backend` monta el código fuente y ejecuta un watcher que recompila al guardar cambios; `spring-boot-devtools` reinicia la aplicación cuando detecta las clases actualizadas. No necesitas reconstruir ni reiniciar el contenedor para cambios normales de Java o recursos.
+
+## Pruebas
+
+```bash
+./mvnw test
+```
+
+La suite incluye pruebas de caja negra de autenticación, reservas y administración de salas; pruebas unitarias de cookies, JWT, cancelación, exportación ICS, paginación y validaciones de reserva; además del contrato entre entidades JPA y el esquema SQL.
+
+JaCoCo instrumenta las pruebas automáticamente y genera el reporte de cobertura en `target/site/jacoco/index.html`. El reporte CSV para anexar como evidencia queda en `target/site/jacoco/jacoco.csv`.
+
+Las exportaciones ICS y los enlaces de Google Calendar construyen la ubicación desde la jerarquía persistida `sala -> pabellón -> campus`. Cuando `buildings` tiene coordenadas, el texto incluye latitud/longitud y el ICS agrega la propiedad `GEO`.
 
 ## Despliegue en Render (Docker)
 
@@ -78,12 +102,23 @@ Memoria (500 MB):
 - `POST /api/auth/2fa/confirm`
 - `POST /api/auth/2fa/verify`
 - `POST /api/auth/2fa/disable`
+- `POST /api/auth/2fa/disable/confirm`
+- `POST /api/auth/sensitive-change/request`
+- `POST /api/auth/sensitive-change/confirm`
+- `GET /api/me/sessions`
+- `DELETE /api/me/sessions/{sessionId}`
+- `DELETE /api/me/sessions`
+- `GET /api/me/activity`
 
 ### Salas y disponibilidad
 
 - `GET /api/rooms?page&size&includeSchedule&campus&recinto&ubicacion&q`
   - Devuelve `PageResponse<RoomResponse>`. Por defecto `includeSchedule=false` para listar salas sin cargar horarios completos.
 - `GET /api/rooms/available?fecha&horaInicio&horaFin`
+- `POST /api/rooms/intelligent-search`
+  - Requiere sesión y recibe `{ "query", "date", "start", "end", "limit" }`.
+  - Groq interpreta `query` a una intención tipada. El backend valida esa intención, filtra por disponibilidad y metadata y calcula un ranking determinista; la IA no recibe el catálogo ni elige salas.
+  - La respuesta devuelve `score` y `reasons` construidos por reglas locales para cada alternativa.
 - `GET /api/rooms/{id}/bookings?desde&hasta`
 - `POST /api/rooms`
 - `PUT /api/rooms/{id}`
@@ -91,6 +126,9 @@ Memoria (500 MB):
 - `DELETE /api/rooms/{id}`
 - `POST /api/rooms/{id}/unavailability`
 - `GET /api/rooms/{id}/unavailability`
+- `POST /api/rooms/{id}/availability-subscriptions`
+- `DELETE /api/rooms/{id}/availability-subscriptions/me`
+- `GET /api/me/availability-subscriptions`
 
 ### Reservas
 
@@ -104,6 +142,7 @@ Memoria (500 MB):
 
 ### Administración
 
+- `GET /api/admin/dashboard?from=YYYY-MM-DD&to=YYYY-MM-DD`
 - `GET /api/admin/users`
   - Soporta `query` por código/correo/nombres/apellidos, `year`, `status` (`HABILITADO`, `DESHABILITADO`, `BLOQUEADO`), `sortBy` (`firstName`, `lastName`, `code`, `status`) y `sortDir`.
 - `PATCH /api/admin/users/{id}/estado`
@@ -116,6 +155,9 @@ Memoria (500 MB):
   - En días abiertos, `openTime` y `closeTime` deben alinearse con la duración por reserva del campus (30/45/60/120 min).
   - Los errores de validación incluyen el campo que falló.
 - `GET /api/campus/map`
+- `PUT /api/admin/buildings/{id}/location`
+- `GET /api/admin/security/login-attempts`
+- `POST /api/admin/announcements`
 
 ### Preferencias
 
@@ -136,21 +178,23 @@ Memoria (500 MB):
 - El costo BCrypt es configurable con `BCRYPT_STRENGTH`; para demo/nube barata se usa `10` por defecto.
 - El login usa búsqueda por correo con índice funcional `LOWER(email)` y evita escrituras/flushes innecesarios en el flujo exitoso.
 - CORS cachea preflight por 3600 segundos; los `GET` simples del frontend no envian `Content-Type` para evitar `OPTIONS` innecesarios.
-- Para bases existentes, aplicar `database/004_optimize_auth_indexes.sql` para crear los índices de autenticación.
+- Los índices de autenticación forman parte de `database/001_init.sql`.
+- La estructura y los datos iniciales de búsqueda inteligente están consolidados en `database/001_init.sql` y `database/002_seed_release01.sql`.
+- `database/002_seed_release01.sql` incluye datos de demostración idempotentes para Dashboard, Mapa y Seguridad: usuarios genéricos `@gmail.com`, reservas históricas, una ocupación actual y un mantenimiento activo. Las filas se identifican con valores `DEMO_*` para evitar duplicados al reaplicar el seed.
 - El listado administrativo de usuarios expone si una cuenta sigue bloqueada temporalmente y permite desbloquearla al volver a `HABILITADO`.
 - Se implementa 2FA por código temporal.
 - Los tokens de sesión y tokens provisionales viajan cifrados y se entregan en cookie `HttpOnly`.
 - Los tokens de recuperación y códigos 2FA se almacenan hasheados; no se persisten en texto plano.
 - Las entidades de recuperación y 2FA mapean el estado usado/no usado a la columna SQL `used`.
-- Para bases existentes, aplicar `database/006_harden_auth_secrets.sql` antes de desplegar este refuerzo.
+- El esquema reforzado de autenticación está consolidado en `database/001_init.sql`.
 - `email_outbox` se procesa por scheduler (reintentos automáticos).
 - En local, sin `RESEND_API_KEY`, el envío de correos cae en modo log (no SMTP).
 - Para despliegue en Render, usar `EMAIL_PROVIDER=resend` + `RESEND_API_KEY` (salida por HTTPS/443).
 - Se generan enlaces Google Calendar y descarga `.ics` por reserva.
 - El esquema SQL base (`database/001_init.sql` y `database/002_seed_release01.sql`) define tablas y columnas para instalaciones desde cero.
 - Los tests de backend incluyen un contrato que compara entidades JPA contra `database/001_init.sql` para detectar tablas/columnas desalineadas antes de desplegar.
-- Para bases existentes, aplicar los scripts incrementales disponibles en `/database` antes de levantar el backend.
-- Las salas almacenan data de catalogo en espanol (`code`, `name`, `campus`, `venue`, `location`).
+- Para una instalación limpia, ejecutar `001_init.sql` y después `002_seed_release01.sql`; el script `003_drop_all_tables.sql` permite reiniciarla.
+- El catálogo está normalizado como `campuses -> buildings -> rooms`: campus y recinto se derivan del pabellón, y la sala solo guarda su ubicación interna.
 - El listado de salas usa paginación y respuesta ligera por defecto; la creación/edición conserva horario completo en la respuesta.
 - Los listados de reservas que se mapean a DTO cargan usuario y sala con `EntityGraph` para evitar N+1.
 - El mapa de campus agrupa salas por pabellón desde una carga única y resuelve ocupación/mantenimiento con sets por id.
@@ -163,8 +207,7 @@ Memoria (500 MB):
 - No se permite cancelar reservas que ya finalizaron (validaci?n en backend).
 - La cancelación administrativa reutiliza `PATCH /api/bookings/{id}/cancel`; el frontend ahora agrega confirmación previa y el backend mantiene el envío de correo automático.
 - Se agrega preferencia por usuario `login_landing_view` para definir la vista inicial al iniciar sesión (validada por rol).
-- Para bases ya existentes, aplicar `database/004_add_login_landing_view.sql`.
-- Para convertir data previa de salas (ingles -> espanol en `code/name/campus/venue/location`), aplicar `database/005_rooms_data_to_spanish.sql`.
+- La vista inicial y el catálogo actual de salas están consolidados en `database/001_init.sql` y `database/002_seed_release01.sql`.
 
 ## Keep-alive en Render con UptimeRobot
 
@@ -228,3 +271,30 @@ Si falta alguna credencial, el sistema hace fallback a `log` y deja warning en l
 - El admin puede cambiar salas a disponible, mantenimiento o inactiva; inactivar/eliminar una sala se bloquea si tiene reservas activas en curso o futuras.
 - La preferencia de vista inicial para administradores acepta Salas, Perfiles y Reservas.
 - Las preferencias de notificación por usuario se guardan en `notification_preferences.notification_settings`; los correos de reservas y recordatorios respetan el canal Email configurado.
+## Dashboard administrativo y búsqueda inteligente
+
+- `GET /api/admin/dashboard?from=YYYY-MM-DD&to=YYYY-MM-DD` requiere rol administrador y acepta rangos inclusivos de hasta 366 días.
+- La ocupación por sala se calcula como minutos reservados (sin cancelaciones) entre minutos disponibles según `room_schedules`.
+- Las horas pico distribuyen los minutos de cada reserva en bloques horarios; el ranking de estudiantes se ordena por cantidad, minutos reservados y código.
+- La inasistencia usa reservas no canceladas cuyo inicio ya superó la tolerancia: `INASISTIO / reservas elegibles`.
+- La respuesta del dashboard incluye tendencia diaria de ocupación, celdas día/hora para el mapa de calor, conteos de asistencia/inasistencia/pendientes e inasistencias por estudiante.
+- `ADMIN_DASHBOARD` y su valor inicial para administradores forman parte de `database/001_init.sql` y `database/002_seed_release01.sql`.
+- `POST /api/rooms/intelligent-search` interpreta texto mediante `RoomIntentInterpreter`, filtra disponibilidad y aplica un ranking local determinista. `limit` admite valores de 1 a 3 (3 por defecto).
+- La IA solo estructura la intención; nunca decide el orden final ni recibe la decisión de sala.
+
+## Seguridad, disponibilidad e inasistencias del Release 2
+
+- Spring procesa encabezados reenviados del proxy para conservar la IP real del acceso. El primer acceso crea la referencia; los siguientes alertan por IP o tipo de dispositivo no reconocido.
+- El usuario puede revocar una sesión propia, la sesión actual o todas sus sesiones sin aprobación administrativa. La confirmación por correo se conserva para desactivar 2FA.
+- Las suscripciones evitan duplicados activos por usuario y sala. Un scheduler comprueba cada minuto si el horario quedó libre; usa `EN_COLA` para evitar correos duplicados y cambia a `NOTIFICADA` solo después del envío exitoso.
+- Editar una reserva también notifica a los suscriptores del horario anterior cuando este queda libre.
+- Los comunicados recorren en lotes de 200 a todos los estudiantes habilitados, sin un tope total de destinatarios.
+- `BookingResponse.attendanceStatus` expone `ASISTIO`, `INASISTIO` o `null` para el historial del estudiante.
+- El scheduler de mantenimiento sincroniza `PROGRAMADO`, `EN_CURSO` y `FINALIZADO`, bloquea la sala solo durante el intervalo vigente y la devuelve a `DISPONIBLE` al terminar.
+- El seed regenera reservas `DEMO_DASHBOARD_*` dentro del horario y capacidad configurados, elimina `DEMO_MAP_CURRENT` y oculta del mapa pabellones sin salas activas.
+
+# Mapa de disponibilidad E1-H10
+
+El esquema y las coordenadas iniciales del mapa están incluidos en `database/001_init.sql` y `database/002_seed_release01.sql`. `GET /api/campus/map?campus=Monterrico` requiere sesión. `PUT /api/admin/buildings/{id}/location` requiere administrador y persiste una calibración.
+
+Variables nuevas para Render/backend: `REDIS_URL`, `CAMPUS_MAP_CACHE_TTL_SECONDS=10` y `CAMPUS_MAP_REFRESH_SECONDS=15`. Si Redis falla, el servicio registra una advertencia y consulta PostgreSQL.

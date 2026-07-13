@@ -20,7 +20,7 @@ public interface RoomRepository extends JpaRepository<RoomEntity, Long> {
 
     List<RoomEntity> findByUbicacionIgnoreCaseAndEstadoNot(String ubicacion, RoomState estado);
 
-    List<RoomEntity> findByCampusIgnoreCaseAndEstadoNot(String campus, RoomState estado);
+    List<RoomEntity> findByPabellon_Campus_NombreIgnoreCaseAndEstadoNot(String campus, RoomState estado);
 
     List<RoomEntity> findByPabellonAndEstadoNot(PabellonEntity pabellon, RoomState estado);
 
@@ -28,8 +28,8 @@ public interface RoomRepository extends JpaRepository<RoomEntity, Long> {
     @Query("""
         SELECT r FROM RoomEntity r
         WHERE r.estado <> :excludedState
-          AND (:campus IS NULL OR :campus = '' OR LOWER(r.campus) = LOWER(:campus))
-          AND (:venue IS NULL OR :venue = '' OR LOWER(r.venue) = LOWER(:venue))
+          AND (:campus IS NULL OR :campus = '' OR LOWER(r.pabellon.campus.nombre) = LOWER(:campus))
+          AND (:venue IS NULL OR :venue = '' OR LOWER(r.pabellon.nombre) = LOWER(:venue))
           AND (:location IS NULL OR :location = '' OR LOWER(r.ubicacion) = LOWER(:location))
           AND (
             :query IS NULL OR :query = ''

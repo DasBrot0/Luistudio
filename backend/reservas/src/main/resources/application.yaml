@@ -17,9 +17,13 @@ spring:
     time-zone: America/Lima
     serialization:
       write-dates-as-timestamps: false
+  data:
+    redis:
+      url: ${REDIS_URL:redis://localhost:6379}
 
 server:
   port: ${PORT:8080}
+  forward-headers-strategy: framework
 
 security:
   password:
@@ -30,6 +34,9 @@ security:
     provisional-expiration-minutes: ${JWT_PROVISIONAL_EXP_MINUTES:10}
 
 app:
+  campus-map:
+    cache-ttl-seconds: ${CAMPUS_MAP_CACHE_TTL_SECONDS:10}
+    refresh-after-seconds: ${CAMPUS_MAP_REFRESH_SECONDS:15}
   auth:
     cookie-name: ${AUTH_COOKIE_NAME:luistudio_session}
     cookie-secure: ${AUTH_COOKIE_SECURE:false}
@@ -38,6 +45,7 @@ app:
     origins: ${CORS_ORIGINS:http://localhost:5173}
   frontend:
     reset-password-url: ${FRONTEND_RESET_PASSWORD_URL:http://localhost:5173/restablecer-contrasena}
+    confirm-change-url: ${FRONTEND_CONFIRM_CHANGE_URL:http://localhost:5173/confirmar-cambio}
   email:
     provider: ${EMAIL_PROVIDER:log}
     from: ${EMAIL_FROM:Luistudio <onboarding@resend.dev>}
@@ -47,6 +55,11 @@ app:
       client-id: ${GMAIL_CLIENT_ID:}
       client-secret: ${GMAIL_CLIENT_SECRET:}
       refresh-token: ${GMAIL_REFRESH_TOKEN:}
+  intelligent-search:
+    groq:
+      api-key: ${GROQ_API_KEY:}
+      model: ${GROQ_MODEL:openai/gpt-oss-20b}
+      timeout-seconds: ${GROQ_TIMEOUT_SECONDS:12}
 
 management:
   endpoints:

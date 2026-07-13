@@ -26,6 +26,9 @@ import { MisReservasPage } from './MisReservasPage'
 import { SalasPage } from './SalasPage'
 import { PerfilesPage } from './PerfilesPage'
 import { AdminReservasPage } from './AdminReservasPage'
+import { AdminDashboardPage } from './AdminDashboardPage'
+import { CampusMapPage } from './CampusMapPage'
+import { SmartSearchPage } from './SmartSearchPage'
 import { BookingSuccessModal } from '../components/modals/BookingSuccessModal'
 import { EditBookingModal } from '../components/modals/EditBookingModal'
 import { RoomFormModal } from '../components/modals/RoomFormModal'
@@ -2040,6 +2043,21 @@ export function MainPage() {
                 onSubmitResetPassword={handleResetPasswordSubmit}
                 onBackToLogin={() => navigateToRoute('login')}
               />
+            )}
+            {effectiveRoute === 'dashboard' && token && <AdminDashboardPage token={token} />}
+            {effectiveRoute === 'mapa' && token && authenticatedUser && (
+              <CampusMapPage token={token} isDarkMode={isDarkMode} isAdmin={authenticatedUser.role === 'admin'} onReserve={(roomId) => {
+                const room = activeRooms.find((item) => item.backendId === roomId)
+                if (room) setReservationForm((current) => ({ ...current, roomId: room.id, campus: room.campus, location: room.location }))
+                navigateToRoute(authenticatedUser.role === 'student' ? 'reservas' : 'salas')
+              }} />
+            )}
+            {effectiveRoute === 'busqueda-inteligente' && token && (
+              <SmartSearchPage token={token} onChooseRecommendation={(roomId) => {
+                const room = activeRooms.find((item) => item.backendId === roomId)
+                if (room) setReservationForm((current) => ({ ...current, roomId: room.id, campus: room.campus, location: room.location }))
+                navigateToRoute('reservas')
+              }} />
             )}
             {effectiveRoute === 'reservas' && (
               <ReservasPage

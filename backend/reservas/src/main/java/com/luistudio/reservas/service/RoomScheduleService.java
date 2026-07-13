@@ -9,10 +9,12 @@ import com.luistudio.reservas.dto.room.RoomScheduleInput;
 import com.luistudio.reservas.dto.room.RoomScheduleResponse;
 import com.luistudio.reservas.exception.BusinessException;
 import com.luistudio.reservas.model.CampusScheduleEntity;
+import com.luistudio.reservas.model.CampusEntity;
 import com.luistudio.reservas.model.RoomEntity;
 import com.luistudio.reservas.model.RoomScheduleEntity;
 import com.luistudio.reservas.model.RoomState;
 import com.luistudio.reservas.repository.CampusScheduleRepository;
+import com.luistudio.reservas.repository.CampusRepository;
 import com.luistudio.reservas.repository.ReservationRepository;
 import com.luistudio.reservas.repository.RoomRepository;
 import com.luistudio.reservas.repository.RoomScheduleRepository;
@@ -44,6 +46,7 @@ public class RoomScheduleService {
     }
 
     private final CampusScheduleRepository campusScheduleRepository;
+    private final CampusRepository campusRepository;
     private final RoomScheduleRepository roomScheduleRepository;
     private final RoomRepository roomRepository;
     private final ReservationRepository reservationRepository;
@@ -52,6 +55,7 @@ public class RoomScheduleService {
 
     public RoomScheduleService(
         CampusScheduleRepository campusScheduleRepository,
+        CampusRepository campusRepository,
         RoomScheduleRepository roomScheduleRepository,
         RoomRepository roomRepository,
         ReservationRepository reservationRepository,
@@ -59,6 +63,7 @@ public class RoomScheduleService {
         SystemConfigService systemConfigService
     ) {
         this.campusScheduleRepository = campusScheduleRepository;
+        this.campusRepository = campusRepository;
         this.roomScheduleRepository = roomScheduleRepository;
         this.roomRepository = roomRepository;
         this.reservationRepository = reservationRepository;
@@ -74,7 +79,7 @@ public class RoomScheduleService {
             .distinct()
             .toList();
         List<String> campusesFromConfig = campusScheduleRepository.findAll().stream()
-            .map(CampusScheduleEntity::getCampus)
+            .map(schedule -> schedule.getCampus().getNombre())
             .distinct()
             .toList();
         List<String> campuses = java.util.stream.Stream.concat(campusesFromRooms.stream(), campusesFromConfig.stream())
@@ -103,13 +108,16 @@ public class RoomScheduleService {
         }
         systemConfigService.setCampusSlotMinutes(campus, request.slotMinutes());
 
-        List<CampusScheduleEntity> existing = campusScheduleRepository.findByCampusIgnoreCaseOrderByDiaSemanaAsc(campus);
+        CampusEntity campusEntity = campusRepository.findByNombreIgnoreCase(campus).orElseThrow(
+            () -> new BusinessException(HttpStatus.BAD_REQUEST, "Campus no encontrado")
+        );
+        List<CampusScheduleEntity> existing = campusScheduleRepository.findByCampus_NombreIgnoreCaseOrderByDiaSemanaAsc(campus);
         Map<Integer, CampusScheduleEntity> existingByDay = existing.stream()
             .collect(Collectors.toMap(CampusScheduleEntity::getDiaSemana, Function.identity()));
 
         for (CampusScheduleDayInput dayInput : request.days()) {
             CampusScheduleEntity day = existingByDay.getOrDefault(dayInput.dayOfWeek(), new CampusScheduleEntity());
-            day.setCampus(campus);
+            day.setCampus(campusEntity);
             day.setDiaSemana(dayInput.dayOfWeek());
             day.setCerrado(dayInput.closed());
             day.setHoraApertura(dayInput.closed() ? null : dayInput.openTime());
@@ -155,7 +163,7 @@ public class RoomScheduleService {
             return new EffectiveSchedule(day, roomDay.getHoraApertura(), roomDay.getHoraCierre(), roomDay.getCerrado(), true);
         }
 
-        CampusScheduleEntity campusDay = campusScheduleRepository.findByCampusIgnoreCaseOrderByDiaSemanaAsc(room.getCampus())
+        CampusScheduleEntity campusDay = campusScheduleRepository.findByCampus_NombreIgnoreCaseOrderByDiaSemanaAsc(room.getCampus())
             .stream()
             .filter(item -> item.getDiaSemana() == day)
             .findFirst()
@@ -172,7 +180,7 @@ public class RoomScheduleService {
         Map<Integer, RoomScheduleEntity> roomOverrides = roomScheduleRepository.findBySalaOrderByDiaSemanaAsc(room)
             .stream()
             .collect(Collectors.toMap(RoomScheduleEntity::getDiaSemana, Function.identity()));
-        Map<Integer, CampusScheduleEntity> campus = campusScheduleRepository.findByCampusIgnoreCaseOrderByDiaSemanaAsc(room.getCampus())
+        Map<Integer, CampusScheduleEntity> campus = campusScheduleRepository.findByCampus_NombreIgnoreCaseOrderByDiaSemanaAsc(room.getCampus())
             .stream()
             .collect(Collectors.toMap(CampusScheduleEntity::getDiaSemana, Function.identity()));
 
@@ -214,7 +222,7 @@ public class RoomScheduleService {
     }
 
     private CampusScheduleResponse toCampusResponse(String campus, List<String> warnings) {
-        List<CampusScheduleDayResponse> days = campusScheduleRepository.findByCampusIgnoreCaseOrderByDiaSemanaAsc(campus)
+        List<CampusScheduleDayResponse> days = campusScheduleRepository.findByCampus_NombreIgnoreCaseOrderByDiaSemanaAsc(campus)
             .stream()
             .map(day -> new CampusScheduleDayResponse(day.getDiaSemana(), day.getHoraApertura(), day.getHoraCierre(), day.getCerrado()))
             .sorted(Comparator.comparingInt(CampusScheduleDayResponse::dayOfWeek))
@@ -235,8 +243,8 @@ public class RoomScheduleService {
     }
 
     private List<String> collectCampusConflicts(String campus) {
-        List<RoomEntity> rooms = roomRepository.findByCampusIgnoreCaseAndEstadoNot(campus, RoomState.INACTIVA);
-        List<CampusScheduleEntity> campusSchedule = campusScheduleRepository.findByCampusIgnoreCaseOrderByDiaSemanaAsc(campus);
+        List<RoomEntity> rooms = roomRepository.findByPabellon_Campus_NombreIgnoreCaseAndEstadoNot(campus, RoomState.INACTIVA);
+        List<CampusScheduleEntity> campusSchedule = campusScheduleRepository.findByCampus_NombreIgnoreCaseOrderByDiaSemanaAsc(campus);
         Map<Integer, CampusScheduleEntity> campusByDay = campusSchedule.stream()
             .collect(Collectors.toMap(CampusScheduleEntity::getDiaSemana, Function.identity()));
         List<String> warnings = new ArrayList<>();

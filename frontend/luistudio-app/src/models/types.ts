@@ -8,6 +8,9 @@ export type RouteKey =
   | 'salas'
   | 'perfiles'
   | 'admin-reservas'
+  | 'mapa'
+  | 'busqueda-inteligente'
+  | 'dashboard'
 
 export type BookingStatus = 'Confirmado' | 'Cancelado'
 export type ProfileStatus = 'Habilitado' | 'Deshabilitado' | 'Bloqueado'

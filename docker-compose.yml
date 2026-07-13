@@ -1,0 +1,96 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: luistudio-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-luistudio_db}
+      POSTGRES_USER: ${POSTGRES_USER:-luistudio}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-luistudio_dev_password}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      # El script 003 es destructivo, por eso no se monta ni se ejecuta.
+      - ./database/001_init.sql:/docker-entrypoint-initdb.d/001_init.sql:ro
+      - ./database/002_seed_release01.sql:/docker-entrypoint-initdb.d/002_seed_release01.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  backend:
+    image: maven:3.9.9-eclipse-temurin-21
+    container_name: luistudio-backend
+    restart: unless-stopped
+    environment:
+      DB_URL: jdbc:postgresql://db:5432/${POSTGRES_DB:-luistudio_db}
+      DB_USER: ${POSTGRES_USER:-luistudio}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-luistudio_dev_password}
+      DB_DRIVER: org.postgresql.Driver
+      JWT_SECRET: ${JWT_SECRET:-cambia-esta-clave-por-una-segura}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173}
+      FRONTEND_RESET_PASSWORD_URL: ${FRONTEND_RESET_PASSWORD_URL:-http://localhost:5173/restablecer-contrasena}
+      FRONTEND_CONFIRM_CHANGE_URL: ${FRONTEND_CONFIRM_CHANGE_URL:-http://localhost:5173/confirmar-cambio}
+      AUTH_COOKIE_SECURE: ${AUTH_COOKIE_SECURE:-false}
+      EMAIL_PROVIDER: ${EMAIL_PROVIDER:-log}
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+      GROQ_MODEL: ${GROQ_MODEL:-openai/gpt-oss-20b}
+      GROQ_TIMEOUT_SECONDS: ${GROQ_TIMEOUT_SECONDS:-12}
+      APP_LOG_LEVEL: ${APP_LOG_LEVEL:-INFO}
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "${BACKEND_PORT:-8080}:8080"
+    working_dir: /app
+    volumes:
+      - ./backend/reservas:/app
+      - maven_cache:/root/.m2
+    command: sh ./scripts/watch-and-run.sh
+
+  frontend:
+    image: node:22-alpine
+    container_name: luistudio-frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    environment:
+      VITE_API_BASE_URL: /api
+      VITE_PROXY_TARGET: http://backend:8080
+      VITE_MAPTILER_API_KEY: ${VITE_MAPTILER_API_KEY:-}
+      VITE_MAP_STYLE_LIGHT_URL: ${VITE_MAP_STYLE_LIGHT_URL:-https://api.maptiler.com/maps/streets-v2/style.json}
+      VITE_MAP_STYLE_DARK_URL: ${VITE_MAP_STYLE_DARK_URL:-https://api.maptiler.com/maps/streets-v2-dark/style.json}
+      CHOKIDAR_USEPOLLING: "true"
+      CHOKIDAR_INTERVAL: "300"
+    ports:
+      - "${FRONTEND_PORT:-5173}:5173"
+    working_dir: /app
+    volumes:
+      - ./frontend/luistudio-app:/app
+      - frontend_node_modules:/app/node_modules
+    command: sh -c "corepack enable && pnpm install --frozen-lockfile && pnpm run dev -- --host 0.0.0.0"
+
+  pgadmin:
+    image: dpage/pgadmin4:9.16
+    container_name: luistudio-pgadmin
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL:-admin@luistudio.com}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD:-admin123}
+      PGADMIN_CONFIG_SERVER_MODE: "False"
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "${PGADMIN_PORT:-5050}:80"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+      - ./docker/pgadmin/servers.json:/pgadmin4/servers.json:ro
+
+volumes:
+  postgres_data:
+  pgadmin_data:
+  maven_cache:
+  frontend_node_modules:

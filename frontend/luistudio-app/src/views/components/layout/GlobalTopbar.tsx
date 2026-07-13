@@ -30,9 +30,13 @@ interface GlobalTopbarProps {
 const studentItems: NavItem[] = [
   { route: 'misreservas', label: 'Mis reservas', icon: 'list' },
   { route: 'reservas', label: 'Reservar', icon: 'calendar' },
+  { route: 'busqueda-inteligente', label: 'Búsqueda', icon: 'rooms' },
+  { route: 'mapa', label: 'Mapa', icon: 'rooms' },
 ]
 
 const adminItems: NavItem[] = [
+  { route: 'dashboard', label: 'Dashboard', icon: 'bookings' },
+  { route: 'mapa', label: 'Mapa', icon: 'rooms' },
   { route: 'salas', label: 'Salas', icon: 'rooms' },
   { route: 'perfiles', label: 'Perfiles', icon: 'users' },
   { route: 'admin-reservas', label: 'Reservas', icon: 'bookings' },

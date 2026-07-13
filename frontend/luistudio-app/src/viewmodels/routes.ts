@@ -8,6 +8,9 @@ export const routePaths: Record<RouteKey, string> = {
   salas: '/salas',
   perfiles: '/perfiles',
   'admin-reservas': '/admin/reservas',
+  mapa: '/mapa',
+  'busqueda-inteligente': '/busqueda-inteligente',
+  dashboard: '/admin/dashboard',
 }
 
 export function getRouteFromPath(pathname: string): RouteKey {
@@ -19,6 +22,9 @@ export function getRouteFromPath(pathname: string): RouteKey {
   if (normalized === routePaths.salas) return 'salas'
   if (normalized === routePaths.perfiles) return 'perfiles'
   if (normalized === routePaths['admin-reservas']) return 'admin-reservas'
+  if (normalized === routePaths.mapa) return 'mapa'
+  if (normalized === routePaths['busqueda-inteligente']) return 'busqueda-inteligente'
+  if (normalized === routePaths.dashboard) return 'dashboard'
 
   return 'login'
 }
@@ -47,13 +53,13 @@ export function resolveRouteByAuth(route: RouteKey, user: AuthUser | null, prefe
   }
 
   if (user.role === 'student') {
-    if (route === 'reservas' || route === 'misreservas') {
+    if (route === 'reservas' || route === 'misreservas' || route === 'mapa' || route === 'busqueda-inteligente') {
       return route
     }
     return studentLanding(preferredLanding)
   }
 
-  if (route === 'salas' || route === 'perfiles' || route === 'admin-reservas') {
+  if (route === 'salas' || route === 'perfiles' || route === 'admin-reservas' || route === 'mapa' || route === 'dashboard') {
     return route
   }
 

@@ -17,6 +17,17 @@ import org.springframework.data.repository.query.Param;
 
 public interface ReservationRepository extends JpaRepository<ReservationEntity, Long> {
 
+    @EntityGraph(attributePaths = {"usuario", "usuario.rol", "sala"})
+    @Query("""
+        SELECT r FROM ReservationEntity r
+        WHERE r.fecha BETWEEN :fromDate AND :toDate
+        ORDER BY r.fecha ASC, r.horaInicio ASC
+    """)
+    List<ReservationEntity> findForDashboard(
+        @Param("fromDate") LocalDate fromDate,
+        @Param("toDate") LocalDate toDate
+    );
+
     @EntityGraph(attributePaths = {"usuario", "sala"})
     Page<ReservationEntity> findByUsuarioOrderByFechaDescHoraInicioDesc(UserEntity usuario, Pageable pageable);
 
@@ -91,7 +102,7 @@ public interface ReservationRepository extends JpaRepository<ReservationEntity, 
 
     @Query("""
         SELECT COUNT(r) > 0 FROM ReservationEntity r
-        WHERE LOWER(r.sala.campus) = LOWER(:campus)
+        WHERE LOWER(r.sala.pabellon.campus.nombre) = LOWER(:campus)
           AND r.estado = com.luistudio.reservas.model.ReservationStatus.ACTIVA
           AND (r.fecha > :today OR (r.fecha = :today AND r.horaFin > :nowTime))
     """)
@@ -149,5 +160,18 @@ public interface ReservationRepository extends JpaRepository<ReservationEntity, 
         @Param("usuario") UserEntity usuario,
         @Param("today") LocalDate today,
         @Param("nowTime") LocalTime nowTime
+    );
+
+    @EntityGraph(attributePaths = {"usuario", "sala"})
+    @Query("""
+        SELECT r FROM ReservationEntity r
+        WHERE r.estado = com.luistudio.reservas.model.ReservationStatus.ACTIVA
+          AND r.fecha = :today
+          AND r.horaInicio <= :cutoff
+          AND r.attendanceStatus IS NULL
+    """)
+    List<ReservationEntity> findActiveBookingsMissedBefore(
+        @Param("today") LocalDate today,
+        @Param("cutoff") LocalTime cutoff
     );
 }

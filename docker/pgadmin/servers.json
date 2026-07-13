@@ -1,0 +1,13 @@
+{
+  "Servers": {
+    "1": {
+      "Name": "Luistudio PostgreSQL",
+      "Group": "Servers",
+      "Host": "db",
+      "Port": 5432,
+      "MaintenanceDB": "luistudio_db",
+      "Username": "luistudio",
+      "SSLMode": "prefer"
+    }
+  }
+}

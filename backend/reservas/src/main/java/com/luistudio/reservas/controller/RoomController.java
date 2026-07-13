@@ -4,10 +4,13 @@ import com.luistudio.reservas.dto.booking.BookingResponse;
 import com.luistudio.reservas.dto.common.PageResponse;
 import com.luistudio.reservas.dto.room.MaintenanceRequest;
 import com.luistudio.reservas.dto.room.MaintenanceResponse;
+import com.luistudio.reservas.dto.room.IntelligentRoomSearchRequest;
+import com.luistudio.reservas.dto.room.IntelligentRoomSearchResponse;
 import com.luistudio.reservas.dto.room.RoomResponse;
 import com.luistudio.reservas.dto.room.RoomUpsertRequest;
 import com.luistudio.reservas.service.AccessGuard;
 import com.luistudio.reservas.service.BookingService;
+import com.luistudio.reservas.service.IntelligentRoomSearchService;
 import com.luistudio.reservas.service.RoomService;
 import jakarta.validation.Valid;
 import java.time.LocalDate;
@@ -32,11 +35,14 @@ public class RoomController {
     private final RoomService roomService;
     private final BookingService bookingService;
     private final AccessGuard accessGuard;
+    private final IntelligentRoomSearchService intelligentRoomSearchService;
 
-    public RoomController(RoomService roomService, BookingService bookingService, AccessGuard accessGuard) {
+    public RoomController(RoomService roomService, BookingService bookingService, AccessGuard accessGuard,
+                          IntelligentRoomSearchService intelligentRoomSearchService) {
         this.roomService = roomService;
         this.bookingService = bookingService;
         this.accessGuard = accessGuard;
+        this.intelligentRoomSearchService = intelligentRoomSearchService;
     }
 
     @GetMapping
@@ -51,6 +57,12 @@ public class RoomController {
     ) {
         accessGuard.requireUser();
         return roomService.listRooms(page, size, includeSchedule, campus, recinto, ubicacion, query);
+    }
+
+    @PostMapping("/intelligent-search")
+    public IntelligentRoomSearchResponse intelligentSearch(@Valid @RequestBody IntelligentRoomSearchRequest request) {
+        accessGuard.requireUser();
+        return intelligentRoomSearchService.search(request);
     }
 
     @GetMapping("/available")
