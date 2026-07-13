@@ -1,15 +1,21 @@
 import { useState } from 'react'
 import { AppHeader } from '../components/layout/AppHeader'
 import type { Booking, Room } from '../../models/types'
+import type { AvailabilitySubscription } from './ReservasPage'
 import { formatDate } from '../../utils/helpers'
+import { Pagination } from '../components/layout/Pagination'
+
+const PAGE_SIZE = 10
 
 interface MisReservasPageProps {
   myBookings: Booking[]
   activeRooms: Room[]
+  mySubscriptions: AvailabilitySubscription[]
   onEditBooking: (booking: Booking) => void
   onCancelBooking: (bookingId: string) => void
   onCreateFirstReservation: () => void
   onDownloadIcs: (booking: Booking) => void
+  onUnsubscribeFromSlot: (subscriptionId: number) => void
 }
 
 function PanelIcon() {
@@ -50,17 +56,31 @@ const buildGoogleCalendarUrl = (booking: Booking, roomName: string) => {
   return `https://calendar.google.com/calendar/render?${params.toString()}`
 }
 
+function BellSlashIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M5.5 9.5A6.5 6.5 0 0 1 18 8.5v3.5l2 3H4l2-3V9.5" />
+      <path d="M9.5 20a2.5 2.5 0 0 0 5 0" />
+      <path d="M3 3l18 18" />
+    </svg>
+  )
+}
+
 export function MisReservasPage({
   myBookings,
   activeRooms,
+  mySubscriptions,
   onEditBooking,
   onCancelBooking,
   onCreateFirstReservation,
   onDownloadIcs,
+  onUnsubscribeFromSlot,
 }: MisReservasPageProps) {
   const [showDetailedView, setShowDetailedView] = useState(false)
   const [mobileExpanded, setMobileExpanded] = useState<Record<string, boolean>>({})
   const [exportModalOpen, setExportModalOpen] = useState(false)
+  const [bookingsPage, setBookingsPage] = useState(1)
+  const [subscriptionsPage, setSubscriptionsPage] = useState(1)
 
   const canCancelBooking = (booking: Booking) => {
     if (booking.status === 'Cancelado') return false
@@ -80,6 +100,13 @@ export function MisReservasPage({
     return { booking, room, roomName }
   })
   const confirmedBookingRows = bookingRows.filter(({ booking }) => booking.status === 'Confirmado')
+  const absenceRows = bookingRows.filter(({ booking }) => booking.attendanceStatus === 'INASISTIO')
+  const bookingTotalPages = Math.max(1, Math.ceil(bookingRows.length / PAGE_SIZE))
+  const safeBookingsPage = Math.min(bookingsPage, bookingTotalPages)
+  const visibleBookingRows = bookingRows.slice((safeBookingsPage - 1) * PAGE_SIZE, safeBookingsPage * PAGE_SIZE)
+  const subscriptionTotalPages = Math.max(1, Math.ceil(mySubscriptions.length / PAGE_SIZE))
+  const safeSubscriptionsPage = Math.min(subscriptionsPage, subscriptionTotalPages)
+  const visibleSubscriptions = mySubscriptions.slice((safeSubscriptionsPage - 1) * PAGE_SIZE, safeSubscriptionsPage * PAGE_SIZE)
 
   const toggleMobileCard = (bookingId: string) => {
     setMobileExpanded((current) => ({ ...current, [bookingId]: !current[bookingId] }))
@@ -164,7 +191,7 @@ export function MisReservasPage({
                     )}
                   </thead>
                   <tbody>
-                    {bookingRows.map(({ booking, room, roomName }) => {
+                    {visibleBookingRows.map(({ booking, room, roomName }) => {
                       if (showDetailedView) {
                         return (
                           <tr key={booking.id}>
@@ -206,7 +233,7 @@ export function MisReservasPage({
               </div>
 
               <div className="mobile-bookings-only">
-                {bookingRows.map(({ booking, room, roomName }) => {
+                {visibleBookingRows.map(({ booking, room, roomName }) => {
                   const isExpanded = Boolean(mobileExpanded[booking.id])
                   return (
                     <article key={`mobile-${booking.id}`} className="booking-mobile-card">
@@ -274,10 +301,113 @@ export function MisReservasPage({
                   Exportar
                 </button>
               </div>
+              <Pagination
+                page={safeBookingsPage}
+                totalPages={bookingTotalPages}
+                onPrev={() => setBookingsPage(Math.max(1, safeBookingsPage - 1))}
+                onNext={() => setBookingsPage(Math.min(bookingTotalPages, safeBookingsPage + 1))}
+              />
             </>
           )}
         </article>
       </section>
+
+      <section className="dashboard-grid single-grid">
+        <article className="card">
+          <div className="card-head slim-head">
+            <div>
+              <p className="booking-block-kicker">Asistencia</p>
+              <h2>Historial de inasistencias</h2>
+            </div>
+            <span className="status-pill ok">Sin impedimento vigente</span>
+          </div>
+          <p className="mb-4 mt-0 text-xs text-slate-500">
+            Las inasistencias se registran 15 minutos después del inicio si no existe una asistencia. Actualmente no tienes una fecha de impedimento registrada.
+          </p>
+          {absenceRows.length === 0 ? (
+            <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-5 text-center">
+              <p className="m-0 text-sm font-semibold text-slate-700">No tienes inasistencias registradas.</p>
+            </div>
+          ) : (
+            <div className="table-wrap">
+              <table className="bookings-table">
+                <thead><tr><th>Sala</th><th>Fecha</th><th>Horario</th><th>Asistencia</th></tr></thead>
+                <tbody>{absenceRows.map(({ booking, roomName }) => (
+                  <tr key={`absence-${booking.id}`}>
+                    <td data-label="Sala">{roomName}</td>
+                    <td data-label="Fecha">{formatDate(booking.date)}</td>
+                    <td data-label="Horario">{booking.start}-{booking.end}</td>
+                    <td data-label="Asistencia"><span className="status-pill cancelled">Inasistencia</span></td>
+                  </tr>
+                ))}</tbody>
+              </table>
+            </div>
+          )}
+        </article>
+      </section>
+
+      {mySubscriptions.length > 0 && (
+        <section className="dashboard-grid single-grid">
+          <article className="card">
+            <div className="card-head slim-head">
+              <h2>Avisos de disponibilidad</h2>
+            </div>
+            <p className="text-xs text-slate-500 mb-3">
+              Recibirás un correo cuando el horario ocupado quede disponible.
+            </p>
+            <div className="table-wrap">
+              <table className="bookings-table">
+                <colgroup>
+                  <col style={{ width: '30%' }} />
+                  <col style={{ width: '15%' }} />
+                  <col style={{ width: '18%' }} />
+                  <col style={{ width: '12%' }} />
+                  <col style={{ width: '15%' }} />
+                </colgroup>
+                <thead>
+                  <tr>
+                    <th>Sala</th>
+                    <th>Fecha</th>
+                    <th>Horario</th>
+                    <th>Estado</th>
+                    <th>Acción</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {visibleSubscriptions.map((sub) => (
+                    <tr key={sub.id}>
+                      <td data-label="Sala">{sub.roomName}</td>
+                      <td data-label="Fecha">{formatDate(sub.targetDate)}</td>
+                      <td data-label="Horario">{sub.startTime}–{sub.endTime}</td>
+                      <td data-label="Estado">
+                        <span className="status-pill ok">{sub.status}</span>
+                      </td>
+                      <td data-label="Acción" className="actions-cell">
+                        <button
+                          type="button"
+                          className="inline-flex min-h-8 items-center justify-center gap-2 rounded-md bg-red-100 px-3 text-xs font-semibold text-red-700 transition hover:-translate-y-px hover:bg-red-200"
+                          onClick={() => onUnsubscribeFromSlot(sub.id)}
+                        >
+                          <span className="btn-icon" aria-hidden="true">
+                            <BellSlashIcon />
+                          </span>
+                          Cancelar aviso
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <Pagination
+              page={safeSubscriptionsPage}
+              totalPages={subscriptionTotalPages}
+              onPrev={() => setSubscriptionsPage(Math.max(1, safeSubscriptionsPage - 1))}
+              onNext={() => setSubscriptionsPage(Math.min(subscriptionTotalPages, safeSubscriptionsPage + 1))}
+            />
+          </article>
+        </section>
+      )}
 
       {exportModalOpen && (
         <section className="modal-layer" role="dialog" aria-modal="true" aria-labelledby="export-bookings-title">

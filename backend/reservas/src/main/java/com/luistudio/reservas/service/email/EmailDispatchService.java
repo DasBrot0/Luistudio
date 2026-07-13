@@ -3,6 +3,7 @@ package com.luistudio.reservas.service.email;
 import com.luistudio.reservas.model.EmailOutboxEntity;
 import com.luistudio.reservas.model.EmailStatus;
 import com.luistudio.reservas.repository.EmailOutboxRepository;
+import com.luistudio.reservas.repository.RoomAvailabilitySubscriptionRepository;
 import com.luistudio.reservas.service.email.gateway.EmailGatewayResolver;
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -17,13 +18,16 @@ public class EmailDispatchService {
 
     private final EmailOutboxRepository emailOutboxRepository;
     private final EmailGatewayResolver emailGatewayResolver;
+    private final RoomAvailabilitySubscriptionRepository subscriptionRepository;
 
     public EmailDispatchService(
         EmailOutboxRepository emailOutboxRepository,
-        EmailGatewayResolver emailGatewayResolver
+        EmailGatewayResolver emailGatewayResolver,
+        RoomAvailabilitySubscriptionRepository subscriptionRepository
     ) {
         this.emailOutboxRepository = emailOutboxRepository;
         this.emailGatewayResolver = emailGatewayResolver;
+        this.subscriptionRepository = subscriptionRepository;
     }
 
     @Transactional
@@ -42,6 +46,7 @@ public class EmailDispatchService {
                 email.setEstado(EmailStatus.ENVIADO);
                 email.setEnviadoEn(OffsetDateTime.now());
                 emailOutboxRepository.save(email);
+                markAvailabilitySubscriptionNotified(email);
                 sent++;
             } catch (Exception ex) {
                 failed++;
@@ -49,6 +54,7 @@ public class EmailDispatchService {
                 email.setErrorDetalle(ex.getMessage());
                 if (email.getIntentos() >= 3) {
                     email.setEstado(EmailStatus.ERROR);
+                    restoreAvailabilitySubscription(email);
                 } else {
                     email.setDisponibleDesde(OffsetDateTime.now().plusMinutes(2));
                 }
@@ -73,6 +79,37 @@ public class EmailDispatchService {
 
     private void sendEmail(EmailOutboxEntity email) {
         emailGatewayResolver.resolve().send(email);
+    }
+
+    private void markAvailabilitySubscriptionNotified(EmailOutboxEntity email) {
+        if (email.getPayload() == null || !email.getPayload().isObject()) return;
+        var type = email.getPayload().get("notificationType");
+        var subscriptionId = email.getPayload().get("subscriptionId");
+        if (type == null || !"ROOM_AVAILABLE".equals(type.asText()) || subscriptionId == null || !subscriptionId.canConvertToLong()) return;
+        subscriptionRepository.findById(subscriptionId.asLong()).ifPresent(subscription -> {
+            if (!"ACTIVA".equals(subscription.getStatus())) return;
+            subscription.setStatus("NOTIFICADA");
+            subscription.setNotifiedAt(OffsetDateTime.now());
+            subscriptionRepository.save(subscription);
+        });
+    }
+
+    private void restoreAvailabilitySubscription(EmailOutboxEntity email) {
+        Long subscriptionId = availabilitySubscriptionId(email);
+        if (subscriptionId == null) return;
+        subscriptionRepository.findById(subscriptionId).ifPresent(subscription -> {
+            if (!"EN_COLA".equals(subscription.getStatus())) return;
+            subscription.setStatus("ACTIVA");
+            subscriptionRepository.save(subscription);
+        });
+    }
+
+    private Long availabilitySubscriptionId(EmailOutboxEntity email) {
+        if (email.getPayload() == null || !email.getPayload().isObject()) return null;
+        var type = email.getPayload().get("notificationType");
+        var subscriptionId = email.getPayload().get("subscriptionId");
+        if (type == null || !"ROOM_AVAILABLE".equals(type.asText()) || subscriptionId == null || !subscriptionId.canConvertToLong()) return null;
+        return subscriptionId.asLong();
     }
 
     private String sanitize(String message) {
