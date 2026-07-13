@@ -157,7 +157,7 @@ public class UserService {
             pref.setThemeMode("LIGHT");
             pref.setFontScale(1.0);
             pref.setLoginLandingView(
-                "ADMIN".equalsIgnoreCase(user.getRol().getNombre()) ? "ADMIN_ROOMS" : "STUDENT_MY_BOOKINGS"
+                "ADMIN".equalsIgnoreCase(user.getRol().getNombre()) ? "ADMIN_DASHBOARD" : "STUDENT_MY_BOOKINGS"
             );
             return notificationPreferenceRepository.save(pref);
         });

@@ -27,7 +27,7 @@ export function ConfirmCancelBookingModal({
   return (
     <section className="modal-layer" role="dialog" aria-modal="true" aria-labelledby="cancel-booking-title">
       <div className="modal-card slim-modal text-left">
-        <h2 id="cancel-booking-title">Confirmar cancelacion</h2>
+        <h2 id="cancel-booking-title">Confirmar cancelación</h2>
         <div className="confirm-booking-copy">
           <p>Vas a cancelar {bookingLabel}.</p>
           <dl className="confirm-booking-details">

@@ -12,8 +12,10 @@ import com.luistudio.reservas.security.JwtService;
 import com.luistudio.reservas.security.SecretHashService;
 import com.luistudio.reservas.service.DtoMapper;
 import com.luistudio.reservas.service.EmailOutboxService;
+import com.luistudio.reservas.service.SessionService;
 import com.luistudio.reservas.service.email.EmailTemplateService;
 import java.time.OffsetDateTime;
+import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -29,6 +31,7 @@ public class TwoFactorService {
     private final EmailTemplateService emailTemplateService;
     private final SecurityCodeService securityCodeService;
     private final SecretHashService secretHashService;
+    private final SessionService sessionService;
 
     public TwoFactorService(
         UserRepository userRepository,
@@ -38,7 +41,8 @@ public class TwoFactorService {
         EmailOutboxService emailOutboxService,
         EmailTemplateService emailTemplateService,
         SecurityCodeService securityCodeService,
-        SecretHashService secretHashService
+        SecretHashService secretHashService,
+        SessionService sessionService
     ) {
         this.userRepository = userRepository;
         this.twoFactorCodeRepository = twoFactorCodeRepository;
@@ -48,10 +52,11 @@ public class TwoFactorService {
         this.emailTemplateService = emailTemplateService;
         this.securityCodeService = securityCodeService;
         this.secretHashService = secretHashService;
+        this.sessionService = sessionService;
     }
 
     @Transactional
-    public LoginResponse verifyLoginCode(Long userId, String code) {
+    public LoginResponse verifyLoginCode(Long userId, String code, String ip, String userAgent) {
         UserEntity user = findUser(userId);
         TwoFactorCodeEntity latest = twoFactorCodeRepository.findTopByUsuarioAndUsadoFalseOrderByIdDesc(user)
             .orElseThrow(() -> new BusinessException(HttpStatus.BAD_REQUEST, "No existe código 2FA activo"));
@@ -67,7 +72,9 @@ public class TwoFactorService {
         latest.setUsado(true);
         twoFactorCodeRepository.save(latest);
 
-        String token = jwtService.generateToken(user.getId(), user.getRol().getNombre());
+        String jti = UUID.randomUUID().toString();
+        String token = jwtService.generateToken(user.getId(), user.getRol().getNombre(), jti);
+        sessionService.createSession(user, jti, ip, userAgent);
         return new LoginResponse(token, null, false, dtoMapper.toAuthUser(user), "2FA validado");
     }
 

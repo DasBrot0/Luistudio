@@ -3,6 +3,7 @@ import type { AuthUser, Booking, BookingStatus, CampusSchedule, ScheduleDay, Sys
 import { formatDate } from '../../utils/helpers'
 import { FilterBar } from '../components/filters/FilterBar'
 import { AppHeader } from '../components/layout/AppHeader'
+import { Pagination } from '../components/layout/Pagination'
 
 interface AdminReservasPageProps {
   bookings: Booking[]
@@ -109,7 +110,7 @@ export function AdminReservasPage({
       <section className="dashboard-grid single-grid">
         <article className="card">
           <div className="card-head">
-            <h2>Listado de Reservas</h2>
+            <h2>Listado de reservas</h2>
           </div>
 
           <FilterBar
@@ -256,11 +257,7 @@ export function AdminReservasPage({
           )}
 
           {bookingRows.length > 0 && (
-          <div className="pagination">
-            <button type="button" className="inline-flex min-h-8 items-center justify-center rounded-md border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 transition hover:-translate-y-px hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60" disabled={adminPage === 1} onClick={onPrevPage}>Anterior</button>
-            <p>Página {adminPage} de {totalAdminPages}</p>
-            <button type="button" className="inline-flex min-h-8 items-center justify-center rounded-md border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 transition hover:-translate-y-px hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60" disabled={adminPage === totalAdminPages} onClick={onNextPage}>Siguiente</button>
-          </div>
+          <Pagination page={adminPage} totalPages={totalAdminPages} onPrev={onPrevPage} onNext={onNextPage} />
           )}
         </article>
 
@@ -287,7 +284,7 @@ export function AdminReservasPage({
         </article>
 
         <article className="card config-card">
-          <h2>Horario General por Campus</h2>
+          <h2>Horario general por campus</h2>
           <p className="description">Regla base para todas las salas. Se validará conflicto con el horario individual de cada sala.</p>
 
           {campusSchedules.map((campusSchedule) => (

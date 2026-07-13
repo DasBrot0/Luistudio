@@ -9,7 +9,7 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "test": "vitest run --passWithNoTests",
+    "test": "vitest run",
     "test:watch": "vitest",
     "test:report": "vitest run --reporter=verbose --reporter=junit --outputFile.junit=./test-results/junit.xml"
   },

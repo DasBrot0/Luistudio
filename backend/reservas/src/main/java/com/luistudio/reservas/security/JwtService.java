@@ -6,6 +6,7 @@ import java.security.SecureRandom;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Base64;
+import java.util.UUID;
 import javax.crypto.Cipher;
 import javax.crypto.spec.GCMParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
@@ -38,11 +39,15 @@ public class JwtService {
     }
 
     public String generateToken(Long userId, String role) {
-        return generate(userId, role, false, expirationSeconds);
+        return generate(userId, role, false, expirationSeconds, UUID.randomUUID().toString());
+    }
+
+    public String generateToken(Long userId, String role, String jti) {
+        return generate(userId, role, false, expirationSeconds, jti);
     }
 
     public String generateProvisionalToken(Long userId, String role) {
-        return generate(userId, role, true, provisionalExpirationSeconds);
+        return generate(userId, role, true, provisionalExpirationSeconds, UUID.randomUUID().toString());
     }
 
     public ParsedToken validate(String token) {
@@ -56,20 +61,21 @@ public class JwtService {
             byte[] encryptedPayload = Base64.getUrlDecoder().decode(parts[2]);
             String payload = decrypt(iv, encryptedPayload);
             String[] values = payload.split("\\|");
-            if (values.length != 4) {
+            if (values.length != 5) {
                 throw new BusinessException(HttpStatus.UNAUTHORIZED, "Token inválido");
             }
 
-            Long userId = Long.parseLong(values[0]);
-            String role = values[1];
-            boolean provisional = Boolean.parseBoolean(values[2]);
-            long exp = Long.parseLong(values[3]);
+            String jti = values[0];
+            Long userId = Long.parseLong(values[1]);
+            String role = values[2];
+            boolean provisional = Boolean.parseBoolean(values[3]);
+            long exp = Long.parseLong(values[4]);
 
             if (Instant.now().getEpochSecond() > exp) {
                 throw new BusinessException(HttpStatus.UNAUTHORIZED, "Token expirado");
             }
 
-            return new ParsedToken(userId, role, provisional);
+            return new ParsedToken(jti, userId, role, provisional);
         } catch (BusinessException ex) {
             throw ex;
         } catch (Exception ex) {
@@ -77,9 +83,9 @@ public class JwtService {
         }
     }
 
-    private String generate(Long userId, String role, boolean provisional, long ttlSeconds) {
+    private String generate(Long userId, String role, boolean provisional, long ttlSeconds, String jti) {
         long exp = Instant.now().getEpochSecond() + ttlSeconds;
-        String payload = userId + "|" + role + "|" + provisional + "|" + exp;
+        String payload = jti + "|" + userId + "|" + role + "|" + provisional + "|" + exp;
         byte[] iv = new byte[IV_LENGTH_BYTES];
         RANDOM.nextBytes(iv);
         byte[] encryptedPayload = encrypt(payload, iv);
@@ -119,6 +125,6 @@ public class JwtService {
         }
     }
 
-    public record ParsedToken(Long userId, String role, boolean provisional) {
+    public record ParsedToken(String jti, Long userId, String role, boolean provisional) {
     }
 }

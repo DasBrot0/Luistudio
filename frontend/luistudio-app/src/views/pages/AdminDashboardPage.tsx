@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import type { CSSProperties } from 'react'
 import { AppHeader } from '../components/layout/AppHeader'
 import { Pagination } from '../components/layout/Pagination'
-import { api, type ApiAdminDashboard } from '../../services/api'
+import type { ApiAdminDashboard } from '../../services/api'
 
 interface Props {
   data: ApiAdminDashboard | null
@@ -14,21 +14,6 @@ interface Props {
   onToChange: (value: string) => void
   onApply: () => void
   onReset: () => void
-}
-
-export function AdminDashboardPage({ token }: { token: string }) {
-  const today = new Date()
-  const monthAgo = new Date(today); monthAgo.setDate(today.getDate() - 30)
-  const iso = (date: Date) => date.toISOString().slice(0, 10)
-  const [from, setFrom] = useState(iso(monthAgo))
-  const [to, setTo] = useState(iso(today))
-  const [data, setData] = useState<ApiAdminDashboard | null>(null)
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
-  const load = async () => { setLoading(true); setError(''); try { setData(await api.getAdminDashboard(token, from, to)) } catch (cause) { setError(cause instanceof Error ? cause.message : 'No se pudo cargar el dashboard') } finally { setLoading(false) } }
-  useEffect(() => { void load() }, [])
-  const reset = () => { setFrom(iso(monthAgo)); setTo(iso(today)) }
-  return <AdminDashboardContent data={data} loading={loading} error={error} from={from} to={to} onFromChange={setFrom} onToChange={setTo} onApply={() => void load()} onReset={reset} />
 }
 
 const RANKING_PAGE_SIZE = 5
@@ -124,7 +109,7 @@ function WeeklyHeatmap({ cells }: { cells: ApiAdminDashboard['weeklyHeatmap'] })
   )
 }
 
-function AdminDashboardContent({ data, loading, error, from, to, onFromChange, onToChange, onApply, onReset }: Props) {
+export function AdminDashboardPage({ data, loading, error, from, to, onFromChange, onToChange, onApply, onReset }: Props) {
   const [occupancyMode, setOccupancyMode] = useState<'highest' | 'lowest'>('highest')
   const [rankingQuery, setRankingQuery] = useState('')
   const [rankingPage, setRankingPage] = useState(1)
@@ -155,7 +140,7 @@ function AdminDashboardContent({ data, loading, error, from, to, onFromChange, o
 
   return (
     <main className="page dashboard-page admin-analytics-page">
-      <AppHeader title="Dashboard administrativo" roleLabel="Administrador" />
+      <AppHeader title="Dashboard administrativo" roleLabel="Administrador" subtitle="Analiza la ocupación de salas y el comportamiento de las reservas." />
       <section className="dashboard-metrics-shell" aria-busy={loading}>
         <div className="analytics-toolbar">
           <div className="dashboard-date-filter">

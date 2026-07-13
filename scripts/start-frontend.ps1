@@ -12,12 +12,18 @@ if (-not $env:VITE_API_BASE_URL -and $env:API_BASE_URL) {
 
 Set-Location "$root\frontend\luistudio-app"
 try {
-    corepack enable
+    $pnpm = Get-Command pnpm.cmd -ErrorAction SilentlyContinue
+    function Invoke-Pnpm([string[]]$PnpmArgs) {
+        if ($pnpm) { & pnpm.cmd @PnpmArgs }
+        else { & npx.cmd --yes pnpm@10.13.1 @PnpmArgs }
+    }
+
     if (-not (Test-Path "node_modules\.bin\vite.cmd")) {
         Write-Host "Instalando dependencias del frontend..."
-        pnpm.cmd install --frozen-lockfile
+        Invoke-Pnpm @("install", "--frozen-lockfile")
+        if ($LASTEXITCODE -ne 0) { throw "No se pudieron instalar las dependencias con pnpm." }
     }
-    pnpm.cmd run dev
+    Invoke-Pnpm @("run", "dev")
 } finally {
     Set-Location "..\.."
 }

@@ -68,8 +68,8 @@ public class BookingController {
         AuthPrincipal principal = accessGuard.requireUser();
         String ics = bookingService.getStudentIcsContent(bookingId, principal.userId());
         return ResponseEntity.ok()
-            .contentType(MediaType.parseMediaType("text/calendar"))
-            .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=booking-" + bookingId + ".ics")
+            .contentType(MediaType.parseMediaType("text/calendar; charset=UTF-8"))
+            .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"booking-" + bookingId + ".ics\"")
             .body(ics);
     }
 

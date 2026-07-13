@@ -1,6 +1,10 @@
+import { useState } from 'react'
 import type { Room } from '../../models/types'
 import { FilterBar } from '../components/filters/FilterBar'
 import { AppHeader } from '../components/layout/AppHeader'
+import { Pagination } from '../components/layout/Pagination'
+
+const PAGE_SIZE = 10
 
 interface SalasPageProps {
   filteredRooms: Room[]
@@ -60,6 +64,11 @@ export function SalasPage({
   onOpenEditRoom,
   onAskDeleteRoom,
 }: SalasPageProps) {
+  const [page, setPage] = useState(1)
+  const totalPages = Math.max(1, Math.ceil(filteredRooms.length / PAGE_SIZE))
+  const safePage = Math.min(page, totalPages)
+  const visibleRooms = filteredRooms.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE)
+
   return (
     <main className="page dashboard-page">
       <AppHeader title="Salas" roleLabel="Administrador" />
@@ -67,19 +76,19 @@ export function SalasPage({
       <section className="dashboard-grid single-grid">
         <article className="card">
           <div className="card-head">
-            <h2>Listado de Salas</h2>
+            <h2>Listado de salas</h2>
           </div>
 
           <FilterBar
             searchPlaceholder="Buscar por nombre, código o ubicación"
             searchValue={roomSearchQuery}
-            onSearchChange={onRoomSearchChange}
+            onSearchChange={(value) => { setPage(1); onRoomSearchChange(value) }}
             fieldsClassName="filter-bar-fields-three"
             filters={[
               {
                 id: 'room-campus-filter',
                 value: roomFilterCampus,
-                onChange: onRoomFilterCampusChange,
+                onChange: (value) => { setPage(1); onRoomFilterCampusChange(value) },
                 options: [
                   { value: 'Todos', label: 'Campus: Todos' },
                   ...campusOptions.map((campus) => ({ value: campus, label: `Campus: ${campus}` })),
@@ -88,7 +97,7 @@ export function SalasPage({
               {
                 id: 'room-venue-filter',
                 value: roomFilterVenue,
-                onChange: onRoomFilterVenueChange,
+                onChange: (value) => { setPage(1); onRoomFilterVenueChange(value) },
                 disabled: roomFilterCampus === 'Todos',
                 options: [
                   { value: 'Todos', label: 'Recinto: Todos' },
@@ -98,7 +107,7 @@ export function SalasPage({
               {
                 id: 'room-location-filter',
                 value: roomFilterLocation,
-                onChange: onRoomFilterLocationChange,
+                onChange: (value) => { setPage(1); onRoomFilterLocationChange(value) },
                 disabled: roomFilterCampus === 'Todos',
                 options: [
                   { value: 'Todas', label: 'Ubicación: Todas' },
@@ -110,7 +119,7 @@ export function SalasPage({
               {
                 id: 'room-sort-filter',
                 value: roomSort,
-                onChange: onRoomSortChange,
+                onChange: (value) => { setPage(1); onRoomSortChange(value) },
                 options: [
                   { value: 'name:asc', label: 'Nombre A-Z' },
                   { value: 'name:desc', label: 'Nombre Z-A' },
@@ -124,26 +133,26 @@ export function SalasPage({
                 id: 'room-status-all',
                 label: 'Todas',
                 active: roomStatusFilter === 'Todos',
-                onClick: () => onRoomStatusFilterChange('Todos'),
+                onClick: () => { setPage(1); onRoomStatusFilterChange('Todos') },
               },
               {
                 id: 'room-status-available',
                 label: 'Disponible',
                 active: roomStatusFilter === 'Disponible',
-                onClick: () => onRoomStatusFilterChange('Disponible'),
+                onClick: () => { setPage(1); onRoomStatusFilterChange('Disponible') },
               },
               {
                 id: 'room-status-maintenance',
                 label: 'Mantenimiento',
                 active: roomStatusFilter === 'En mantenimiento',
-                onClick: () => onRoomStatusFilterChange('En mantenimiento'),
+                onClick: () => { setPage(1); onRoomStatusFilterChange('En mantenimiento') },
               },
             ]}
             actions={
               <button
                 type="button"
                 className="inline-flex min-h-8 items-center justify-center gap-2 rounded-md border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 transition hover:-translate-y-px hover:bg-slate-50"
-                onClick={onResetRoomFilters}
+                onClick={() => { setPage(1); onResetRoomFilters() }}
               >
                 <span className="btn-icon" aria-hidden="true">
                   <ResetFiltersIcon />
@@ -190,7 +199,7 @@ export function SalasPage({
                 </tr>
               </thead>
               <tbody>
-                {filteredRooms.map((room) => (
+                {visibleRooms.map((room) => (
                   <tr key={room.id}>
                     <td data-label="Código">{room.id}</td>
                     <td data-label="Nombre">{room.name}</td>
@@ -218,7 +227,7 @@ export function SalasPage({
 
           {filteredRooms.length > 0 && (
           <div className="mobile-list-only">
-            {filteredRooms.map((room) => (
+            {visibleRooms.map((room) => (
               <article key={`room-mobile-${room.id}`} className="mobile-record-card">
                 <div className="mobile-record-grid">
                   <p><strong>Código:</strong> {room.id}</p>
@@ -239,6 +248,15 @@ export function SalasPage({
               </article>
             ))}
           </div>
+          )}
+
+          {filteredRooms.length > 0 && (
+            <Pagination
+              page={safePage}
+              totalPages={totalPages}
+              onPrev={() => setPage(Math.max(1, safePage - 1))}
+              onNext={() => setPage(Math.min(totalPages, safePage + 1))}
+            />
           )}
 
           {roomNotice && <p className="error-text">{roomNotice}</p>}

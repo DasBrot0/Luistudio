@@ -1,13 +1,17 @@
 package com.luistudio.reservas.security;
 
 import com.luistudio.reservas.exception.BusinessException;
+import com.luistudio.reservas.model.LoginSessionEntity;
+import com.luistudio.reservas.repository.LoginSessionRepository;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -24,10 +28,16 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private static final Logger log = LoggerFactory.getLogger(JwtAuthenticationFilter.class);
 
     private final JwtService jwtService;
+    private final LoginSessionRepository loginSessionRepository;
     private final String cookieName;
 
-    public JwtAuthenticationFilter(JwtService jwtService, @Value("${app.auth.cookie-name}") String cookieName) {
+    public JwtAuthenticationFilter(
+        JwtService jwtService,
+        LoginSessionRepository loginSessionRepository,
+        @Value("${app.auth.cookie-name}") String cookieName
+    ) {
         this.jwtService = jwtService;
+        this.loginSessionRepository = loginSessionRepository;
         this.cookieName = cookieName;
     }
 
@@ -41,6 +51,20 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         if (token != null && !token.isBlank()) {
             try {
                 JwtService.ParsedToken parsed = jwtService.validate(token);
+
+                // Validate JTI — only check for non-provisional tokens (provisional tokens are
+                // ephemeral and not stored in login_sessions)
+                if (!parsed.provisional()) {
+                    Optional<LoginSessionEntity> session = loginSessionRepository.findByJti(parsed.jti());
+                    if (session.isEmpty() || session.get().getRevokedAt() != null) {
+                        throw new BusinessException(HttpStatus.UNAUTHORIZED, "Sesión revocada");
+                    }
+                    // Update last_seen_at lazily (fire-and-forget; no transaction needed here)
+                    LoginSessionEntity s = session.get();
+                    s.setLastSeenAt(OffsetDateTime.now());
+                    loginSessionRepository.save(s);
+                }
+
                 AuthPrincipal principal = new AuthPrincipal(parsed.userId(), null, parsed.role());
 
                 UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
@@ -49,7 +73,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     List.of(new SimpleGrantedAuthority("ROLE_" + parsed.role()))
                 );
 
-                authentication.setDetails(parsed.provisional());
+                authentication.setDetails(parsed);
                 SecurityContextHolder.getContext().setAuthentication(authentication);
                 log.debug(
                     "jwt_authenticated endpoint={} actorRole={} userIdHash={} provisional={}",

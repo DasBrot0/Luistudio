@@ -1,7 +1,18 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
 import { AppHeader } from '../components/layout/AppHeader'
 import type { AuthUser, Booking, ReservationCompanion, ReservationForm, Room } from '../../models/types'
+import type { ApiIntelligentRoomSearchResponse } from '../../services/api'
+
+export interface AvailabilitySubscription {
+  id: number
+  roomId: number
+  roomName: string
+  targetDate: string
+  startTime: string
+  endTime: string
+  status: string
+}
 
 interface ReservasPageProps {
   reservationForm: ReservationForm
@@ -15,6 +26,7 @@ interface ReservasPageProps {
   currentUser: AuthUser | null
   companions: ReservationCompanion[]
   companionCodeInput: string
+  mySubscriptions: AvailabilitySubscription[]
   onReservationChange: (next: ReservationForm) => void
   onAddCompanion: () => void
   onCompanionCodeInputChange: (value: string) => void
@@ -22,6 +34,13 @@ interface ReservasPageProps {
   onWeekOffsetChange: (value: number) => void
   onClearReservationForm: () => void
   onSubmitReservation: (event: FormEvent<HTMLFormElement>) => void
+  onSubscribeToSlot: (roomId: number, date: string, start: string, end: string) => void
+  onUnsubscribeFromSlot: (subscriptionId: number) => void
+  intelligentSearchResult: ApiIntelligentRoomSearchResponse | null
+  intelligentSearchLoading: boolean
+  intelligentSearchError: string
+  onIntelligentSearch: (query: string, date: string, start: string, end: string) => void
+  onSelectRecommendation: (roomId: number) => void
 }
 
 interface CalendarDay {
@@ -141,6 +160,7 @@ export function ReservasPage({
   currentUser,
   companions,
   companionCodeInput,
+  mySubscriptions,
   onReservationChange,
   onAddCompanion,
   onCompanionCodeInputChange,
@@ -148,7 +168,15 @@ export function ReservasPage({
   onWeekOffsetChange,
   onClearReservationForm,
   onSubmitReservation,
+  onSubscribeToSlot,
+  onUnsubscribeFromSlot,
+  intelligentSearchResult,
+  intelligentSearchLoading,
+  intelligentSearchError,
+  onIntelligentSearch,
+  onSelectRecommendation,
 }: ReservasPageProps) {
+  const [naturalQuery, setNaturalQuery] = useState('')
   const roomsByCampus = useMemo(
     () => activeRooms.filter((room) => room.campusLabel === reservationForm.campus),
     [activeRooms, reservationForm.campus],
@@ -244,6 +272,44 @@ export function ReservasPage({
   return (
     <main className="page dashboard-page">
       <AppHeader title="Reservar" roleLabel="Estudiante" />
+
+      {intelligentSearchResult ? Boolean(0) && <section className="smart-search-card">
+        <div className="smart-search-heading">
+          <div><span className="smart-search-badge">Búsqueda inteligente</span><h2>Cuéntanos qué espacio necesitas</h2><p>Escribe tu intención con tus propias palabras; ordenaremos salas disponibles por compatibilidad.</p></div>
+        </div>
+        <form className="smart-search-form" onSubmit={(event) => { event.preventDefault(); onIntelligentSearch(naturalQuery, reservationForm.date, reservationForm.start, reservationForm.end) }}>
+          <label className="smart-search-query">Necesidad<textarea value={naturalQuery} maxLength={500} rows={2} placeholder="Ej.: Necesito estudiar en silencio con otras 3 personas, con pizarra y proyector" onChange={(event) => setNaturalQuery(event.target.value)} /></label>
+          <label>Fecha<input type="date" value={reservationForm.date} onChange={(event) => onReservationChange({ ...reservationForm, date: event.target.value })} /></label>
+          <label>Inicio<input type="time" value={reservationForm.start} onChange={(event) => onReservationChange({ ...reservationForm, start: event.target.value })} /></label>
+          <label>Fin<input type="time" value={reservationForm.end} onChange={(event) => onReservationChange({ ...reservationForm, end: event.target.value })} /></label>
+          <button className="inline-flex min-h-10 items-center justify-center gap-2 rounded-full bg-primary px-4 text-sm font-semibold text-white transition hover:-translate-y-px hover:bg-primary-dark disabled:cursor-not-allowed disabled:opacity-60" type="submit" disabled={intelligentSearchLoading || !naturalQuery.trim() || !reservationForm.date || !reservationForm.start || !reservationForm.end}>
+            <span className="btn-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6" /><path d="m16 16 4 4" /></svg></span>
+            {intelligentSearchLoading ? 'Interpretando…' : 'Encontrar salas'}
+          </button>
+        </form>
+        {intelligentSearchError && <p className="smart-search-error" role="alert">{intelligentSearchError}</p>}
+        {intelligentSearchResult && (
+          <div className="smart-search-results">
+            <div className="interpreted-intent">
+              <span>Interpretamos:</span>
+              <b>{intelligentSearchResult.intent.minimumCapacity} personas</b>
+              <b>Ruido {intelligentSearchResult.intent.maximumNoise.toLowerCase()}</b>
+              {intelligentSearchResult.intent.requiresConcentration && <b>Concentración</b>}
+              {intelligentSearchResult.intent.requiredEquipment.map((item) => <b key={item}>{item}</b>)}
+            </div>
+            {intelligentSearchResult.recommendations.length === 0 ? <p className="smart-search-empty">No encontramos salas compatibles disponibles en ese horario. Prueba otra hora o describe requisitos más flexibles.</p> : (
+              <div className="recommendation-grid">{intelligentSearchResult.recommendations.map((recommendation, index) => (
+                <article className="recommendation-card" key={recommendation.room.id}>
+                  <div className="recommendation-rank">#{index + 1}</div>
+                  <div><span className="recommendation-score">{recommendation.score} puntos</span><h3>{recommendation.room.resourceLabel}</h3><p>{recommendation.room.campusLabel} · {recommendation.room.venueLabel} · Cap. {recommendation.room.capacity}</p></div>
+                  <ul>{recommendation.reasons.map((reason) => <li key={reason}>{reason}</li>)}</ul>
+                  <button type="button" className="inline-flex min-h-10 items-center justify-center gap-2 rounded-full bg-primary px-4 text-sm font-semibold text-white transition hover:-translate-y-px hover:bg-primary-dark disabled:cursor-not-allowed disabled:opacity-60" onClick={() => onSelectRecommendation(recommendation.room.id)}><span className="btn-icon" aria-hidden="true"><CheckIcon /></span>Elegir esta sala</button>
+                </article>
+              ))}</div>
+            )}
+          </div>
+        )}
+      </section> : null}
 
       <section className="dashboard-grid single-grid">
         <article className="card booking-card">
@@ -511,6 +577,37 @@ export function ReservasPage({
                           const selected = reservationForm.date === day.isoDate && reservationForm.start === slot
                           const disabled = blockedBySchedule || occupied
 
+                          if (occupied && selectedRoom) {
+                            const existingSub = mySubscriptions.find(
+                              (s) =>
+                                s.roomId === selectedRoom.backendId &&
+                                s.targetDate === day.isoDate &&
+                                s.startTime === slot &&
+                                s.endTime === slotEnd,
+                            )
+                            return (
+                              <td key={`${day.isoDate}-${slot}`}>
+                                <button
+                                  type="button"
+                                  className={`calendar-cell-btn blocked calendar-cell-btn-notify ${existingSub ? 'subscribed' : ''}`}
+                                  title={existingSub ? 'Cancelar aviso de disponibilidad' : 'Avisarme cuando esté disponible'}
+                                  aria-label={existingSub ? `Cancelar suscripción ${day.weekdayLabel} ${day.dateLabel} ${slot}` : `Suscribirse a disponibilidad ${day.weekdayLabel} ${day.dateLabel} ${slot}`}
+                                  onClick={() => {
+                                    if (existingSub) {
+                                      onUnsubscribeFromSlot(existingSub.id)
+                                    } else {
+                                      onSubscribeToSlot(selectedRoom.backendId, day.isoDate, slot, slotEnd)
+                                    }
+                                  }}
+                                >
+                                  <span className="calendar-cell-notify-icon" aria-hidden="true">
+                                    {existingSub ? '🔔' : '🔕'}
+                                  </span>
+                                </button>
+                              </td>
+                            )
+                          }
+
                           return (
                             <td key={`${day.isoDate}-${slot}`}>
                               <button
@@ -558,5 +655,3 @@ export function ReservasPage({
     </main>
   )
 }
-
-

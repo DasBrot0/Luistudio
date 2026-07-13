@@ -15,6 +15,7 @@ import com.luistudio.reservas.model.RoomEntity;
 import com.luistudio.reservas.model.UserEntity;
 import com.luistudio.reservas.repository.ReservationRepository;
 import com.luistudio.reservas.service.AuditService;
+import com.luistudio.reservas.service.AvailabilitySubscriptionService;
 import com.luistudio.reservas.service.BookingService;
 import com.luistudio.reservas.service.DtoMapper;
 import com.luistudio.reservas.service.EmailOutboxService;
@@ -77,6 +78,7 @@ class BookingServicePaginationTest {
     @Mock private DtoMapper                  dtoMapper;
     @Mock private BookingValidationService   bookingValidationService;
     @Mock private EmailTemplateService       emailTemplateService;
+    @Mock private AvailabilitySubscriptionService availabilitySubscriptionService;
 
     @InjectMocks
     private BookingService sut;

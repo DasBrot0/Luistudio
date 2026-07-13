@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { AppHeader } from '../components/layout/AppHeader'
 import type { ReservationForm } from '../../models/types'
-import { api, type ApiIntelligentRoomSearchResponse } from '../../services/api'
+import type { ApiIntelligentRoomSearchResponse } from '../../services/api'
 
 interface SmartSearchPageProps {
   reservationForm: ReservationForm
@@ -17,7 +17,7 @@ function CheckIcon() {
   return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4.5 12.5 4.6 4.6L19.5 6.8" /></svg>
 }
 
-function SmartSearchContent({ reservationForm, result, loading, error, onReservationChange, onSearch, onChooseRecommendation }: SmartSearchPageProps) {
+export function SmartSearchPage({ reservationForm, result, loading, error, onReservationChange, onSearch, onChooseRecommendation }: SmartSearchPageProps) {
   const [query, setQuery] = useState('')
 
   return (
@@ -64,14 +64,4 @@ function SmartSearchContent({ reservationForm, result, loading, error, onReserva
       </section>
     </main>
   )
-}
-
-export function SmartSearchPage({ token, onChooseRecommendation }: { token: string; onChooseRecommendation: (roomId: number) => void }) {
-  const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 1)
-  const [form, setForm] = useState<ReservationForm>({ campus: '', location: '', roomId: '', people: 1, date: tomorrow.toISOString().slice(0, 10), start: '09:00', end: '10:00' })
-  const [result, setResult] = useState<ApiIntelligentRoomSearchResponse | null>(null)
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
-  const search = async (query: string, date: string, start: string, end: string) => { setLoading(true); setError(''); try { setResult(await api.intelligentRoomSearch(token, { query, date, start, end, limit: 3 })) } catch (cause) { setError(cause instanceof Error ? cause.message : 'No se pudo realizar la búsqueda') } finally { setLoading(false) } }
-  return <SmartSearchContent reservationForm={form} result={result} loading={loading} error={error} onReservationChange={setForm} onSearch={(...args) => void search(...args)} onChooseRecommendation={onChooseRecommendation} />
 }

@@ -31,12 +31,17 @@ public class LoginAttemptService {
         this.emailTemplateService = emailTemplateService;
     }
 
-    public void recordAttempt(UserEntity user, boolean success, String ipAddress) {
+    public void recordAttempt(UserEntity user, boolean success, String ipAddress, String userAgent) {
         LoginAttemptEntity attempt = new LoginAttemptEntity();
         attempt.setUsuario(user);
         attempt.setExito(success);
         attempt.setIpOrigen(ipAddress);
+        attempt.setUserAgent(userAgent);
         loginAttemptRepository.save(attempt);
+    }
+
+    public void recordAttempt(UserEntity user, boolean success, String ipAddress) {
+        recordAttempt(user, success, ipAddress, null);
     }
 
     public long countRecentFailures(UserEntity user, int minutes) {
@@ -46,8 +51,8 @@ public class LoginAttemptService {
         );
     }
 
-    public void registerFailedAttemptOrLock(UserEntity user, String ipAddress) {
-        recordAttempt(user, false, ipAddress);
+    public void registerFailedAttemptOrLock(UserEntity user, String ipAddress, String userAgent) {
+        recordAttempt(user, false, ipAddress, userAgent);
         long failedLast15m = countRecentFailures(user, 15);
 
         if (failedLast15m >= 5) {
@@ -67,6 +72,7 @@ public class LoginAttemptService {
     }
 
     public void registerSuccessfulAttempt(UserEntity user, String ipAddress) {
+        recordAttempt(user, true, ipAddress);
         if (user.getLockedUntil() != null) {
             user.setLockedUntil(null);
             userRepository.save(user);
