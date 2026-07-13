@@ -2,6 +2,7 @@ package com.luistudio.reservas.service;
 
 import com.luistudio.reservas.dto.admin.AdminDashboardResponse;
 import com.luistudio.reservas.exception.BusinessException;
+import com.luistudio.reservas.model.CampusScheduleEntity;
 import com.luistudio.reservas.model.ReservationEntity;
 import com.luistudio.reservas.model.ReservationStatus;
 import com.luistudio.reservas.model.RoomEntity;
@@ -9,6 +10,7 @@ import com.luistudio.reservas.model.RoomScheduleEntity;
 import com.luistudio.reservas.model.RoomState;
 import com.luistudio.reservas.model.UserEntity;
 import com.luistudio.reservas.repository.ReservationRepository;
+import com.luistudio.reservas.repository.CampusScheduleRepository;
 import com.luistudio.reservas.repository.RoomRepository;
 import com.luistudio.reservas.repository.RoomScheduleRepository;
 import com.luistudio.reservas.util.AppTime;
@@ -21,7 +23,6 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -35,15 +36,18 @@ public class AdminDashboardService {
     private final ReservationRepository reservationRepository;
     private final RoomRepository roomRepository;
     private final RoomScheduleRepository roomScheduleRepository;
+    private final CampusScheduleRepository campusScheduleRepository;
 
     public AdminDashboardService(
         ReservationRepository reservationRepository,
         RoomRepository roomRepository,
-        RoomScheduleRepository roomScheduleRepository
+        RoomScheduleRepository roomScheduleRepository,
+        CampusScheduleRepository campusScheduleRepository
     ) {
         this.reservationRepository = reservationRepository;
         this.roomRepository = roomRepository;
         this.roomScheduleRepository = roomScheduleRepository;
+        this.campusScheduleRepository = campusScheduleRepository;
     }
 
     @Transactional(readOnly = true)
@@ -57,9 +61,19 @@ public class AdminDashboardService {
             .findBySalaIdIn(rooms.stream().map(RoomEntity::getId).toList())
             .stream()
             .collect(Collectors.groupingBy(schedule -> schedule.getSala().getId()));
+        List<Long> campusIds = rooms.stream()
+            .filter(room -> room.getPabellon() != null && room.getPabellon().getCampus() != null)
+            .map(room -> room.getPabellon().getCampus().getId())
+            .distinct()
+            .toList();
+        Map<Long, List<CampusScheduleEntity>> schedulesByCampus = campusIds.isEmpty()
+            ? Map.of()
+            : campusScheduleRepository.findByCampus_IdIn(campusIds).stream()
+                .collect(Collectors.groupingBy(schedule -> schedule.getCampus().getId()));
 
         List<AdminDashboardResponse.RoomOccupancy> occupancy = rooms.stream()
-            .map(room -> occupancy(room, reservations, schedulesByRoom.getOrDefault(room.getId(), List.of()), from, to))
+            .map(room -> occupancy(room, reservations, schedulesByRoom.getOrDefault(room.getId(), List.of()),
+                campusSchedules(room, schedulesByCampus), from, to))
             .sorted(Comparator.comparingDouble(AdminDashboardResponse.RoomOccupancy::occupancyRate).reversed()
                 .thenComparing(AdminDashboardResponse.RoomOccupancy::roomCode))
             .toList();
@@ -76,8 +90,8 @@ public class AdminDashboardService {
             Math.max(0, reservations.size() - attendance.eligible()),
             occupancy,
             peakHours(reservations),
-            dailyOccupancy(reservations, rooms, schedulesByRoom, from, to),
-            weeklyHeatmap(reservations, rooms, schedulesByRoom, from, to),
+            dailyOccupancy(reservations, rooms, schedulesByRoom, schedulesByCampus, from, to),
+            weeklyHeatmap(reservations, rooms, schedulesByRoom, schedulesByCampus, from, to),
             topStudents(reservations)
         );
     }
@@ -95,6 +109,7 @@ public class AdminDashboardService {
         RoomEntity room,
         List<ReservationEntity> reservations,
         List<RoomScheduleEntity> schedules,
+        List<CampusScheduleEntity> campusSchedules,
         LocalDate from,
         LocalDate to
     ) {
@@ -102,10 +117,8 @@ public class AdminDashboardService {
             .filter(item -> item.getSala().getId().equals(room.getId()))
             .mapToLong(this::durationMinutes)
             .sum();
-        Map<Integer, RoomScheduleEntity> byDay = schedules.stream()
-            .collect(Collectors.toMap(RoomScheduleEntity::getDiaSemana, Function.identity(), (first, ignored) -> first));
         long available = from.datesUntil(to.plusDays(1))
-            .mapToLong(date -> scheduleMinutes(byDay.get(toDatabaseDay(date.getDayOfWeek()))))
+            .mapToLong(date -> scheduleMinutes(resolveSchedule(schedules, campusSchedules, toDatabaseDay(date.getDayOfWeek()))))
             .sum();
         return new AdminDashboardResponse.RoomOccupancy(
             room.getId(), room.getCodigo(), room.getNombre(), reserved, available, percentage(reserved, available)
@@ -173,6 +186,7 @@ public class AdminDashboardService {
         List<ReservationEntity> reservations,
         List<RoomEntity> rooms,
         Map<Long, List<RoomScheduleEntity>> schedulesByRoom,
+        Map<Long, List<CampusScheduleEntity>> schedulesByCampus,
         LocalDate from,
         LocalDate to
     ) {
@@ -182,9 +196,11 @@ public class AdminDashboardService {
                 .mapToLong(this::durationMinutes)
                 .sum();
             long available = rooms.stream().mapToLong(room -> {
-                RoomScheduleEntity schedule = schedulesByRoom.getOrDefault(room.getId(), List.of()).stream()
-                    .filter(item -> item.getDiaSemana().equals(toDatabaseDay(date.getDayOfWeek())))
-                    .findFirst().orElse(null);
+                ScheduleWindow schedule = resolveSchedule(
+                    schedulesByRoom.getOrDefault(room.getId(), List.of()),
+                    campusSchedules(room, schedulesByCampus),
+                    toDatabaseDay(date.getDayOfWeek())
+                );
                 return scheduleMinutes(schedule);
             }).sum();
             return new AdminDashboardResponse.DailyOccupancy(date, reserved, available, percentage(reserved, available));
@@ -195,6 +211,7 @@ public class AdminDashboardService {
         List<ReservationEntity> reservations,
         List<RoomEntity> rooms,
         Map<Long, List<RoomScheduleEntity>> schedulesByRoom,
+        Map<Long, List<CampusScheduleEntity>> schedulesByCampus,
         LocalDate from,
         LocalDate to
     ) {
@@ -204,13 +221,17 @@ public class AdminDashboardService {
             accumulateHours(reservation.getFecha().getDayOfWeek().getValue(), reservation.getHoraInicio(), reservation.getHoraFin(),
                 (key, minutes) -> reserved.merge(key, minutes, Long::sum));
         }
-        from.datesUntil(to.plusDays(1)).forEach(date -> rooms.forEach(room ->
-            schedulesByRoom.getOrDefault(room.getId(), List.of()).stream()
-                .filter(item -> item.getDiaSemana().equals(toDatabaseDay(date.getDayOfWeek())))
-                .filter(item -> !Boolean.TRUE.equals(item.getCerrado()) && item.getHoraApertura() != null && item.getHoraCierre() != null)
-                .findFirst()
-                .ifPresent(schedule -> accumulateHours(date.getDayOfWeek().getValue(), schedule.getHoraApertura(), schedule.getHoraCierre(),
-                    (key, minutes) -> available.merge(key, minutes, Long::sum)))));
+        from.datesUntil(to.plusDays(1)).forEach(date -> rooms.forEach(room -> {
+            ScheduleWindow schedule = resolveSchedule(
+                schedulesByRoom.getOrDefault(room.getId(), List.of()),
+                campusSchedules(room, schedulesByCampus),
+                toDatabaseDay(date.getDayOfWeek())
+            );
+            if (schedule != null && !schedule.closed() && schedule.open() != null && schedule.close() != null) {
+                accumulateHours(date.getDayOfWeek().getValue(), schedule.open(), schedule.close(),
+                    (key, minutes) -> available.merge(key, minutes, Long::sum));
+            }
+        }));
         return available.entrySet().stream().map(entry -> {
             String[] parts = entry.getKey().split("-");
             int day = Integer.parseInt(parts[0]);
@@ -238,10 +259,33 @@ public class AdminDashboardService {
         return Duration.between(reservation.getHoraInicio(), reservation.getHoraFin()).toMinutes();
     }
 
-    private long scheduleMinutes(RoomScheduleEntity schedule) {
-        if (schedule == null || Boolean.TRUE.equals(schedule.getCerrado())
-            || schedule.getHoraApertura() == null || schedule.getHoraCierre() == null) return 0;
-        return Math.max(0, Duration.between(schedule.getHoraApertura(), schedule.getHoraCierre()).toMinutes());
+    private List<CampusScheduleEntity> campusSchedules(
+        RoomEntity room,
+        Map<Long, List<CampusScheduleEntity>> schedulesByCampus
+    ) {
+        if (room.getPabellon() == null || room.getPabellon().getCampus() == null) return List.of();
+        return schedulesByCampus.getOrDefault(room.getPabellon().getCampus().getId(), List.of());
+    }
+
+    private ScheduleWindow resolveSchedule(
+        List<RoomScheduleEntity> roomSchedules,
+        List<CampusScheduleEntity> campusSchedules,
+        int dayOfWeek
+    ) {
+        return roomSchedules.stream()
+            .filter(item -> item.getDiaSemana().equals(dayOfWeek))
+            .findFirst()
+            .map(item -> new ScheduleWindow(Boolean.TRUE.equals(item.getCerrado()), item.getHoraApertura(), item.getHoraCierre()))
+            .orElseGet(() -> campusSchedules.stream()
+                .filter(item -> item.getDiaSemana().equals(dayOfWeek))
+                .findFirst()
+                .map(item -> new ScheduleWindow(Boolean.TRUE.equals(item.getCerrado()), item.getHoraApertura(), item.getHoraCierre()))
+                .orElse(null));
+    }
+
+    private long scheduleMinutes(ScheduleWindow schedule) {
+        if (schedule == null || schedule.closed() || schedule.open() == null || schedule.close() == null) return 0;
+        return Math.max(0, Duration.between(schedule.open(), schedule.close()).toMinutes());
     }
 
     private int toDatabaseDay(DayOfWeek day) {
@@ -254,6 +298,7 @@ public class AdminDashboardService {
     }
 
     private record AttendanceSummary(long absences, long eligible) {}
+    private record ScheduleWindow(boolean closed, LocalTime open, LocalTime close) {}
 
     private static final class HourAccumulator {
         private long reservedMinutes;

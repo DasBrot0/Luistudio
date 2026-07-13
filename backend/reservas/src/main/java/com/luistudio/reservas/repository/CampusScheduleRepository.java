@@ -6,4 +6,5 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface CampusScheduleRepository extends JpaRepository<CampusScheduleEntity, Long> {
     List<CampusScheduleEntity> findByCampus_NombreIgnoreCaseOrderByDiaSemanaAsc(String campus);
+    List<CampusScheduleEntity> findByCampus_IdIn(List<Long> campusIds);
 }

@@ -5,6 +5,9 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.when;
 
 import com.luistudio.reservas.exception.BusinessException;
+import com.luistudio.reservas.model.CampusEntity;
+import com.luistudio.reservas.model.CampusScheduleEntity;
+import com.luistudio.reservas.model.PabellonEntity;
 import com.luistudio.reservas.model.ReservationEntity;
 import com.luistudio.reservas.model.ReservationStatus;
 import com.luistudio.reservas.model.RoleEntity;
@@ -13,6 +16,7 @@ import com.luistudio.reservas.model.RoomScheduleEntity;
 import com.luistudio.reservas.model.RoomState;
 import com.luistudio.reservas.model.UserEntity;
 import com.luistudio.reservas.repository.ReservationRepository;
+import com.luistudio.reservas.repository.CampusScheduleRepository;
 import com.luistudio.reservas.repository.RoomRepository;
 import com.luistudio.reservas.repository.RoomScheduleRepository;
 import java.time.LocalDate;
@@ -29,11 +33,12 @@ class AdminDashboardServiceTest {
     @Mock ReservationRepository reservationRepository;
     @Mock RoomRepository roomRepository;
     @Mock RoomScheduleRepository roomScheduleRepository;
+    @Mock CampusScheduleRepository campusScheduleRepository;
     private AdminDashboardService service;
 
     @BeforeEach
     void setUp() {
-        service = new AdminDashboardService(reservationRepository, roomRepository, roomScheduleRepository);
+        service = new AdminDashboardService(reservationRepository, roomRepository, roomScheduleRepository, campusScheduleRepository);
     }
 
     @Test
@@ -78,6 +83,39 @@ class AdminDashboardServiceTest {
         assertThatThrownBy(() -> service.getDashboard(LocalDate.of(2026, 7, 2), LocalDate.of(2026, 7, 1)))
             .isInstanceOf(BusinessException.class)
             .hasMessageContaining("rango");
+    }
+
+    @Test
+    void usesCampusScheduleWhenRoomHasNoSpecificSchedule() {
+        LocalDate monday = LocalDate.of(2026, 7, 6);
+        CampusEntity campus = new CampusEntity();
+        campus.setId(10L);
+        campus.setNombre("Monterrico");
+        PabellonEntity building = new PabellonEntity();
+        building.setId(20L);
+        building.setCampus(campus);
+        RoomEntity room = room(1L, "A-101", "Sala A");
+        room.setPabellon(building);
+        ReservationEntity booking = booking(room, student(8L, "20201234", "Ana", "Ramos"), monday,
+            LocalTime.of(9, 0), LocalTime.of(10, 0), null);
+        CampusScheduleEntity campusSchedule = new CampusScheduleEntity();
+        campusSchedule.setCampus(campus);
+        campusSchedule.setDiaSemana(1);
+        campusSchedule.setHoraApertura(LocalTime.of(8, 0));
+        campusSchedule.setHoraCierre(LocalTime.of(18, 0));
+        campusSchedule.setCerrado(false);
+
+        when(reservationRepository.findForDashboard(monday, monday)).thenReturn(List.of(booking));
+        when(roomRepository.findByEstadoNot(RoomState.INACTIVA)).thenReturn(List.of(room));
+        when(roomScheduleRepository.findBySalaIdIn(List.of(1L))).thenReturn(List.of());
+        when(campusScheduleRepository.findByCampus_IdIn(List.of(10L))).thenReturn(List.of(campusSchedule));
+
+        var result = service.getDashboard(monday, monday);
+
+        assertThat(result.occupancyByRoom().getFirst().availableMinutes()).isEqualTo(600);
+        assertThat(result.occupancyByRoom().getFirst().occupancyRate()).isEqualTo(10.0);
+        assertThat(result.dailyOccupancy().getFirst().occupancyRate()).isEqualTo(10.0);
+        assertThat(result.weeklyHeatmap()).isNotEmpty();
     }
 
     private RoomEntity room(Long id, String code, String name) {

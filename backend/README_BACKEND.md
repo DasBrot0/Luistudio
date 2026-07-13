@@ -143,6 +143,7 @@ Memoria (500 MB):
 ### Administración
 
 - `GET /api/admin/dashboard?from=YYYY-MM-DD&to=YYYY-MM-DD`
+  - Calcula disponibilidad con el horario específico de cada sala. Si una sala no tiene horario para un día, hereda el horario general de su campus; un horario propio, incluso cerrado, siempre prevalece como override.
 - `GET /api/admin/users`
   - Soporta `query` por código/correo/nombres/apellidos, `year`, `status` (`HABILITADO`, `DESHABILITADO`, `BLOQUEADO`), `sortBy` (`firstName`, `lastName`, `code`, `status`) y `sortDir`.
 - `PATCH /api/admin/users/{id}/estado`
