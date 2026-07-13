@@ -14,6 +14,8 @@ import static org.mockito.Mockito.when;
 import com.luistudio.reservas.dto.booking.BookingUpsertRequest;
 import com.luistudio.reservas.exception.BusinessException;
 import com.luistudio.reservas.model.RoomEntity;
+import com.luistudio.reservas.model.CampusEntity;
+import com.luistudio.reservas.model.PabellonEntity;
 import com.luistudio.reservas.model.RoomState;
 import com.luistudio.reservas.model.UserEntity;
 import com.luistudio.reservas.repository.ReservationRepository;
@@ -162,7 +164,11 @@ class BookingValidationAvailabilityAndLimitTest {
         room.setMinimoPersonas(1);
         room.setMinimoPersonasObligatorio(false);
         room.setEstado(RoomState.DISPONIBLE);
-        room.setCampus("Monterrico");
+        CampusEntity campus = new CampusEntity();
+        campus.setNombre("Monterrico");
+        PabellonEntity pabellon = new PabellonEntity();
+        pabellon.setCampus(campus);
+        room.setPabellon(pabellon);
 
         user = new UserEntity();
     }

@@ -3,14 +3,17 @@ package com.luistudio.reservas.controller;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.hamcrest.Matchers.containsString;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.nullable;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -47,7 +50,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 /**
  * ============================================================
- * Prueba de Caja Negra #4 — Autenticación, sesión y recuperación
+ * Pruebas complementarias de caja negra — Autenticación, sesión y recuperación
  *   POST /api/auth/login
  *   GET  /api/auth/me
  *   POST /api/auth/logout
@@ -100,6 +103,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
  * | CN-AUTH-04| GET  /api/auth/me          | Consulta de sesión sin autenticación             | 401           | message = "No autenticado"                                  |
  * | CN-AUTH-05| POST /api/auth/reset-request| Solicitud de recuperación con correo válido      | 200 OK        | message = "Si el correo existe, se envió un enlace…"        |
  * | CN-AUTH-06| POST /api/auth/reset-confirm| Confirmación de recuperación con token inválido  | 400           | message = "Token inválido o expirado"                       |
+ * | CN-AUTH-07| POST /api/auth/logout      | Cierre de sesión autenticada                    | 200 OK        | message = "Sesión cerrada" y cookie invalidada              |
  *
  * Estrategia de mock
  * ------------------
@@ -451,5 +455,31 @@ class AuthBlackBoxTest {
         String body = result.getResponse().getContentAsString();
         assertTrue(body.contains("Token inválido o expirado"),
             "CN-AUTH-06: El body debe contener el mensaje de error. Body: " + body);
+    }
+
+    // -----------------------------------------------------------------------
+    // CN-AUTH-07 — Cierre de sesión autenticada
+    // -----------------------------------------------------------------------
+
+    @Test
+    @DisplayName("CN-AUTH-07: Logout autenticado — HTTP 200 y cookie de sesión invalidada")
+    void shouldReturn200AndClearCookieWhenLogoutIsAuthenticated() throws Exception {
+        AuthPrincipal principal = new AuthPrincipal(1L, "user@test.com", "ESTUDIANTE");
+        when(currentUserProvider.requireCurrentUser()).thenReturn(principal);
+        when(currentUserProvider.currentJti()).thenReturn("jti-session-123");
+
+        ResponseCookie clearCookie = ResponseCookie.from("auth_token", "")
+            .maxAge(0)
+            .path("/")
+            .build();
+        when(authCookieService.clearCookie()).thenReturn(clearCookie);
+
+        mockMvc.perform(post("/api/auth/logout"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.message").value("Sesión cerrada"))
+            .andExpect(header().string(HttpHeaders.SET_COOKIE, containsString("auth_token=")))
+            .andExpect(header().string(HttpHeaders.SET_COOKIE, containsString("Max-Age=0")));
+
+        verify(authService).logoutCurrent(1L, "jti-session-123");
     }
 }

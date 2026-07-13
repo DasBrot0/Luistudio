@@ -10,6 +10,7 @@ import com.luistudio.reservas.model.RoomEntity;
 import com.luistudio.reservas.model.UserEntity;
 import com.luistudio.reservas.repository.RoomAvailabilitySubscriptionRepository;
 import com.luistudio.reservas.service.email.EmailTemplateService;
+import com.luistudio.reservas.util.AppTime;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.OffsetDateTime;
@@ -46,8 +47,8 @@ public class AvailabilitySubscriptionService {
         UserEntity user = userService.getById(userId);
         RoomEntity room = roomService.getRoomEntity(roomId);
 
-        subscriptionRepository.findActiveByUserAndRoom(user, room, request.targetDate(), request.startTime(), request.endTime())
-            .ifPresent(s -> { throw new BusinessException(HttpStatus.CONFLICT, "Ya existe una suscripción activa para esa sala y horario"); });
+        subscriptionRepository.findActiveByUserAndRoom(user, room)
+            .ifPresent(s -> { throw new BusinessException(HttpStatus.CONFLICT, "Ya existe una suscripción activa para esa sala"); });
 
         RoomAvailabilitySubscriptionEntity entity = new RoomAvailabilitySubscriptionEntity();
         entity.setUsuario(user);
@@ -90,15 +91,37 @@ public class AvailabilitySubscriptionService {
 
         for (RoomAvailabilitySubscriptionEntity sub : subscribers) {
             String body = emailTemplateService.roomAvailableAlert(room.getNombre(), date, startTime, endTime);
-            emailOutboxService.enqueue(
+            boolean queued = emailOutboxService.enqueue(
                 sub.getUsuario(),
                 "Sala disponible: " + room.getNombre(),
                 body,
-                "{\"notificationType\":\"ROOM_AVAILABLE\"}"
+                "{\"notificationType\":\"ROOM_AVAILABLE\",\"subscriptionId\":" + sub.getId() + "}"
             );
-            sub.setStatus("NOTIFICADA");
-            sub.setNotifiedAt(OffsetDateTime.now());
-            subscriptionRepository.save(sub);
+            if (queued) {
+                sub.setStatus("EN_COLA");
+                subscriptionRepository.save(sub);
+            }
+        }
+    }
+
+    @Transactional
+    public void processNewlyAvailableRooms() {
+        for (RoomAvailabilitySubscriptionEntity subscription : subscriptionRepository.findByStatus("ACTIVA")) {
+            if (subscription.getTargetDate().isBefore(AppTime.today())) continue;
+            if (roomService.isRoomAvailable(
+                subscription.getSala(),
+                subscription.getTargetDate(),
+                subscription.getStartTime(),
+                subscription.getEndTime(),
+                null
+            )) {
+                notifySubscribers(
+                    subscription.getSala(),
+                    subscription.getTargetDate(),
+                    subscription.getStartTime(),
+                    subscription.getEndTime()
+                );
+            }
         }
     }
 

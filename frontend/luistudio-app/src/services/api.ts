@@ -21,7 +21,7 @@ interface ApiLoginResponse {
   message: string
 }
 
-interface ApiRoom {
+export interface ApiRoom {
   id: number
   code: string
   name: string
@@ -39,6 +39,39 @@ interface ApiRoom {
   schedule: ApiScheduleDay[]
   status: string
   pabellonCode: string
+  noiseLevel: 'BAJO' | 'MEDIO' | 'ALTO'
+  supportsConcentration: boolean
+  roomType: string
+  equipment: string[]
+}
+
+export interface ApiRoomSearchIntent {
+  roomType: string
+  minimumCapacity: number
+  maximumNoise: 'BAJO' | 'MEDIO' | 'ALTO'
+  requiresConcentration: boolean
+  requiredEquipment: string[]
+}
+
+export interface ApiIntelligentRoomSearchResponse {
+  intent: ApiRoomSearchIntent
+  recommendations: Array<{ room: ApiRoom; score: number; reasons: string[] }>
+}
+
+export interface ApiAdminDashboard {
+  from: string
+  to: string
+  totalReservations: number
+  absenceRate: number
+  absenceCount: number
+  attendanceEligibleCount: number
+  attendanceCount: number
+  pendingAttendanceCount: number
+  occupancyByRoom: Array<{ roomId: number; roomCode: string; roomName: string; reservedMinutes: number; availableMinutes: number; occupancyRate: number }>
+  peakHours: Array<{ hour: number; reservedMinutes: number; reservationCount: number }>
+  dailyOccupancy: Array<{ date: string; reservedMinutes: number; availableMinutes: number; occupancyRate: number }>
+  weeklyHeatmap: Array<{ dayOfWeek: number; hour: number; reservedMinutes: number; availableMinutes: number; occupancyRate: number }>
+  topStudents: Array<{ userId: number; code: string; fullName: string; email: string; reservationCount: number; reservedMinutes: number; absenceCount: number }>
 }
 
 export interface ApiScheduleDay {
@@ -62,6 +95,7 @@ interface ApiBooking {
   start: string
   end: string
   status: 'ACTIVA' | 'CANCELADA' | 'COMPLETADA'
+  attendanceStatus?: 'ASISTIO' | 'INASISTIO' | null
   observation?: string
   googleCalendarUrl: string
   icsUrl: string
@@ -117,7 +151,7 @@ export interface ApiPreferences {
   notificationSettings: Record<string, { app: boolean; email: boolean }>
   themeMode: 'LIGHT' | 'DARK'
   fontScale: number
-  loginLandingView: 'STUDENT_MY_BOOKINGS' | 'STUDENT_RESERVE' | 'ADMIN_ROOMS' | 'ADMIN_PROFILES' | 'ADMIN_BOOKINGS'
+  loginLandingView: 'STUDENT_MY_BOOKINGS' | 'STUDENT_RESERVE' | 'ADMIN_DASHBOARD' | 'ADMIN_ROOMS' | 'ADMIN_PROFILES' | 'ADMIN_BOOKINGS'
 }
 
 const fieldLabels: Record<string, string> = {
@@ -197,6 +231,7 @@ const readErrorMessage = async (response: Response) => {
 }
 
 async function http<T>(path: string, options: RequestInit = {}, _token?: string): Promise<T> {
+  void _token
   const headers = new Headers(options.headers)
 
   if (options.body && !headers.has('Content-Type')) {
@@ -310,6 +345,14 @@ export const api = {
       start,
     )}&horaFin=${encodeURIComponent(end)}`
     return http<ApiRoom[]>(`/rooms/available${query}`, {}, token)
+  },
+
+  intelligentRoomSearch(token: string, payload: { query: string; date: string; start: string; end: string; limit?: number }) {
+    return http<ApiIntelligentRoomSearchResponse>(
+      '/rooms/intelligent-search',
+      { method: 'POST', body: JSON.stringify(payload) },
+      token,
+    )
   },
 
   createRoom(
@@ -440,6 +483,11 @@ export const api = {
     return http<ApiConfig>('/admin/config', {}, token)
   },
 
+  getAdminDashboard(token: string, from: string, to: string) {
+    const params = new URLSearchParams({ from, to })
+    return http<ApiAdminDashboard>(`/admin/dashboard?${params.toString()}`, {}, token)
+  },
+
   updateAdminConfig(token: string, config: ApiConfig) {
     return http<ApiConfig>('/admin/config', { method: 'PUT', body: JSON.stringify(config) }, token)
   },
@@ -509,8 +557,15 @@ export const api = {
     return http<ApiPreferences>('/me/preferences', { method: 'PUT', body: JSON.stringify(preferences) }, token)
   },
 
-  getCampusMap(token: string) {
-    return http('/campus/map', {}, token)
+  getCampusMap(token: string, campus?: string, signal?: AbortSignal) {
+    const query = campus ? `?campus=${encodeURIComponent(campus)}` : ''
+    return http<import('../models/campusMap').CampusMapResponse>(`/campus/map${query}`, { signal }, token)
+  },
+
+  updateBuildingLocation(token: string, buildingId: number, latitude: number, longitude: number) {
+    return http<import('../models/campusMap').CampusMapPavilion>(`/admin/buildings/${buildingId}/location`, {
+      method: 'PUT', body: JSON.stringify({ latitude, longitude }),
+    }, token)
   },
 
   lookupUserByCode(token: string, code: string) {
@@ -554,12 +609,14 @@ export const api = {
   },
 
   // ST-07 Admin login attempts
-  getLoginAttempts(token: string, filters: { userId?: number; email?: string; from?: string; to?: string; success?: boolean }, page = 0, size = 20) {
+  getLoginAttempts(token: string, filters: { user?: string; email?: string; from?: string; to?: string; success?: boolean; blocked?: boolean }, page = 0, size = 10) {
     const params = new URLSearchParams({ page: String(page), size: String(size) })
+    if (filters.user) params.set('user', filters.user)
     if (filters.email) params.set('email', filters.email)
     if (filters.from) params.set('from', filters.from)
     if (filters.to) params.set('to', filters.to)
     if (filters.success !== undefined) params.set('success', String(filters.success))
+    if (filters.blocked !== undefined) params.set('blocked', String(filters.blocked))
     return http<{ content: Array<{ id: number; userId: number; userEmail: string; ip: string | null; userAgent: string | null; attemptedAt: string; success: boolean; lockedUntil: string | null }>; page: number; totalPages: number; totalElements: number }>(`/admin/security/login-attempts?${params.toString()}`, {}, token)
   },
 

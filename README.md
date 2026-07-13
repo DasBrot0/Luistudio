@@ -1,5 +1,44 @@
 # Luistudio
 
+## Ejecutar todo con Docker
+
+El proyecto puede iniciarse sin instalar Java, Maven, Node.js, PostgreSQL ni pgAdmin: solo requiere Docker con Docker Compose. Desde la carpeta raiz ejecuta:
+
+```bash
+docker compose up --build
+```
+
+Una vez que los contenedores terminen de iniciar:
+
+- Aplicacion: `http://localhost`
+- API: `http://localhost:8080/api`
+- pgAdmin: `http://localhost:5050` (usuario `admin@luistudio.com`, clave `admin123`)
+- PostgreSQL: host `localhost`, puerto `5432`, base `luistudio_db`, usuario `luistudio`, clave `luistudio_dev_password`.
+
+pgAdmin viene incluido y registra el servidor **Luistudio PostgreSQL** automaticamente. Al conectarte, ingresa la clave de PostgreSQL. Tambien puedes conectar un pgAdmin externo usando los mismos datos y la IP de la PC que ejecuta Docker en lugar de `localhost`.
+
+Antes de compartir o desplegar el proyecto, copia `.env.example` a `.env` y cambia al menos `POSTGRES_PASSWORD`, `PGADMIN_DEFAULT_PASSWORD` y `JWT_SECRET`. Si se accede desde otra PC, actualiza las URLs y `CORS_ORIGINS` con la IP o dominio del servidor.
+
+Los scripts `001_init.sql` y `002_seed_release01.sql` se cargan automáticamente **solo al crear el volumen de la base de datos por primera vez**. El script destructivo `003_drop_all_tables.sql` queda excluido. Para eliminar datos de desarrollo y volver a inicializar la base, usa:
+
+```bash
+docker compose down -v
+docker compose up --build
+```
+
+Para detener los servicios preservando los datos: `docker compose down`.
+
+## Ejecución local (sin Docker)
+
+En dos terminales de PowerShell, desde la raíz:
+
+```powershell
+./scripts/start-backend.ps1
+./scripts/start-frontend.ps1
+```
+
+El script del frontend instala sus dependencias automáticamente si faltan y usa el proxy local hacia `http://localhost:8080`. Para Docker, usa `docker compose up --build` o `./scripts/start-docker.ps1 -Rebuild`.
+
 Sistema web universitario para la reserva y gestión de salas de estudio en bibliotecas y campus académicos.
 
 ## ¿Qué es Luistudio?
@@ -113,7 +152,7 @@ Luistudio/
 │   ├── README_FRONTEND.md                #  Guía técnica del frontend
 │   └── luistudio-app/
 │       ├── index.html                    #  HTML base donde monta React
-│       ├── package.json                  #  Scripts y dependencias npm
+│       ├── package.json                  #  Scripts y dependencias pnpm
 │       ├── vite.config.ts                # ⚡ Configuración de Vite
 │       └── src/
 │           ├── App.tsx                   #  Componente raíz, estado global básico y rutas
@@ -241,9 +280,9 @@ Luistudio/
 | `AuthCookieService.java` | Crea, limpia y configura cookies de autenticación. |
 | `AuthPrincipal.java` | Representa al usuario autenticado dentro de Spring Security. |
 | `CurrentUserProvider.java` | Obtiene el usuario actual desde el contexto de seguridad. |
-| `JwtAuthenticationFilter.java` | Lee y v?lida JWT en cada request protegido. |
-| `JwtService.java` | Genera, firma y v?lida tokens JWT. |
-| `SecretHashService.java` | Aplica hashing seguro a secretos c?mo códigos o tokens. |
+| `JwtAuthenticationFilter.java` | Lee y valida JWT en cada request protegido. |
+| `JwtService.java` | Genera, firma y valida tokens JWT. |
+| `SecretHashService.java` | Aplica hashing seguro a secretos como códigos o tokens. |
 
 ** Services**
 
@@ -358,3 +397,6 @@ Luistudio/
    - `powershell -ExecutionPolicy Bypass -File scripts/start-backend.ps1`
 4. Levantar frontend:
    - `powershell -ExecutionPolicy Bypass -File scripts/start-frontend.ps1`
+# Despliegue del mapa
+
+Para E1-H10, ejecutar `database/001_init.sql` y después `database/002_seed_release01.sql`; configurar Redis en Render y las variables `VITE_MAP*` en Vercel.

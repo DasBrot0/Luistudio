@@ -44,7 +44,14 @@ class JwtServiceTest {
     @Test
     void shouldRejectTamperedToken() {
         String token = jwtService.generateToken(10L, "ADMIN");
-        String tampered = token.substring(0, token.length() - 1) + "A";
+        String[] parts = token.split("\\.");
+        String encryptedPayload = parts[2];
+        int changedIndex = encryptedPayload.length() / 2;
+        char replacement = encryptedPayload.charAt(changedIndex) == 'A' ? 'B' : 'A';
+        parts[2] = encryptedPayload.substring(0, changedIndex)
+            + replacement
+            + encryptedPayload.substring(changedIndex + 1);
+        String tampered = String.join(".", parts);
 
         assertThrows(BusinessException.class, () -> jwtService.validate(tampered));
     }

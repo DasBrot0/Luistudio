@@ -5,6 +5,8 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import java.time.LocalTime;
 import java.time.OffsetDateTime;
@@ -21,8 +23,9 @@ public class CampusScheduleEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "campus", nullable = false, length = 120)
-    private String campus;
+    @ManyToOne
+    @JoinColumn(name = "campus_id", nullable = false)
+    private CampusEntity campus;
 
     @Column(name = "day_of_week", nullable = false)
     private Integer diaSemana;

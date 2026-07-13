@@ -1,5 +1,6 @@
 import { AppHeader } from '../components/layout/AppHeader'
 import { FilterBar } from '../components/filters/FilterBar'
+import { Pagination } from '../components/layout/Pagination'
 
 export interface LoginAttemptItem {
   id: number
@@ -15,15 +16,19 @@ export interface LoginAttemptItem {
 interface SecurityPageProps {
   attempts: LoginAttemptItem[]
   loading: boolean
+  userFilter: string
   emailFilter: string
   statusFilter: 'todos' | 'fallido' | 'exitoso'
+  blockFilter: 'todos' | 'bloqueado' | 'sin-bloqueo'
   fromFilter: string
   toFilter: string
   page: number
   totalPages: number
   totalElements: number
+  onUserFilterChange: (value: string) => void
   onEmailFilterChange: (value: string) => void
   onStatusFilterChange: (value: 'todos' | 'fallido' | 'exitoso') => void
+  onBlockFilterChange: (value: 'todos' | 'bloqueado' | 'sin-bloqueo') => void
   onFromFilterChange: (value: string) => void
   onToFilterChange: (value: string) => void
   onPrevPage: () => void
@@ -77,15 +82,19 @@ function ClearIcon() {
 export function SecurityPage({
   attempts,
   loading,
+  userFilter,
   emailFilter,
   statusFilter,
+  blockFilter,
   fromFilter,
   toFilter,
   page,
   totalPages,
   totalElements,
+  onUserFilterChange,
   onEmailFilterChange,
   onStatusFilterChange,
+  onBlockFilterChange,
   onFromFilterChange,
   onToFilterChange,
   onPrevPage,
@@ -93,8 +102,10 @@ export function SecurityPage({
   onClearFilters,
 }: SecurityPageProps) {
   const noFiltersActive =
+    userFilter === '' &&
     emailFilter === '' &&
     statusFilter === 'todos' &&
+    blockFilter === 'todos' &&
     fromFilter === '' &&
     toFilter === ''
 
@@ -114,6 +125,13 @@ export function SecurityPage({
             onSearchChange={onEmailFilterChange}
             filters={[
               {
+                id: 'sec-user-filter',
+                type: 'text',
+                value: userFilter,
+                onChange: onUserFilterChange,
+                placeholder: 'Código o nombre del usuario',
+              },
+              {
                 id: 'sec-status-filter',
                 value: statusFilter,
                 onChange: (value) => onStatusFilterChange(value as 'todos' | 'fallido' | 'exitoso'),
@@ -121,6 +139,16 @@ export function SecurityPage({
                   { value: 'todos', label: 'Estado: Todos' },
                   { value: 'fallido', label: 'Estado: Fallido' },
                   { value: 'exitoso', label: 'Estado: Exitoso' },
+                ],
+              },
+              {
+                id: 'sec-block-filter',
+                value: blockFilter,
+                onChange: (value) => onBlockFilterChange(value as 'todos' | 'bloqueado' | 'sin-bloqueo'),
+                options: [
+                  { value: 'todos', label: 'Bloqueo: Todos' },
+                  { value: 'bloqueado', label: 'Bloqueo: Vigente' },
+                  { value: 'sin-bloqueo', label: 'Bloqueo: Sin bloqueo' },
                 ],
               },
               {
@@ -243,25 +271,7 @@ export function SecurityPage({
           )}
 
           {!loading && attempts.length > 0 && (
-            <div className="pagination">
-              <button
-                type="button"
-                className="inline-flex min-h-8 items-center justify-center rounded-md border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 transition hover:-translate-y-px hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
-                disabled={page === 1}
-                onClick={onPrevPage}
-              >
-                Anterior
-              </button>
-              <p>Página {page} de {totalPages}</p>
-              <button
-                type="button"
-                className="inline-flex min-h-8 items-center justify-center rounded-md border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 transition hover:-translate-y-px hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
-                disabled={page === totalPages}
-                onClick={onNextPage}
-              >
-                Siguiente
-              </button>
-            </div>
+            <Pagination page={page} totalPages={totalPages} onPrev={onPrevPage} onNext={onNextPage} />
           )}
         </article>
       </section>

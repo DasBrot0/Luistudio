@@ -24,7 +24,9 @@ import { ResetPasswordPage } from './ResetPasswordPage'
 import { ConfirmSensitiveChangePage } from './ConfirmSensitiveChangePage'
 import { ReservasPage } from './ReservasPage'
 import type { AvailabilitySubscription } from './ReservasPage'
+import { SmartSearchPage } from './SmartSearchPage'
 import { MisReservasPage } from './MisReservasPage'
+import { CampusMapPage } from './CampusMapPage'
 import { SalasPage } from './SalasPage'
 import { PerfilesPage } from './PerfilesPage'
 import { AdminReservasPage } from './AdminReservasPage'
@@ -33,6 +35,7 @@ import type { SessionItem, ActivityItem } from './ProfilePage'
 import { SecurityPage } from './SecurityPage'
 import type { LoginAttemptItem } from './SecurityPage'
 import { ComunicadosPage } from './ComunicadosPage'
+import { AdminDashboardPage } from './AdminDashboardPage'
 import type { AnnouncementItem } from './ComunicadosPage'
 import { BookingSuccessModal } from '../components/modals/BookingSuccessModal'
 import { EditBookingModal } from '../components/modals/EditBookingModal'
@@ -44,7 +47,7 @@ import { TwoFactorModal } from '../components/modals/TwoFactorModal'
 import { MessageModal } from '../components/modals/MessageModal'
 import { ConfirmCancelBookingModal } from '../components/modals/ConfirmCancelBookingModal'
 import { GlobalTopbar } from '../components/layout/GlobalTopbar'
-import { api, type ApiCampusSchedule, type ApiPreferences } from '../../services/api'
+import { api, type ApiAdminDashboard, type ApiCampusSchedule, type ApiIntelligentRoomSearchResponse, type ApiPreferences } from '../../services/api'
 
 interface NotificationItem {
   id: number
@@ -75,6 +78,7 @@ interface NotificationPreferenceOption {
 type LoginLandingViewCode =
   | 'STUDENT_MY_BOOKINGS'
   | 'STUDENT_RESERVE'
+  | 'ADMIN_DASHBOARD'
   | 'ADMIN_ROOMS'
   | 'ADMIN_PROFILES'
   | 'ADMIN_BOOKINGS'
@@ -133,6 +137,7 @@ const toUiUser = (user: {
   lastName: string
   email: string
   role: 'ADMIN' | 'ESTUDIANTE'
+  status: string
   has2fa: boolean
 }): AuthUser => ({
   id: user.id,
@@ -141,6 +146,7 @@ const toUiUser = (user: {
   firstName: user.firstName,
   lastName: user.lastName,
   email: user.email,
+  status: user.status,
   has2fa: user.has2fa,
 })
 
@@ -161,6 +167,10 @@ const toUiRoom = (room: {
   slotMinutes: number
   schedule: ScheduleDay[]
   status: string
+  noiseLevel?: 'BAJO' | 'MEDIO' | 'ALTO'
+  supportsConcentration?: boolean
+  roomType?: string
+  equipment?: string[]
 }): Room => ({
   backendId: room.id,
   id: room.code,
@@ -184,6 +194,10 @@ const toUiRoom = (room: {
       : room.status === 'INACTIVA'
         ? 'Inactiva'
         : 'Disponible',
+  noiseLevel: room.noiseLevel,
+  supportsConcentration: room.supportsConcentration,
+  roomType: room.roomType,
+  equipment: room.equipment,
 })
 
 const toApiRoomStatus = (status: RoomStatus): 'DISPONIBLE' | 'EN_MANTENIMIENTO' | 'INACTIVA' => {
@@ -252,6 +266,7 @@ const toUiBooking = (booking: {
   start: string
   end: string
   status: 'ACTIVA' | 'CANCELADA' | 'COMPLETADA'
+  attendanceStatus?: 'ASISTIO' | 'INASISTIO' | null
   observation?: string
   googleCalendarUrl?: string
   icsUrl?: string
@@ -268,6 +283,7 @@ const toUiBooking = (booking: {
   start: toHourMinute(booking.start),
   end: toHourMinute(booking.end),
   status: booking.status === 'CANCELADA' ? 'Cancelado' : 'Confirmado',
+  attendanceStatus: booking.attendanceStatus,
   observation: booking.observation,
   googleCalendarUrl: booking.googleCalendarUrl,
   icsUrl: booking.icsUrl,
@@ -350,10 +366,11 @@ const toProfile = (user: {
   blocked: user.blocked,
 })
 
-const defaultLandingRoute = (role: Role): RouteKey => (role === 'admin' ? 'salas' : 'misreservas')
+const defaultLandingRoute = (role: Role): RouteKey => (role === 'admin' ? 'dashboard' : 'misreservas')
 
 const routeToLandingViewCode = (role: Role, route: RouteKey): LoginLandingViewCode => {
   if (role === 'admin') {
+    if (route === 'dashboard') return 'ADMIN_DASHBOARD'
     if (route === 'perfiles') return 'ADMIN_PROFILES'
     return route === 'admin-reservas' ? 'ADMIN_BOOKINGS' : 'ADMIN_ROOMS'
   }
@@ -362,6 +379,7 @@ const routeToLandingViewCode = (role: Role, route: RouteKey): LoginLandingViewCo
 
 const landingViewCodeToRoute = (role: Role, code: LoginLandingViewCode): RouteKey => {
   if (role === 'admin') {
+    if (code === 'ADMIN_DASHBOARD') return 'dashboard'
     if (code === 'ADMIN_PROFILES') return 'perfiles'
     return code === 'ADMIN_BOOKINGS' ? 'admin-reservas' : 'salas'
   }
@@ -548,6 +566,13 @@ export function MainPage() {
   const [adminSort, setAdminSort] = useState('date:desc')
   const [adminPage, setAdminPage] = useState(1)
   const [adminTotalPages, setAdminTotalPages] = useState(1)
+  const [dashboardData, setDashboardData] = useState<ApiAdminDashboard | null>(null)
+  const [dashboardLoading, setDashboardLoading] = useState(false)
+  const [dashboardError, setDashboardError] = useState('')
+  const [dashboardFrom, setDashboardFrom] = useState(() => {
+    const date = new Date(); date.setDate(date.getDate() - 29); return date.toISOString().slice(0, 10)
+  })
+  const [dashboardTo, setDashboardTo] = useState(getTodayIso)
   const [profilesQuery, setProfilesQuery] = useState('')
   const [profilesYearFilter, setProfilesYearFilter] = useState('')
   const [profilesStatusFilter, setProfilesStatusFilter] = useState<'Todos' | 'Habilitado' | 'Deshabilitado' | 'Bloqueado'>('Todos')
@@ -556,8 +581,10 @@ export function MainPage() {
 
   const [securityAttempts, setSecurityAttempts] = useState<LoginAttemptItem[]>([])
   const [securityLoading, setSecurityLoading] = useState(false)
+  const [securityUserFilter, setSecurityUserFilter] = useState('')
   const [securityEmailFilter, setSecurityEmailFilter] = useState('')
   const [securityStatusFilter, setSecurityStatusFilter] = useState<'todos' | 'fallido' | 'exitoso'>('todos')
+  const [securityBlockFilter, setSecurityBlockFilter] = useState<'todos' | 'bloqueado' | 'sin-bloqueo'>('todos')
   const [securityFromFilter, setSecurityFromFilter] = useState('')
   const [securityToFilter, setSecurityToFilter] = useState('')
   const [securityPage, setSecurityPage] = useState(1)
@@ -589,6 +616,9 @@ export function MainPage() {
   const [loginLandingRoute, setLoginLandingRoute] = useState<RouteKey | null>(null)
   const [campusSchedules, setCampusSchedules] = useState<CampusSchedule[]>([])
   const [mySubscriptions, setMySubscriptions] = useState<AvailabilitySubscription[]>([])
+  const [intelligentSearchResult, setIntelligentSearchResult] = useState<ApiIntelligentRoomSearchResponse | null>(null)
+  const [intelligentSearchLoading, setIntelligentSearchLoading] = useState(false)
+  const [intelligentSearchError, setIntelligentSearchError] = useState('')
 
   // ProfilePage state
   const [profileSessions, setProfileSessions] = useState<SessionItem[]>([])
@@ -724,6 +754,7 @@ export function MainPage() {
         firstName: editBookingOwner.fullName,
         lastName: '',
         email: '',
+        status: 'HABILITADO',
         has2fa: false,
       }
     : authenticatedUser
@@ -787,6 +818,35 @@ export function MainPage() {
       setReservationCompanions([])
       setReservationCompanionCodeInput('')
     }
+  }
+
+  const handleIntelligentSearch = async (query: string, date: string, start: string, end: string) => {
+    if (!token) return
+    setIntelligentSearchLoading(true)
+    setIntelligentSearchError('')
+    try {
+      setIntelligentSearchResult(await api.intelligentRoomSearch(token, { query, date, start, end, limit: 3 }))
+    } catch (error) {
+      setIntelligentSearchResult(null)
+      setIntelligentSearchError(error instanceof Error ? error.message : 'No se pudo interpretar tu búsqueda.')
+    } finally {
+      setIntelligentSearchLoading(false)
+    }
+  }
+
+  const handleSelectRecommendation = (roomBackendId: number) => {
+    const recommendation = intelligentSearchResult?.recommendations.find((item) => item.room.id === roomBackendId)
+    if (!recommendation) return
+    const room = toUiRoom(recommendation.room)
+    setRooms((current) => current.some((item) => item.backendId === roomBackendId) ? current : [...current, room])
+    handleReservationChange({
+      ...reservationForm,
+      campus: room.campusLabel,
+      location: room.venueLabel,
+      roomId: room.id,
+      people: 1,
+    })
+    setIntelligentSearchError('')
   }
 
   const handleAddReservationCompanion = async () => {
@@ -921,13 +981,14 @@ export function MainPage() {
     setSecurityLoading(true)
     try {
       const successParam = securityStatusFilter === 'todos' ? undefined : securityStatusFilter === 'exitoso'
+      const blockedParam = securityBlockFilter === 'todos' ? undefined : securityBlockFilter === 'bloqueado'
       const fromParam = securityFromFilter ? securityFromFilter + 'T00:00:00-05:00' : undefined
       const toParam = securityToFilter ? securityToFilter + 'T23:59:59-05:00' : undefined
       const result = await api.getLoginAttempts(
         authToken,
-        { email: securityEmailFilter || undefined, from: fromParam, to: toParam, success: successParam },
+        { user: securityUserFilter || undefined, email: securityEmailFilter || undefined, from: fromParam, to: toParam, success: successParam, blocked: blockedParam },
         securityPage - 1,
-        20,
+        10,
       )
       setSecurityAttempts(result.content.map((a) => ({
         id: a.id,
@@ -943,6 +1004,18 @@ export function MainPage() {
       setSecurityTotalElements(result.totalElements)
     } finally {
       setSecurityLoading(false)
+    }
+  }
+
+  const loadDashboard = async (authToken: string, from = dashboardFrom, to = dashboardTo) => {
+    setDashboardLoading(true)
+    setDashboardError('')
+    try {
+      setDashboardData(await api.getAdminDashboard(authToken, from, to))
+    } catch (error) {
+      setDashboardError(error instanceof Error ? error.message : 'No se pudieron cargar las métricas.')
+    } finally {
+      setDashboardLoading(false)
     }
   }
 
@@ -982,6 +1055,10 @@ export function MainPage() {
 
   const loadInitialDataForRoute = async (authToken: string, user: AuthUser, targetRoute: RouteKey) => {
     if (user.role === 'admin') {
+      if (targetRoute === 'dashboard') {
+        await loadDashboard(authToken)
+        return
+      }
       if (targetRoute === 'salas') {
         await loadRoomDirectory(authToken)
         return
@@ -1013,7 +1090,7 @@ export function MainPage() {
       ])
       return
     }
-    if (targetRoute === 'reservas') {
+    if (targetRoute === 'reservas' || targetRoute === 'busqueda-inteligente') {
       await Promise.all([loadRooms(authToken), loadMySubscriptions(authToken)])
     }
   }
@@ -1052,7 +1129,7 @@ export function MainPage() {
       const cachedLanding = localStorage.getItem(LOCAL_STORAGE_LANDING_KEY) as RouteKey | null
       const allowedRoutes =
         user.role === 'admin'
-          ? (['salas', 'admin-reservas'] as RouteKey[])
+          ? (['dashboard', 'salas', 'perfiles', 'admin-reservas'] as RouteKey[])
           : (['misreservas', 'reservas'] as RouteKey[])
       const fallbackLanding =
         cachedLanding && allowedRoutes.includes(cachedLanding)
@@ -1294,8 +1371,10 @@ export function MainPage() {
     })
   }, [
     securityPage,
+    securityUserFilter,
     securityEmailFilter,
     securityStatusFilter,
+    securityBlockFilter,
     securityFromFilter,
     securityToFilter,
     token,
@@ -2227,6 +2306,56 @@ export function MainPage() {
                 onSubmitReservation={handleCreateReservation}
                 onSubscribeToSlot={handleSubscribeToSlot}
                 onUnsubscribeFromSlot={handleUnsubscribeFromSlot}
+                intelligentSearchResult={intelligentSearchResult}
+                intelligentSearchLoading={intelligentSearchLoading}
+                intelligentSearchError={intelligentSearchError}
+                onIntelligentSearch={handleIntelligentSearch}
+                onSelectRecommendation={handleSelectRecommendation}
+              />
+            )}
+            {effectiveRoute === 'busqueda-inteligente' && (
+              <SmartSearchPage
+                reservationForm={reservationForm}
+                result={intelligentSearchResult}
+                loading={intelligentSearchLoading}
+                error={intelligentSearchError}
+                onReservationChange={handleReservationChange}
+                onSearch={handleIntelligentSearch}
+                onChooseRecommendation={(roomId) => {
+                  handleSelectRecommendation(roomId)
+                  navigateToRoute('reservas')
+                }}
+              />
+            )}
+            {effectiveRoute === 'dashboard' && (
+              <AdminDashboardPage
+                data={dashboardData}
+                loading={dashboardLoading}
+                error={dashboardError}
+                from={dashboardFrom}
+                to={dashboardTo}
+                onFromChange={setDashboardFrom}
+                onToChange={setDashboardTo}
+                onApply={() => token && void loadDashboard(token)}
+                onReset={() => {
+                  const nextTo = getTodayIso()
+                  const nextFromDate = new Date(); nextFromDate.setDate(nextFromDate.getDate() - 29)
+                  const nextFrom = nextFromDate.toISOString().slice(0, 10)
+                  setDashboardFrom(nextFrom)
+                  setDashboardTo(nextTo)
+                  if (token) void loadDashboard(token, nextFrom, nextTo)
+                }}
+              />
+            )}
+            {effectiveRoute === 'mapa' && token && authenticatedUser && (
+              <CampusMapPage
+                token={token}
+                isDarkMode={isDarkMode}
+                isAdmin={authenticatedUser.role === 'admin'}
+                onReserve={(roomId) => {
+                  navigate(`/reservas?roomId=${roomId}`)
+                  setRoute('reservas')
+                }}
               />
             )}
             {effectiveRoute === 'misreservas' && (
@@ -2251,7 +2380,12 @@ export function MainPage() {
                 onRevokeSession={async (sessionId) => {
                   if (!token) return
                   try {
+                    const revokingCurrentSession = profileSessions.some((session) => session.id === sessionId && session.current)
                     await api.revokeSession(token, sessionId)
+                    if (revokingCurrentSession) {
+                      logout()
+                      return
+                    }
                     setProfileSessions((current) => current.filter((s) => s.id !== sessionId))
                     setToastMessage('Sesión revocada')
                   } catch {
@@ -2262,19 +2396,9 @@ export function MainPage() {
                   if (!token) return
                   try {
                     await api.revokeAllSessions(token)
-                    setProfileSessions([])
-                    setToastMessage('Todas las sesiones fueron revocadas')
+                    logout()
                   } catch {
                     setModalMessage({ title: 'Error', message: 'No se pudo revocar las sesiones', variant: 'error' })
-                  }
-                }}
-                onRequestChangePassword={async () => {
-                  if (!token) return
-                  try {
-                    await api.requestSensitiveChange(token, 'CHANGE_PASSWORD')
-                    setModalMessage({ title: 'Correo enviado', message: 'Revisa tu correo para confirmar el cambio de contraseña.', variant: 'success' })
-                  } catch {
-                    setModalMessage({ title: 'Error', message: 'No se pudo enviar el correo de confirmación', variant: 'error' })
                   }
                 }}
                 onRequestDisable2fa={async () => {
@@ -2293,15 +2417,6 @@ export function MainPage() {
                     setModalMessage({ title: 'Correo enviado', message: 'Revisa tu correo con el código para activar 2FA.', variant: 'success' })
                   } catch {
                     setModalMessage({ title: 'Error', message: 'No se pudo enviar el código', variant: 'error' })
-                  }
-                }}
-                onRequestRevokeAll={async () => {
-                  if (!token) return
-                  try {
-                    await api.requestSensitiveChange(token, 'REVOKE_ALL_SESSIONS')
-                    setModalMessage({ title: 'Correo enviado', message: 'Revisa tu correo para confirmar el cierre de todas las sesiones.', variant: 'success' })
-                  } catch {
-                    setModalMessage({ title: 'Error', message: 'No se pudo enviar el correo de confirmación', variant: 'error' })
                   }
                 }}
               />
@@ -2464,22 +2579,28 @@ export function MainPage() {
               <SecurityPage
                 attempts={securityAttempts}
                 loading={securityLoading}
+                userFilter={securityUserFilter}
                 emailFilter={securityEmailFilter}
                 statusFilter={securityStatusFilter}
+                blockFilter={securityBlockFilter}
                 fromFilter={securityFromFilter}
                 toFilter={securityToFilter}
                 page={securityPage}
                 totalPages={securityTotalPages}
                 totalElements={securityTotalElements}
+                onUserFilterChange={(value) => { setSecurityUserFilter(value); setSecurityPage(1) }}
                 onEmailFilterChange={(value) => { setSecurityEmailFilter(value); setSecurityPage(1) }}
                 onStatusFilterChange={(value) => { setSecurityStatusFilter(value); setSecurityPage(1) }}
+                onBlockFilterChange={(value) => { setSecurityBlockFilter(value); setSecurityPage(1) }}
                 onFromFilterChange={(value) => { setSecurityFromFilter(value); setSecurityPage(1) }}
                 onToFilterChange={(value) => { setSecurityToFilter(value); setSecurityPage(1) }}
                 onPrevPage={() => setSecurityPage((current) => current - 1)}
                 onNextPage={() => setSecurityPage((current) => current + 1)}
                 onClearFilters={() => {
+                  setSecurityUserFilter('')
                   setSecurityEmailFilter('')
                   setSecurityStatusFilter('todos')
+                  setSecurityBlockFilter('todos')
                   setSecurityFromFilter('')
                   setSecurityToFilter('')
                   setSecurityPage(1)
@@ -2776,6 +2897,7 @@ export function MainPage() {
               >
                 {authenticatedUser?.role === 'admin' ? (
                   <>
+                    <option value="dashboard">Dashboard</option>
                     <option value="salas">Salas</option>
                     <option value="perfiles">Perfiles</option>
                     <option value="admin-reservas">Reservas</option>
@@ -2839,9 +2961,10 @@ export function MainPage() {
               </button>
               <button
                 type="button"
-                className={pendingProfileTarget.nextStatus === 'Deshabilitado' ? 'danger-btn' : 'primary-btn'}
+                className={pendingProfileTarget.nextStatus === 'Deshabilitado' ? 'danger-btn' : 'inline-flex min-h-10 items-center justify-center gap-2 rounded-full bg-primary px-4 text-sm font-semibold text-white transition hover:-translate-y-px hover:bg-primary-dark disabled:cursor-not-allowed disabled:opacity-60'}
                 onClick={confirmProfileAction}
               >
+                <span className="btn-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m4.5 12.5 4.6 4.6L19.5 6.8" /></svg></span>
                 Confirmar
               </button>
             </div>

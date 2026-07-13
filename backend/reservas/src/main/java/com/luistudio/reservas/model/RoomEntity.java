@@ -1,6 +1,8 @@
 package com.luistudio.reservas.model;
 
 import jakarta.persistence.Column;
+import jakarta.persistence.CollectionTable;
+import jakarta.persistence.ElementCollection;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -12,6 +14,8 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import java.time.OffsetDateTime;
+import java.util.LinkedHashSet;
+import java.util.Set;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -38,12 +42,6 @@ public class RoomEntity {
     @Column(name = "capacity", nullable = false)
     private Integer capacidad;
 
-    @Column(name = "campus", nullable = false, length = 120)
-    private String campus;
-
-    @Column(name = "venue", nullable = false, length = 160)
-    private String venue;
-
     @Column(name = "location", nullable = false, length = 120)
     private String ubicacion;
 
@@ -57,9 +55,35 @@ public class RoomEntity {
     private Integer maximoPersonas = 1;
 
     @Enumerated(EnumType.STRING)
+    @Column(name = "noise_level", nullable = false, length = 10)
+    private RoomNoiseLevel nivelRuido = RoomNoiseLevel.MEDIO;
+
+    @Column(name = "supports_concentration", nullable = false)
+    private Boolean permiteConcentracion = false;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "room_type", nullable = false, length = 30)
+    private RoomType tipo = RoomType.GENERAL;
+
+    @ElementCollection
+    @CollectionTable(name = "room_equipment", joinColumns = @JoinColumn(name = "room_id"))
+    @Column(name = "equipment", nullable = false, length = 50)
+    private Set<String> equipamiento = new LinkedHashSet<>();
+
+    @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 30)
     private RoomState estado = RoomState.DISPONIBLE;
 
     @Column(name = "created_at", nullable = false)
     private OffsetDateTime creadaEn = OffsetDateTime.now();
+
+    /** Valores derivados para conservar el contrato de lectura sin duplicar catálogo. */
+    public String getCampus() {
+        return pabellon == null || pabellon.getCampus() == null ? null : pabellon.getCampus().getNombre();
+    }
+
+    public String getVenue() {
+        return pabellon == null ? null : pabellon.getNombre();
+    }
+
 }

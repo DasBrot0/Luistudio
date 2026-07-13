@@ -10,6 +10,7 @@ import com.luistudio.reservas.repository.InstitutionalAnnouncementRepository;
 import com.luistudio.reservas.repository.UserRepository;
 import com.luistudio.reservas.service.email.EmailTemplateService;
 import java.util.List;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -48,12 +49,6 @@ public class AnnouncementService {
         entity.setStatus("PUBLICADO");
         announcementRepository.save(entity);
 
-        // Load all active students - use pagination to avoid loading all at once
-        List<UserEntity> students = userRepository.searchUsers(null, null, UserStatus.HABILITADO, null, PageRequest.of(0, 1000)).getContent()
-            .stream()
-            .filter(u -> "ESTUDIANTE".equalsIgnoreCase(u.getRol().getNombre()))
-            .toList();
-
         String body = emailTemplateService.branded(
             request.title(),
             request.content(),
@@ -63,10 +58,19 @@ public class AnnouncementService {
             null
         );
 
-        for (UserEntity student : students) {
-            emailOutboxService.enqueue(student, request.title(), body, "{\"notificationType\":\"ANNOUNCEMENT\"}");
-        }
+        int recipientCount = 0;
+        int pageNumber = 0;
+        Page<UserEntity> page;
+        do {
+            page = userRepository.searchUsers(null, null, UserStatus.HABILITADO, null, PageRequest.of(pageNumber, 200));
+            for (UserEntity student : page.getContent()) {
+                if (!"ESTUDIANTE".equalsIgnoreCase(student.getRol().getNombre())) continue;
+                emailOutboxService.enqueue(student, request.title(), body, "{\"notificationType\":\"ANNOUNCEMENT\"}");
+                recipientCount++;
+            }
+            pageNumber++;
+        } while (pageNumber < page.getTotalPages());
 
-        return new AnnouncementResponse(entity.getId(), entity.getTitle(), entity.getAnnouncementType(), entity.getCreatedAt(), students.size());
+        return new AnnouncementResponse(entity.getId(), entity.getTitle(), entity.getAnnouncementType(), entity.getCreatedAt(), recipientCount);
     }
 }

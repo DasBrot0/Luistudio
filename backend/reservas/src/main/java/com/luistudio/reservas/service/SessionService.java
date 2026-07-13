@@ -41,15 +41,20 @@ public class SessionService {
 
     @Transactional
     public LoginSessionEntity createSession(UserEntity user, String jti, String ip, String userAgent) {
-        boolean isUnusual = ip != null && userAgent != null
-            && !loginSessionRepository.existsByUsuarioAndIpAndUserAgent(user, ip, userAgent);
+        String deviceLabel = deriveDeviceLabel(userAgent);
+        boolean hasPreviousAccess = loginSessionRepository.existsByUsuario(user);
+        boolean newIp = ip != null && !ip.isBlank()
+            && !loginSessionRepository.existsByUsuarioAndIp(user, ip);
+        boolean newDevice = userAgent != null && !userAgent.isBlank()
+            && !loginSessionRepository.existsByUsuarioAndDeviceLabel(user, deviceLabel);
+        boolean isUnusual = hasPreviousAccess && (newIp || newDevice);
 
         LoginSessionEntity session = new LoginSessionEntity();
         session.setUsuario(user);
         session.setJti(jti);
         session.setIp(ip);
         session.setUserAgent(userAgent);
-        session.setDeviceLabel(deriveDeviceLabel(userAgent));
+        session.setDeviceLabel(deviceLabel);
         session.setCreatedAt(OffsetDateTime.now());
         session.setLastSeenAt(OffsetDateTime.now());
         session.setCurrent(true);
@@ -92,6 +97,7 @@ public class SessionService {
             throw new BusinessException(HttpStatus.FORBIDDEN, "No puedes revocar una sesión de otro usuario");
         }
         session.setRevokedAt(OffsetDateTime.now());
+        session.setCurrent(false);
         loginSessionRepository.save(session);
         auditService.record(user, "LOGOUT_REMOTE", "login_session", String.valueOf(sessionId), "session_id=" + sessionId);
     }
@@ -101,6 +107,7 @@ public class SessionService {
         if (jti == null) return;
         loginSessionRepository.findByJti(jti).ifPresent(s -> {
             s.setRevokedAt(OffsetDateTime.now());
+            s.setCurrent(false);
             loginSessionRepository.save(s);
         });
         auditService.record(user, "LOGOUT_CURRENT", "login_session", jti, null);
@@ -109,7 +116,7 @@ public class SessionService {
     @Transactional
     public void revokeAllSessions(Long userId) {
         UserEntity user = userService.getById(userId);
-        loginSessionRepository.revokeAllByUsuario(user);
+        loginSessionRepository.revokeAllByUsuario(user, OffsetDateTime.now());
         auditService.record(user, "LOGOUT_ALL", "login_session", null, "userId=" + userId);
     }
 

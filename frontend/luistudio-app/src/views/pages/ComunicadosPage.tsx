@@ -1,6 +1,9 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { AppHeader } from '../components/layout/AppHeader'
+import { Pagination } from '../components/layout/Pagination'
+
+const PAGE_SIZE = 10
 
 export interface AnnouncementItem {
   id: number
@@ -56,6 +59,10 @@ export function ComunicadosPage({ published, sending, onPublish }: ComunicadosPa
   const [content, setContent] = useState('')
   const [announcementType, setAnnouncementType] = useState('GENERAL')
   const [formError, setFormError] = useState('')
+  const [page, setPage] = useState(1)
+  const totalPages = Math.max(1, Math.ceil(published.length / PAGE_SIZE))
+  const safePage = Math.min(page, totalPages)
+  const visiblePublished = published.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE)
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -76,7 +83,7 @@ export function ComunicadosPage({ published, sending, onPublish }: ComunicadosPa
     <main className="page dashboard-page">
       <AppHeader title="Comunicados" roleLabel="Administrador" />
 
-      <section className="dashboard-grid" style={{ gridTemplateColumns: '1fr', gap: '1.5rem' }}>
+      <section className="dashboard-grid single-grid">
 
         {/* Compose card */}
         <article className="card">
@@ -84,8 +91,8 @@ export function ComunicadosPage({ published, sending, onPublish }: ComunicadosPa
             <h2>Nuevo comunicado institucional</h2>
           </div>
 
-          <form onSubmit={handleSubmit} noValidate style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+          <form onSubmit={handleSubmit} noValidate className="form-grid">
+            <div className="compact-field">
               <label htmlFor="ann-type" className="field-label">Tipo</label>
               <select
                 id="ann-type"
@@ -100,24 +107,24 @@ export function ComunicadosPage({ published, sending, onPublish }: ComunicadosPa
               </select>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            <div className="compact-field">
               <label htmlFor="ann-title" className="field-label">Título</label>
               <input
                 id="ann-title"
                 type="text"
                 className="input-field"
-                placeholder="Ej: Nueva sala disponible en Campus Norte"
+                placeholder="Ej.: Nueva sala disponible en Campus Norte"
                 maxLength={160}
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 disabled={sending}
               />
-              <span style={{ fontSize: 11, color: 'var(--color-text-secondary, #6b7280)', alignSelf: 'flex-end' }}>
+              <span className="field-counter">
                 {title.length}/160
               </span>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            <div className="compact-field">
               <label htmlFor="ann-content" className="field-label">Contenido</label>
               <textarea
                 id="ann-content"
@@ -132,17 +139,16 @@ export function ComunicadosPage({ published, sending, onPublish }: ComunicadosPa
             </div>
 
             {formError && (
-              <p role="alert" style={{ margin: 0, fontSize: 13, color: 'var(--color-error, #ef4444)' }}>
+              <p role="alert" className="error-text">
                 {formError}
               </p>
             )}
 
-            <div>
+            <div className="action-row">
               <button
                 type="submit"
-                className="btn-primary"
+                className="inline-flex min-h-10 items-center justify-center gap-2 rounded-full bg-primary px-4 text-sm font-semibold text-white transition hover:-translate-y-px hover:bg-primary-dark disabled:cursor-not-allowed disabled:opacity-60"
                 disabled={sending}
-                style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}
               >
                 <MegaphoneIcon />
                 {sending ? 'Enviando…' : 'Publicar y notificar a estudiantes'}
@@ -175,7 +181,7 @@ export function ComunicadosPage({ published, sending, onPublish }: ComunicadosPa
                   </tr>
                 </thead>
                 <tbody>
-                  {published.map((item) => (
+                  {visiblePublished.map((item) => (
                     <tr key={item.id}>
                       <td data-label="Título">{item.title}</td>
                       <td data-label="Tipo"><span className="status-pill ok">{typeLabel(item.announcementType)}</span></td>
@@ -190,7 +196,7 @@ export function ComunicadosPage({ published, sending, onPublish }: ComunicadosPa
 
           {published.length > 0 && (
             <div className="mobile-list-only">
-              {published.map((item) => (
+              {visiblePublished.map((item) => (
                 <article key={`com-mob-${item.id}`} className="mobile-record-card">
                   <div className="mobile-record-grid">
                     <p><strong>Título:</strong> {item.title}</p>
@@ -201,6 +207,15 @@ export function ComunicadosPage({ published, sending, onPublish }: ComunicadosPa
                 </article>
               ))}
             </div>
+          )}
+
+          {published.length > 0 && (
+            <Pagination
+              page={safePage}
+              totalPages={totalPages}
+              onPrev={() => setPage(Math.max(1, safePage - 1))}
+              onNext={() => setPage(Math.min(totalPages, safePage + 1))}
+            />
           )}
         </article>
       </section>

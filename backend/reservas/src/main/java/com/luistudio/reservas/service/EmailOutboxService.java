@@ -39,14 +39,14 @@ public class EmailOutboxService {
     }
 
     @Transactional
-    public void enqueue(UserEntity recipient, String subject, String body, String payload) {
+    public boolean enqueue(UserEntity recipient, String subject, String body, String payload) {
         NotificationPreferenceEntity preference = notificationPreferenceRepository
             .findByUsuario(recipient)
             .orElse(null);
 
         if (preference != null && Boolean.FALSE.equals(preference.getEmailHabilitado())) {
             log.info("email_outbox_skipped reason=email_disabled");
-            return;
+            return false;
         }
 
         String notificationType = resolveNotificationType(payload);
@@ -55,7 +55,7 @@ public class EmailOutboxService {
                 "email_outbox_skipped reason=notification_email_disabled notificationType={}",
                 notificationType
             );
-            return;
+            return false;
         }
 
         EmailOutboxEntity email = new EmailOutboxEntity();
@@ -68,6 +68,7 @@ public class EmailOutboxService {
         email.setDisponibleDesde(OffsetDateTime.now());
         emailOutboxRepository.save(email);
         log.info("email_outbox_enqueued emailId={} notificationType={}", email.getId(), notificationType);
+        return true;
     }
 
     @Transactional

@@ -13,10 +13,12 @@ import com.luistudio.reservas.repository.ReservationRepository;
 import com.luistudio.reservas.service.booking.validation.BookingValidationService;
 import com.luistudio.reservas.service.email.EmailTemplateService;
 import com.luistudio.reservas.util.AppTime;
+import com.luistudio.reservas.util.RoomLocationFormatter;
 import com.luistudio.reservas.util.CalendarUtils;
 import org.springframework.context.annotation.Lazy;
 import java.time.Duration;
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.time.OffsetDateTime;
 import java.util.List;
 import org.slf4j.Logger;
@@ -118,6 +120,10 @@ public class BookingService {
     @Transactional
     public BookingResponse updateBooking(Long bookingId, Long actorUserId, BookingUpsertRequest request) {
         ReservationEntity current = getBookingEntity(bookingId);
+        RoomEntity previousRoom = current.getSala();
+        LocalDate previousDate = current.getFecha();
+        LocalTime previousStart = current.getHoraInicio();
+        LocalTime previousEnd = current.getHoraFin();
         RoomEntity room = roomService.getRoomEntity(request.roomId());
         UserEntity actor = userService.getById(actorUserId);
         log.info(
@@ -152,6 +158,13 @@ public class BookingService {
             "{\"notificationType\":\"BOOKING_UPDATE\"}"
         );
         auditService.record(actor, "BOOKING_UPDATED", "reserva", String.valueOf(saved.getId()), "from=" + previous + ";to=" + next);
+        boolean releasedPreviousSlot = !previousRoom.getId().equals(saved.getSala().getId())
+            || !previousDate.equals(saved.getFecha())
+            || !previousStart.equals(saved.getHoraInicio())
+            || !previousEnd.equals(saved.getHoraFin());
+        if (releasedPreviousSlot) {
+            availabilitySubscriptionService.notifySubscribers(previousRoom, previousDate, previousStart, previousEnd);
+        }
         log.info(
             "booking_update_completed bookingId={} roomId={} status={} date={} start={} durationMinutes={}",
             saved.getId(),
@@ -302,10 +315,14 @@ public class BookingService {
     }
 
     private String createIcsContent(ReservationEntity reservation) {
+        RoomEntity room = reservation.getSala();
         return CalendarUtils.createIcs(
-            "Reserva - " + reservation.getSala().getNombre(),
+            "booking-" + reservation.getId(),
+            "Reserva - " + room.getNombre(),
             "Reserva Luistudio",
-            reservation.getSala().getUbicacion(),
+            RoomLocationFormatter.format(room),
+            RoomLocationFormatter.latitude(room),
+            RoomLocationFormatter.longitude(room),
             reservation.getFecha(),
             reservation.getHoraInicio(),
             reservation.getHoraFin()

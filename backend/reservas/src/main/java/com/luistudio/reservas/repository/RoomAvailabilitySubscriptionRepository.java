@@ -17,17 +17,11 @@ public interface RoomAvailabilitySubscriptionRepository extends JpaRepository<Ro
         SELECT s FROM RoomAvailabilitySubscriptionEntity s
         WHERE s.usuario = :user
           AND s.sala = :room
-          AND s.targetDate = :targetDate
-          AND s.startTime = :startTime
-          AND s.endTime = :endTime
-          AND s.status = 'ACTIVA'
+          AND s.status IN ('ACTIVA', 'EN_COLA')
     """)
     Optional<RoomAvailabilitySubscriptionEntity> findActiveByUserAndRoom(
         @Param("user") UserEntity user,
-        @Param("room") RoomEntity room,
-        @Param("targetDate") LocalDate targetDate,
-        @Param("startTime") LocalTime startTime,
-        @Param("endTime") LocalTime endTime
+        @Param("room") RoomEntity room
     );
 
     @Query("""
@@ -46,4 +40,6 @@ public interface RoomAvailabilitySubscriptionRepository extends JpaRepository<Ro
     );
 
     List<RoomAvailabilitySubscriptionEntity> findByUsuarioAndStatus(UserEntity usuario, String status);
+
+    List<RoomAvailabilitySubscriptionEntity> findByStatus(String status);
 }

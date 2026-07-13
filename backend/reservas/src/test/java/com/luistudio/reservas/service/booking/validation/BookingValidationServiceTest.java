@@ -12,6 +12,8 @@ import static org.mockito.Mockito.when;
 import com.luistudio.reservas.dto.booking.BookingUpsertRequest;
 import com.luistudio.reservas.exception.BusinessException;
 import com.luistudio.reservas.model.RoomEntity;
+import com.luistudio.reservas.model.CampusEntity;
+import com.luistudio.reservas.model.PabellonEntity;
 import com.luistudio.reservas.model.RoomState;
 import com.luistudio.reservas.model.UserEntity;
 import com.luistudio.reservas.repository.ReservationRepository;
@@ -38,7 +40,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
  *
  * Módulo evaluado: BookingValidationService.validate(UserEntity, RoomEntity, BookingUpsertRequest, Long)
  *
- * Complejidad Ciclomática (M = E − N + 2P):
+ * Complejidad Ciclomática:
  *   El método validate() orquesta 6 sub-validadores. Contando todos sus predicados
  *   internos independientes:
  *     validateEndTimeAfterStart  → 1 predicado
@@ -54,6 +56,13 @@ import org.mockito.junit.jupiter.MockitoExtension;
  *   - AppTime se mockea con MockedStatic para fijar "now" a un lunes a las 08:00 hs.
  *   - Para cada caso se configuran los mocks de forma que SOLO la ruta bajo prueba falle,
  *     dejando todas las demás condiciones en estado "válido".
+ */
+/*
+ * Aclaración de la unidad de análisis: se evalúa el flujo interprocedural completo.
+ * validate() es el punto de entrada y delega en seis subvalidadores privados. Una
+ * herramienta que mida cada método por separado reportará M=1 para el orquestador;
+ * en esta prueba de módulo se contabilizan las decisiones alcanzables desde él,
+ * que producen las rutas observables documentadas arriba (M=15).
  */
 @ExtendWith(MockitoExtension.class)
 class BookingValidationServiceTest {
@@ -105,7 +114,11 @@ class BookingValidationServiceTest {
         room.setMinimoPersonas(1);
         room.setMinimoPersonasObligatorio(false);
         room.setEstado(RoomState.DISPONIBLE);
-        room.setCampus("Monterrico");
+        CampusEntity campus = new CampusEntity();
+        campus.setNombre("Monterrico");
+        PabellonEntity pabellon = new PabellonEntity();
+        pabellon.setCampus(campus);
+        room.setPabellon(pabellon);
 
         user = new UserEntity();
     }

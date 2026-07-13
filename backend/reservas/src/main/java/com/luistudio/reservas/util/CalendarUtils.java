@@ -1,6 +1,7 @@
 package com.luistudio.reservas.util;
 
 import java.net.URLEncoder;
+import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -37,26 +38,35 @@ public final class CalendarUtils {
     }
 
     public static String createIcs(
+        String uid,
         String title,
         String description,
         String location,
+        BigDecimal latitude,
+        BigDecimal longitude,
         LocalDate date,
         LocalTime start,
         LocalTime end
     ) {
+        String geo = latitude == null || longitude == null
+            ? ""
+            : "GEO:" + latitude.stripTrailingZeros().toPlainString() + ";"
+                + longitude.stripTrailingZeros().toPlainString() + "\r\n";
+
         return "BEGIN:VCALENDAR\r\n"
             + "VERSION:2.0\r\n"
             + "PRODID:-//Luistudio//Reservas//ES\r\n"
             + "CALSCALE:GREGORIAN\r\n"
             + "METHOD:PUBLISH\r\n"
             + "BEGIN:VEVENT\r\n"
-            + "UID:" + System.currentTimeMillis() + "@luistudio\r\n"
+            + "UID:" + sanitize(uid) + "@luistudio\r\n"
             + "DTSTAMP:" + OffsetDateTime.now(java.time.ZoneOffset.UTC).format(UTC_FORMATTER) + "\r\n"
             + "DTSTART:" + toUtcCalendarInstant(date, start) + "\r\n"
             + "DTEND:" + toUtcCalendarInstant(date, end) + "\r\n"
             + "SUMMARY:" + sanitize(title) + "\r\n"
             + "DESCRIPTION:" + sanitize(description) + "\r\n"
             + "LOCATION:" + sanitize(location) + "\r\n"
+            + geo
             + "END:VEVENT\r\n"
             + "END:VCALENDAR\r\n";
     }
@@ -71,6 +81,12 @@ public final class CalendarUtils {
     }
 
     private static String sanitize(String value) {
-        return value.replace("\n", " ").replace(",", "\\,").replace(";", "\\;");
+        return value
+            .replace("\\", "\\\\")
+            .replace("\r\n", "\\n")
+            .replace("\r", "\\n")
+            .replace("\n", "\\n")
+            .replace(",", "\\,")
+            .replace(";", "\\;");
     }
 }

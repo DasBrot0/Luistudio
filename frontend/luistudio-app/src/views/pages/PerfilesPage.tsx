@@ -1,4 +1,5 @@
 import { AppHeader } from '../components/layout/AppHeader'
+import { Pagination } from '../components/layout/Pagination'
 import { FilterBar } from '../components/filters/FilterBar'
 import type { Profile } from '../../models/types'
 
@@ -70,7 +71,7 @@ export function PerfilesPage({
       <section className="dashboard-grid single-grid">
         <article className="card">
           <div className="card-head">
-            <h2>Listado de Perfiles</h2>
+            <h2>Listado de perfiles</h2>
           </div>
 
           <FilterBar
@@ -251,11 +252,7 @@ export function PerfilesPage({
             ))}
           </div>
 
-          <div className="pagination pagination-center">
-            <button type="button" className="inline-flex min-h-8 items-center justify-center rounded-md border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 transition hover:-translate-y-px hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60" onClick={onPrevPage} disabled={profilesPage === 1}>Anterior</button>
-            <p>Página {profilesPage} de {totalProfilePages}</p>
-            <button type="button" className="inline-flex min-h-8 items-center justify-center rounded-md border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 transition hover:-translate-y-px hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60" onClick={onNextPage} disabled={profilesPage === totalProfilePages}>Siguiente</button>
-          </div>
+          <Pagination page={profilesPage} totalPages={totalProfilePages} onPrev={onPrevPage} onNext={onNextPage} />
         </article>
       </section>
     </main>

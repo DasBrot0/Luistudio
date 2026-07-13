@@ -25,6 +25,7 @@ public class PreferenceService {
     private static final String STUDENT_MY_BOOKINGS = "STUDENT_MY_BOOKINGS";
     private static final String STUDENT_RESERVE = "STUDENT_RESERVE";
     private static final String ADMIN_ROOMS = "ADMIN_ROOMS";
+    private static final String ADMIN_DASHBOARD = "ADMIN_DASHBOARD";
     private static final String ADMIN_PROFILES = "ADMIN_PROFILES";
     private static final String ADMIN_BOOKINGS = "ADMIN_BOOKINGS";
     private static final String BOOKING_CONFIRMATION = "BOOKING_CONFIRMATION";
@@ -209,7 +210,7 @@ public class PreferenceService {
         String role = roleName == null ? "" : roleName.trim().toUpperCase();
 
         if ("ADMIN".equals(role)) {
-            if (ADMIN_ROOMS.equals(normalized) || ADMIN_PROFILES.equals(normalized) || ADMIN_BOOKINGS.equals(normalized)) return normalized;
+            if (ADMIN_DASHBOARD.equals(normalized) || ADMIN_ROOMS.equals(normalized) || ADMIN_PROFILES.equals(normalized) || ADMIN_BOOKINGS.equals(normalized)) return normalized;
             throw new BusinessException(HttpStatus.BAD_REQUEST, "Vista inicial inválida para ADMIN.");
         }
 
@@ -220,8 +221,8 @@ public class PreferenceService {
     private String resolveLandingView(String value, String roleName) {
         String role = roleName == null ? "" : roleName.trim().toUpperCase();
         if ("ADMIN".equals(role)) {
-            if (ADMIN_BOOKINGS.equals(value) || ADMIN_PROFILES.equals(value) || ADMIN_ROOMS.equals(value)) return value;
-            return ADMIN_ROOMS;
+            if (ADMIN_DASHBOARD.equals(value) || ADMIN_BOOKINGS.equals(value) || ADMIN_PROFILES.equals(value) || ADMIN_ROOMS.equals(value)) return value;
+            return ADMIN_DASHBOARD;
         }
         if (STUDENT_RESERVE.equals(value) || STUDENT_MY_BOOKINGS.equals(value)) return value;
         return STUDENT_MY_BOOKINGS;

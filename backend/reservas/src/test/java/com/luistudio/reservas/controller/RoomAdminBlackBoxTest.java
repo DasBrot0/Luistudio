@@ -169,7 +169,11 @@ class RoomAdminBlackBoxTest {
             false,
             List.of(new RoomScheduleInput(1, LocalTime.of(7, 0), LocalTime.of(22, 0), false)),
             pabellonCode,
-            RoomState.DISPONIBLE
+            RoomState.DISPONIBLE,
+            null,
+            null,
+            null,
+            null
         );
     }
 
@@ -197,7 +201,11 @@ class RoomAdminBlackBoxTest {
             60,                         // slotMinutes
             List.of(new RoomScheduleResponse(1, LocalTime.of(7, 0), LocalTime.of(22, 0), false, false)),
             "DISPONIBLE",               // status
-            "PA"                        // pabellonCode
+            "PA",                       // pabellonCode
+            null,                       // noiseLevel
+            null,                       // supportsConcentration
+            null,                       // roomType
+            null                        // equipment
         );
     }
 
@@ -242,7 +250,11 @@ class RoomAdminBlackBoxTest {
                 60,
                 List.of(new RoomScheduleResponse(1, LocalTime.of(7, 0), LocalTime.of(22, 0), false, false)),
                 "DISPONIBLE",
-                "PA"
+                "PA",
+                null,
+                null,
+                null,
+                null
             ));
 
         RoomUpsertRequest request = validRequest("Sala de Cómputo A", 30, 30, "PA");
@@ -448,7 +460,11 @@ class RoomAdminBlackBoxTest {
             false,
             List.of(),
             tooLongCode,
-            RoomState.DISPONIBLE
+            RoomState.DISPONIBLE,
+            null,
+            null,
+            null,
+            null
         );
 
         MvcResult result = mockMvc.perform(
@@ -509,7 +525,11 @@ class RoomAdminBlackBoxTest {
             60,
             List.of(new RoomScheduleResponse(1, LocalTime.of(8, 0), LocalTime.of(21, 0), false, false)),
             "DISPONIBLE",
-            "PB"
+            "PB",
+            null,
+            null,
+            null,
+            null
         );
         when(roomService.updateRoom(eq(EXISTING_ROOM_ID), any(RoomUpsertRequest.class)))
             .thenReturn(updatedRoom);
@@ -524,7 +544,11 @@ class RoomAdminBlackBoxTest {
             false,
             List.of(new RoomScheduleInput(1, LocalTime.of(8, 0), LocalTime.of(21, 0), false)),
             "PB",
-            RoomState.DISPONIBLE
+            RoomState.DISPONIBLE,
+            null,
+            null,
+            null,
+            null
         );
 
         // Act & Assert

@@ -2,10 +2,10 @@ package com.luistudio.reservas.controller;
 
 import com.luistudio.reservas.dto.admin.AdminConfigResponse;
 import com.luistudio.reservas.dto.admin.AdminConfigUpdateRequest;
+import com.luistudio.reservas.dto.admin.AdminDashboardResponse;
 import com.luistudio.reservas.dto.admin.AnnouncementRequest;
 import com.luistudio.reservas.dto.admin.AnnouncementResponse;
 import com.luistudio.reservas.dto.admin.CampusScheduleListResponse;
-import com.luistudio.reservas.dto.admin.CampusMapResponse;
 import com.luistudio.reservas.dto.admin.CampusScheduleResponse;
 import com.luistudio.reservas.dto.admin.CampusScheduleUpdateRequest;
 import com.luistudio.reservas.dto.admin.LoginAttemptAdminResponse;
@@ -16,13 +16,14 @@ import com.luistudio.reservas.model.LoginAttemptEntity;
 import com.luistudio.reservas.repository.LoginAttemptRepository;
 import com.luistudio.reservas.service.AccessGuard;
 import com.luistudio.reservas.service.AnnouncementService;
-import com.luistudio.reservas.service.CampusMapService;
+import com.luistudio.reservas.service.AdminDashboardService;
 import com.luistudio.reservas.service.RoomScheduleService;
 import com.luistudio.reservas.service.SystemConfigService;
 import com.luistudio.reservas.service.UserService;
 import jakarta.persistence.criteria.Predicate;
 import jakarta.validation.Valid;
 import java.time.OffsetDateTime;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import org.springframework.data.domain.Page;
@@ -45,27 +46,36 @@ public class AdminController {
     private final AccessGuard accessGuard;
     private final UserService userService;
     private final SystemConfigService systemConfigService;
-    private final CampusMapService campusMapService;
     private final RoomScheduleService roomScheduleService;
     private final LoginAttemptRepository loginAttemptRepository;
     private final AnnouncementService announcementService;
+    private final AdminDashboardService adminDashboardService;
 
     public AdminController(
         AccessGuard accessGuard,
         UserService userService,
         SystemConfigService systemConfigService,
-        CampusMapService campusMapService,
         RoomScheduleService roomScheduleService,
         LoginAttemptRepository loginAttemptRepository,
-        AnnouncementService announcementService
+        AnnouncementService announcementService,
+        AdminDashboardService adminDashboardService
     ) {
         this.accessGuard = accessGuard;
         this.userService = userService;
         this.systemConfigService = systemConfigService;
-        this.campusMapService = campusMapService;
         this.roomScheduleService = roomScheduleService;
         this.loginAttemptRepository = loginAttemptRepository;
         this.announcementService = announcementService;
+        this.adminDashboardService = adminDashboardService;
+    }
+
+    @GetMapping("/admin/dashboard")
+    public AdminDashboardResponse getDashboard(
+        @RequestParam LocalDate from,
+        @RequestParam LocalDate to
+    ) {
+        accessGuard.requireAdmin();
+        return adminDashboardService.getDashboard(from, to);
     }
 
     @GetMapping("/admin/users")
@@ -103,12 +113,6 @@ public class AdminController {
         return systemConfigService.updateConfig(request);
     }
 
-    @GetMapping("/campus/map")
-    public CampusMapResponse getCampusMap() {
-        accessGuard.requireUser();
-        return campusMapService.getCampusMap();
-    }
-
     @GetMapping("/admin/campus-schedules")
     public CampusScheduleListResponse getCampusSchedules() {
         accessGuard.requireAdmin();
@@ -123,10 +127,12 @@ public class AdminController {
 
     @GetMapping("/admin/security/login-attempts")
     public PageResponse<LoginAttemptAdminResponse> getLoginAttempts(
+        @RequestParam(required = false) String user,
         @RequestParam(required = false) String email,
         @RequestParam(required = false) String from,
         @RequestParam(required = false) String to,
         @RequestParam(required = false) Boolean success,
+        @RequestParam(required = false) Boolean blocked,
         @RequestParam(defaultValue = "0") int page,
         @RequestParam(defaultValue = "20") int size
     ) {
@@ -145,6 +151,14 @@ public class AdminController {
             if (email != null && !email.isBlank()) {
                 predicates.add(cb.like(cb.lower(usuario.get("correo")), "%" + email.toLowerCase() + "%"));
             }
+            if (user != null && !user.isBlank()) {
+                String normalized = "%" + user.toLowerCase() + "%";
+                predicates.add(cb.or(
+                    cb.like(cb.lower(usuario.get("codigo")), normalized),
+                    cb.like(cb.lower(usuario.get("nombres")), normalized),
+                    cb.like(cb.lower(usuario.get("apellidos")), normalized)
+                ));
+            }
             if (fromDt != null) {
                 predicates.add(cb.greaterThanOrEqualTo(root.get("fechaIntento"), fromDt));
             }
@@ -153,6 +167,12 @@ public class AdminController {
             }
             if (success != null) {
                 predicates.add(cb.equal(root.get("exito"), success));
+            }
+            if (blocked != null) {
+                OffsetDateTime now = OffsetDateTime.now();
+                predicates.add(blocked
+                    ? cb.greaterThan(usuario.get("lockedUntil"), now)
+                    : cb.or(cb.isNull(usuario.get("lockedUntil")), cb.lessThanOrEqualTo(usuario.get("lockedUntil"), now)));
             }
             if (query != null) {
                 query.orderBy(cb.desc(root.get("fechaIntento")));

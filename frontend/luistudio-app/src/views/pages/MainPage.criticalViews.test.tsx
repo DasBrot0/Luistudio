@@ -2,7 +2,7 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App from '../../App'
-import { api } from '../../services/api'
+import { api, type ApiRoom } from '../../services/api'
 
 /**
  * Pruebas complementarias de vistas críticas del frontend.
@@ -12,7 +12,7 @@ import { api } from '../../services/api'
  *   - Restauración de sesión: estado de carga ("Restaurando sesión").
  *   - Reservas (estudiante): renderizado tras un login exitoso con datos simulados.
  *   - Salas (admin): renderizado con datos mockeados y estado de error (toast) si falla la carga.
- *   - Perfil: estado de carga ("Cargando...") y renderizado posterior con datos mockeados.
+ *   - Perfil: estado de carga de actividad y renderizado posterior con datos mockeados.
  *   - Vista administrativa principal (Reservas registradas): renderizado con datos mockeados.
  */
 
@@ -89,7 +89,7 @@ const adminUser = {
 
 const emptyPage = { content: [], page: 0, size: 10, totalElements: 0, totalPages: 1 }
 
-const sampleRoom = {
+const sampleRoom: ApiRoom = {
   id: 1,
   code: 'A-101',
   name: 'Sala A-101',
@@ -107,6 +107,10 @@ const sampleRoom = {
   schedule: [],
   status: 'DISPONIBLE',
   pabellonCode: 'BC',
+  noiseLevel: 'MEDIO',
+  supportsConcentration: true,
+  roomType: 'GENERAL',
+  equipment: [],
 }
 
 const sampleBooking = {
@@ -187,7 +191,11 @@ beforeEach(() => {
   // guardado en localStorage (comportamiento real de degradación documentado en MainPage).
   vi.mocked(api.getPreferences).mockReset().mockRejectedValue(new Error('Sin preferencias'))
   vi.mocked(api.updatePreferences).mockReset().mockResolvedValue({} as never)
-  vi.mocked(api.getCampusMap).mockReset().mockResolvedValue({})
+  vi.mocked(api.getCampusMap).mockReset().mockResolvedValue({
+    generatedAt: '2026-07-12T00:00:00Z',
+    refreshAfterSeconds: 300,
+    campuses: [],
+  })
   vi.mocked(api.lookupUserByCode).mockReset()
   vi.mocked(api.getSessions).mockReset().mockResolvedValue({ sessions: [] })
   vi.mocked(api.revokeSession).mockReset()
@@ -211,7 +219,7 @@ describe('Vista crítica: Login', () => {
   it('renderiza el formulario de inicio de sesión', () => {
     renderApp()
 
-    expect(screen.getByRole('heading', { name: 'Bienvenido a Luistudio' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Inicia sesión' })).toBeInTheDocument()
     expect(screen.getByLabelText('Correo institucional')).toBeInTheDocument()
     expect(screen.getByLabelText('Contraseña')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Iniciar sesión' })).toBeInTheDocument()
@@ -296,9 +304,10 @@ describe('Vista crítica: Perfil / configuración', () => {
   it('muestra el estado de carga y luego el historial de actividad obtenido vía HTTP mockeado', async () => {
     vi.mocked(api.login).mockResolvedValueOnce(loginResponse(studentUser))
 
-    let resolveActivity: (value: { content: unknown[]; page: number; totalPages: number }) => void = () => {}
+    type ActivityResponse = Awaited<ReturnType<typeof api.getMyActivity>>
+    let resolveActivity: (value: ActivityResponse) => void = () => {}
     vi.mocked(api.getMyActivity).mockReturnValue(
-      new Promise((resolve) => {
+      new Promise<ActivityResponse>((resolve) => {
         resolveActivity = resolve
       }),
     )
@@ -307,10 +316,11 @@ describe('Vista crítica: Perfil / configuración', () => {
     await fillAndSubmitLogin(studentUser.email, 'Student123!')
 
     // Espera a estar dentro de la app autenticada antes de navegar al perfil
-    fireEvent.click(await screen.findByTitle('Mi perfil'))
+    const [profileButton] = await screen.findAllByTitle('Mi perfil')
+    fireEvent.click(profileButton)
     fireEvent.click(await screen.findByRole('button', { name: 'Actividad' }))
 
-    expect(screen.getByText('Cargando...')).toBeInTheDocument()
+    expect(screen.getByText('Cargando actividad…')).toBeInTheDocument()
 
     await act(async () => {
       resolveActivity({
@@ -321,7 +331,7 @@ describe('Vista crítica: Perfil / configuración', () => {
     })
 
     expect(await screen.findByText('Inicio de sesión')).toBeInTheDocument()
-    expect(screen.queryByText('Cargando...')).not.toBeInTheDocument()
+    expect(screen.queryByText('Cargando actividad…')).not.toBeInTheDocument()
   })
 })
 

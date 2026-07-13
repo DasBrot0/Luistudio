@@ -11,6 +11,7 @@ import com.luistudio.reservas.model.ReservationEntity;
 import com.luistudio.reservas.model.RoomEntity;
 import com.luistudio.reservas.model.UserEntity;
 import com.luistudio.reservas.util.CalendarUtils;
+import com.luistudio.reservas.util.RoomLocationFormatter;
 import java.time.OffsetDateTime;
 import org.springframework.stereotype.Component;
 
@@ -54,14 +55,18 @@ public class DtoMapper {
             60,
             java.util.List.<RoomScheduleResponse>of(),
             room.getEstado().name(),
-            room.getPabellon().getCodigo()
+            room.getPabellon().getCodigo(),
+            room.getNivelRuido().name(),
+            room.getPermiteConcentracion(),
+            room.getTipo().name(),
+            java.util.Set.copyOf(room.getEquipamiento())
         );
     }
 
     public BookingResponse toBooking(ReservationEntity reservation) {
         String title = "Reserva - " + reservation.getSala().getNombre();
         String description = "Reserva Luistudio ID " + reservation.getId();
-        String location = reservation.getSala().getUbicacion();
+        String location = RoomLocationFormatter.format(reservation.getSala());
 
         return new BookingResponse(
             reservation.getId(),
@@ -70,12 +75,13 @@ public class DtoMapper {
             reservation.getSala().getId(),
             reservation.getSala().getCodigo(),
             reservation.getSala().getNombre(),
-            reservation.getSala().getUbicacion(),
+            location,
             reservation.getCantidadPersonas(),
             reservation.getFecha(),
             reservation.getHoraInicio(),
             reservation.getHoraFin(),
             reservation.getEstado().name(),
+            reservation.getAttendanceStatus(),
             reservation.getObservacion(),
             CalendarUtils.googleCalendarLink(
                 title,

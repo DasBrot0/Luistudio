@@ -50,7 +50,7 @@ export function RoomFormModal({
   return (
     <section className="modal-layer" role="dialog" aria-modal="true">
       <div className="modal-card text-left room-form-modal-card">
-        <h2>{mode === 'add' ? 'Agregar Sala' : 'Editar Sala'}</h2>
+        <h2>{mode === 'add' ? 'Agregar sala' : 'Editar sala'}</h2>
         {mode === 'edit' && targetRoomId && <p className="meta-id">ID: {targetRoomId}</p>}
 
         <form className="stack" onSubmit={onSubmit}>

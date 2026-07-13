@@ -1,72 +1,48 @@
-# Stack Tecnológico – Luistudio
+# Stack tecnológico — Luistudio
 
-## Tecnologías por capa
+## Tecnologías verificadas
 
-| Capa                      | Tecnología         |
-| ------------------------- | ------------------ |
-| Frontend                  | React + TypeScript |
-| UI / Estilos              | Tailwind CSS       |
-| Backend                   | Spring Boot + Java |
-| Base de Datos             | PostgreSQL         |
-| ORM                       | Spring Data JPA + Hibernate             |
-| Autenticación             | JWT + bcrypt       |
-| Correos / Notificaciones  | Brevo / Resend API |
-| Dashboard                 | Recharts           |
-| Exportación de calendario | `.ics`             |
-| Control de versiones      | Git + GitHub       |
-| Despliegue Frontend       | Vercel             |
-| Despliegue Backend        | Render             |
-| Hosting Base de Datos     | Supabase           |
+| Capa | Tecnología actual |
+|---|---|
+| Frontend | React 19, TypeScript 6 y Vite 8 |
+| UI y estilos | Tailwind CSS 3, CSS propio y variables semánticas |
+| Mapa | MapLibre GL; teselas de MapTiler configurables |
+| Dashboard | SVG y CSS nativos, sin Recharts ni shadcn/ui |
+| Pruebas frontend | Vitest, Testing Library y jsdom |
+| Gestor frontend | pnpm 10.13.1, fijado en `packageManager` y `pnpm-lock.yaml` |
+| Backend | Spring Boot, Java 21 y Maven Wrapper |
+| Persistencia | Spring Data JPA, Hibernate y PostgreSQL; H2 para pruebas/contexto local |
+| Autenticación | JWT firmado, JTI persistido, cookies HttpOnly y bcrypt |
+| Correos | Outbox persistente con adaptadores Log, Resend y Gmail |
+| Cache | Redis opcional para el mapa, con fallback a PostgreSQL |
+| Calendario | Exportación `.ics` y enlaces de Google Calendar |
+| Cobertura Java | JaCoCo |
+| Contenedores | Docker y Docker Compose |
 
----
+## Arquitectura ejecutable
 
-## Lenguajes utilizados
-
-| Contexto      | Lenguaje   |
-| ------------- | ---------- |
-| Frontend      | TypeScript |
-| Backend       | Java       |
-| Base de datos | SQL        |
-| Estilos       | CSS        |
-
----
-
-## Arquitectura general
-
-```
-Navegador (PC / Móvil)
-        ↓  HTTPS
-Frontend React (Vercel)
-        ↓  REST API
-Backend Spring Boot + Java (Render)
-        ↓  TCP/IP :5432
-PostgreSQL (Supabase)
-        +
-Servidor SMTP externo (Resend)
+```text
+Navegador
+  → React/Vite
+  → REST /api (Spring Boot)
+  → PostgreSQL
+  ↘ Redis opcional para cache del mapa
+  ↘ email_outbox → proveedor de correo configurado
 ```
 
----
+Los puntos de entrada son `frontend/luistudio-app/src/main.tsx` y
+`backend/reservas/src/main/java/com/luistudio/reservas/ReservasApplication.java`.
 
-## Componentes principales
+## Comandos
 
-| Componente                    | Archivo    | Rol                        |
-| ----------------------------- | ---------- | -------------------------- |
-| `AplicacionCliente.tsx`       | Frontend   | Interfaz de usuario React  |
-| `SistemaReservasAPI.java`     | Backend    | Exposición de la API REST  |
-| `ModuloPersistencia.java`     | Backend    | Acceso a datos             |
-| `ModuloAutenticacion.java`    | Backend    | JWT, bcrypt, 2FA           |
-| `ServicioNotificaciones.java` | Backend    | Envío de correos y alertas |
-| `luistudio_db`                | PostgreSQL | Base de datos principal    |
-
----
-
-## Estructura del repositorio
-
+```bash
+cd frontend/luistudio-app
+pnpm install --frozen-lockfile
+pnpm test
+pnpm run build
 ```
-Luistudio/
-├── frontend/        → Aplicación React + TypeScript
-├── backend/         → API Spring Boot + Java
-├── docs/            → Documentación del proyecto
-├── README.md
-└── .gitignore
+
+```bash
+cd backend/reservas
+./mvnw test
 ```

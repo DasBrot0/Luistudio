@@ -5,7 +5,10 @@ export type RouteKey =
   | 'reset-password'
   | 'confirm-change'
   | 'reservas'
+  | 'busqueda-inteligente'
   | 'misreservas'
+  | 'mapa'
+  | 'dashboard'
   | 'salas'
   | 'perfiles'
   | 'admin-reservas'
@@ -24,6 +27,7 @@ export interface AuthUser {
   firstName: string
   lastName: string
   email: string
+  status: string
   has2fa: boolean
 }
 
@@ -45,6 +49,10 @@ export interface Room {
   schedule: ScheduleDay[]
   active: boolean
   status: RoomStatus
+  noiseLevel?: 'BAJO' | 'MEDIO' | 'ALTO'
+  supportsConcentration?: boolean
+  roomType?: string
+  equipment?: string[]
 }
 
 export interface ScheduleDay {
@@ -83,6 +91,7 @@ export interface Booking {
   start: string
   end: string
   status: BookingStatus
+  attendanceStatus?: 'ASISTIO' | 'INASISTIO' | null
   observation?: string
   googleCalendarUrl?: string
   icsUrl?: string

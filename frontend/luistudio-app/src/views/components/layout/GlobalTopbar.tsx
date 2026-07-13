@@ -13,7 +13,7 @@ interface NotificationItem {
 interface NavItem {
   route: RouteKey
   label: string
-  icon: 'calendar' | 'list' | 'rooms' | 'users' | 'bookings' | 'security' | 'megaphone'
+  icon: 'dashboard' | 'calendar' | 'list' | 'rooms' | 'users' | 'bookings' | 'security' | 'megaphone' | 'map' | 'search'
 }
 
 interface GlobalTopbarProps {
@@ -31,21 +31,28 @@ interface GlobalTopbarProps {
 const studentItems: NavItem[] = [
   { route: 'misreservas', label: 'Mis reservas', icon: 'list' },
   { route: 'reservas', label: 'Reservar', icon: 'calendar' },
+  { route: 'busqueda-inteligente', label: 'Búsqueda inteligente', icon: 'search' },
+  { route: 'mapa', label: 'Mapa', icon: 'map' },
 ]
 
 const adminItems: NavItem[] = [
+  { route: 'dashboard', label: 'Dashboard', icon: 'dashboard' },
   { route: 'salas', label: 'Salas', icon: 'rooms' },
   { route: 'perfiles', label: 'Perfiles', icon: 'users' },
   { route: 'admin-reservas', label: 'Reservas', icon: 'bookings' },
+  { route: 'mapa', label: 'Mapa', icon: 'map' },
   { route: 'seguridad', label: 'Seguridad', icon: 'security' },
   { route: 'comunicados', label: 'Comunicados', icon: 'megaphone' },
 ]
 
 function NavIcon({ type }: { type: NavItem['icon'] | 'bell' | 'collapse' | 'settings' | 'profile' }) {
+  if (type === 'dashboard') return <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="4" rx="1" /><rect x="14" y="11" width="7" height="10" rx="1" /><rect x="3" y="14" width="7" height="7" rx="1" /></svg>
+  if (type === 'map') return <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 18l-6 3V6l6-3 6 3 6-3v15l-6 3-6-3zM9 3v15M15 6v15" /></svg>
   if (type === 'megaphone') return <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 11V13a2 2 0 0 0 2 2h1l2 4h2l-2-4h1a2 2 0 0 0 2-2v-2" /><path d="M11 11V7.5L21 5v14l-10-2.5V13" /><path d="M11 11H3" /></svg>
   if (type === 'security') return <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /></svg>
   if (type === 'profile') return <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="8" r="4" /><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" /></svg>
   if (type === 'calendar') return <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M16 3v4M8 3v4M3 10h18" /></svg>
+  if (type === 'search') return <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="6" /><path d="m16 16 4 4" /></svg>
   if (type === 'list') return <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" /></svg>
   if (type === 'rooms') return <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 21V8a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v13M3 21h18M8 11h2M8 15h2M16 3h3a2 2 0 0 1 2 2v16" /></svg>
   if (type === 'users') return <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="8.5" cy="7" r="3.5" /><path d="M20 8v6M23 11h-6" /></svg>
@@ -133,16 +140,17 @@ export function GlobalTopbar({
             <img src={logoHorizontalOscuro} alt="Luistudio" className="mobile-brand-logo logo-dark" />
           </div>
           <div className="flex items-center gap-2">
-            <button type="button" className="rounded-md border border-slate-300 px-2 py-1 text-xs font-semibold text-text-secondary" onClick={onOpenNotifications}><NavIcon type="bell" /></button>
-            <button type="button" className="rounded-md border border-slate-300 px-2 py-1 text-xs font-semibold text-text-secondary" onClick={onOpenSettings}><NavIcon type="settings" /></button>
+            <button type="button" className="mobile-topbar-action" onClick={onOpenNotifications} aria-label={`Notificaciones${notifications.length ? ` (${notifications.length})` : ''}`} title="Notificaciones"><NavIcon type="bell" /></button>
+            <button type="button" className={`mobile-topbar-action ${activeRoute === 'profile' ? 'active' : ''}`} onClick={() => onNavigate('profile')} aria-label="Mi perfil" title="Mi perfil" aria-current={activeRoute === 'profile' ? 'page' : undefined}><NavIcon type="profile" /></button>
+            <button type="button" className="mobile-topbar-action" onClick={onOpenSettings} aria-label="Configuración" title="Configuración"><NavIcon type="settings" /></button>
           </div>
         </div>
       </header>
 
       <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-bg-card md:hidden">
-        <div className="mx-auto flex max-w-md items-center justify-center gap-2 px-3 py-1.5">
+        <div className="flex items-center gap-1 overflow-x-auto px-2 py-1.5">
           {navItems.map((item) => (
-            <button key={item.route} type="button" onClick={() => onNavigate(item.route)} className={`mobile-nav-btn flex min-w-0 flex-1 flex-col items-center gap-1 rounded-md px-2 py-2 text-[11px] font-semibold ${activeRoute === item.route ? 'active' : ''}`}>
+            <button key={item.route} type="button" onClick={() => onNavigate(item.route)} className={`mobile-nav-btn flex min-w-[4.8rem] flex-1 flex-col items-center gap-1 rounded-md px-2 py-2 text-[11px] font-semibold ${activeRoute === item.route ? 'active' : ''}`}>
               <NavIcon type={item.icon} />
               <span className="truncate">{item.label}</span>
             </button>

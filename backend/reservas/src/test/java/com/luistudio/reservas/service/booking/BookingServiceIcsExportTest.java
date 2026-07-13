@@ -8,6 +8,8 @@ import static org.mockito.Mockito.when;
 import com.luistudio.reservas.exception.BusinessException;
 import com.luistudio.reservas.exception.NotFoundException;
 import com.luistudio.reservas.model.ReservationEntity;
+import com.luistudio.reservas.model.CampusEntity;
+import com.luistudio.reservas.model.PabellonEntity;
 import com.luistudio.reservas.model.ReservationStatus;
 import com.luistudio.reservas.model.RoleEntity;
 import com.luistudio.reservas.model.RoomEntity;
@@ -24,6 +26,7 @@ import com.luistudio.reservas.service.booking.validation.BookingValidationServic
 import com.luistudio.reservas.service.email.EmailTemplateService;
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.math.BigDecimal;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -114,7 +117,16 @@ class BookingServiceIcsExportTest {
         room.setId(5L);
         room.setCodigo("A-101");
         room.setNombre("Aula A-101");
-        room.setUbicacion("Pabellón A, 1er piso");
+        room.setUbicacion("Piso 1, ala norte");
+
+        CampusEntity campus = new CampusEntity();
+        campus.setNombre("Monterrico");
+        PabellonEntity building = new PabellonEntity();
+        building.setNombre("Pabellón A1");
+        building.setCampus(campus);
+        building.setLatitude(new BigDecimal("-12.0842548"));
+        building.setLongitude(new BigDecimal("-76.9729651"));
+        room.setPabellon(building);
 
         // Reserva activa que pertenece al estudiante
         activeReservation = new ReservationEntity();
@@ -152,10 +164,22 @@ class BookingServiceIcsExportTest {
             "El ICS debe incluir la fecha/hora de inicio");
         assertTrue(ics.contains("DTEND:"),
             "El ICS debe incluir la fecha/hora de fin");
+        assertTrue(ics.contains("UID:booking-1@luistudio"),
+            "El evento debe conservar un UID estable para la reserva");
+        assertTrue(ics.contains("DTSTART:20250811T140000Z"),
+            "La hora de Lima debe convertirse correctamente a UTC");
+        assertTrue(ics.contains("DTEND:20250811T150000Z"),
+            "La hora final debe convertirse correctamente a UTC");
         assertTrue(ics.contains("Aula A-101"),
             "El SUMMARY del ICS debe incluir el nombre de la sala");
+        assertTrue(ics.contains("LOCATION:Piso 1\\, ala norte\\, Pabellón A1\\, Campus Monterrico\\, (-12.0842548\\, -76.9729651)"),
+            "La ubicación debe provenir de la sala, pabellón, campus y coordenadas reales");
+        assertTrue(ics.contains("GEO:-12.0842548;-76.9729651"),
+            "El ICS debe incluir las coordenadas del pabellón usadas por el mapa");
         assertTrue(ics.contains("END:VCALENDAR"),
             "El ICS debe cerrar con END:VCALENDAR");
+        assertTrue(ics.endsWith("\r\n"),
+            "El documento iCalendar debe usar terminadores CRLF");
     }
 
     // -----------------------------------------------------------------------

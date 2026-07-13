@@ -5,9 +5,7 @@ import { api } from '../../services/api'
 type Status = 'loading' | 'success' | 'error'
 
 const ACTION_LABELS: Record<string, string> = {
-  CHANGE_PASSWORD: 'cambio de contraseña',
   DISABLE_2FA: 'desactivación de 2FA',
-  REVOKE_ALL_SESSIONS: 'cierre de todas las sesiones',
 }
 
 export function ConfirmSensitiveChangePage() {

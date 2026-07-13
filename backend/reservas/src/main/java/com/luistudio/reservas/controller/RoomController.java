@@ -9,11 +9,14 @@ import com.luistudio.reservas.dto.room.MaintenanceRequest;
 import com.luistudio.reservas.dto.room.MaintenanceResponse;
 import com.luistudio.reservas.dto.room.RoomResponse;
 import com.luistudio.reservas.dto.room.RoomUpsertRequest;
+import com.luistudio.reservas.dto.room.IntelligentRoomSearchRequest;
+import com.luistudio.reservas.dto.room.IntelligentRoomSearchResponse;
 import com.luistudio.reservas.security.AuthPrincipal;
 import com.luistudio.reservas.service.AccessGuard;
 import com.luistudio.reservas.service.AvailabilitySubscriptionService;
 import com.luistudio.reservas.service.BookingService;
 import com.luistudio.reservas.service.RoomService;
+import com.luistudio.reservas.service.IntelligentRoomSearchService;
 import jakarta.validation.Valid;
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -39,17 +42,20 @@ public class RoomController {
     private final BookingService bookingService;
     private final AccessGuard accessGuard;
     private final AvailabilitySubscriptionService subscriptionService;
+    private final IntelligentRoomSearchService intelligentRoomSearchService;
 
     public RoomController(
         RoomService roomService,
         BookingService bookingService,
         AccessGuard accessGuard,
-        AvailabilitySubscriptionService subscriptionService
+        AvailabilitySubscriptionService subscriptionService,
+        IntelligentRoomSearchService intelligentRoomSearchService
     ) {
         this.roomService = roomService;
         this.bookingService = bookingService;
         this.accessGuard = accessGuard;
         this.subscriptionService = subscriptionService;
+        this.intelligentRoomSearchService = intelligentRoomSearchService;
     }
 
     @GetMapping
@@ -74,6 +80,12 @@ public class RoomController {
     ) {
         accessGuard.requireUser();
         return roomService.listAvailableRooms(fecha, horaInicio, horaFin);
+    }
+
+    @PostMapping("/intelligent-search")
+    public IntelligentRoomSearchResponse intelligentSearch(@Valid @RequestBody IntelligentRoomSearchRequest request) {
+        accessGuard.requireUser();
+        return intelligentRoomSearchService.search(request);
     }
 
     @GetMapping("/{roomId}/bookings")

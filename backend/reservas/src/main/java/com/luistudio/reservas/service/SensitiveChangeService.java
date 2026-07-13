@@ -13,7 +13,6 @@ import java.time.OffsetDateTime;
 import java.util.UUID;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -27,9 +26,7 @@ public class SensitiveChangeService {
     private final EmailOutboxService emailOutboxService;
     private final EmailTemplateService emailTemplateService;
     private final SecretHashService secretHashService;
-    private final SessionService sessionService;
     private final AuditService auditService;
-    private final PasswordEncoder passwordEncoder;
     private final String confirmChangeUrl;
 
     public SensitiveChangeService(
@@ -38,9 +35,7 @@ public class SensitiveChangeService {
         EmailOutboxService emailOutboxService,
         EmailTemplateService emailTemplateService,
         SecretHashService secretHashService,
-        SessionService sessionService,
         AuditService auditService,
-        PasswordEncoder passwordEncoder,
         @Value("${app.frontend.confirm-change-url}") String confirmChangeUrl
     ) {
         this.tokenRepository = tokenRepository;
@@ -48,9 +43,7 @@ public class SensitiveChangeService {
         this.emailOutboxService = emailOutboxService;
         this.emailTemplateService = emailTemplateService;
         this.secretHashService = secretHashService;
-        this.sessionService = sessionService;
         this.auditService = auditService;
-        this.passwordEncoder = passwordEncoder;
         this.confirmChangeUrl = confirmChangeUrl;
     }
 
@@ -108,33 +101,23 @@ public class SensitiveChangeService {
 
     private void dispatchAction(UserEntity user, String actionType, String payload) {
         switch (actionType) {
-            case "CHANGE_PASSWORD" -> {
-                if (payload == null || payload.isBlank()) {
-                    throw new BusinessException(HttpStatus.BAD_REQUEST, "Se requiere la nueva contraseña en el payload");
-                }
-                user.setPasswordHash(passwordEncoder.encode(payload));
-                userRepository.save(user);
-            }
             case "DISABLE_2FA" -> {
                 user.setHas2fa(false);
                 userRepository.save(user);
             }
-            case "REVOKE_ALL_SESSIONS" -> sessionService.revokeAllSessions(user.getId());
             default -> throw new BusinessException(HttpStatus.BAD_REQUEST, "Tipo de acción desconocido: " + actionType);
         }
     }
 
     private void validateActionType(String actionType) {
-        if (!actionType.equals("CHANGE_PASSWORD") && !actionType.equals("DISABLE_2FA") && !actionType.equals("REVOKE_ALL_SESSIONS")) {
+        if (!actionType.equals("DISABLE_2FA")) {
             throw new BusinessException(HttpStatus.BAD_REQUEST, "Tipo de acción no válido");
         }
     }
 
     private String describeAction(String actionType) {
         return switch (actionType) {
-            case "CHANGE_PASSWORD" -> "cambio de contraseña";
             case "DISABLE_2FA" -> "desactivación de 2FA";
-            case "REVOKE_ALL_SESSIONS" -> "cierre de todas las sesiones";
             default -> actionType;
         };
     }
