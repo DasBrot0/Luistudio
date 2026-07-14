@@ -186,12 +186,9 @@ public class AdminController {
             default -> "fechaIntento";
         };
 
-        Specification<LoginAttemptEntity> spec = (root, query, cb) -> {
+        Specification<LoginAttemptEntity> spec = (root, criteriaQuery, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
             var usuario = root.join("usuario");
-            if (query != null && Long.class != query.getResultType()) {
-                root.fetch("usuario");
-            }
             if (email != null && !email.isBlank()) {
                 predicates.add(cb.like(cb.lower(usuario.get("correo")), "%" + email.toLowerCase() + "%"));
             }

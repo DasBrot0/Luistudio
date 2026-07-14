@@ -158,6 +158,8 @@ Memoria (500 MB):
 - `GET /api/campus/map`
 - `PUT /api/admin/buildings/{id}/location`
 - `GET /api/admin/security/login-attempts`
+  - La paginación carga el usuario con un `EntityGraph`; no agrega `fetch join` a
+    la especificación, por lo que también funciona al ejecutar la consulta de conteo.
 - `POST /api/admin/announcements`
 
 ### Preferencias
