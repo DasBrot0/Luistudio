@@ -26,6 +26,7 @@ interface GlobalTopbarProps {
   onToggleSidebar: () => void
   onOpenNotifications: () => void
   onOpenSettings: () => void
+  onLogoClick: () => void
 }
 
 const studentItems: NavItem[] = [
@@ -76,6 +77,7 @@ export function GlobalTopbar({
   onToggleSidebar,
   onOpenNotifications,
   onOpenSettings,
+  onLogoClick,
 }: GlobalTopbarProps) {
   const navItems = role === 'admin' ? adminItems : studentItems
   const roleLabel = role === 'admin' ? 'Administrador' : 'Estudiante'
@@ -96,10 +98,15 @@ export function GlobalTopbar({
 
         <div className={`flex items-center pb-4 pt-5 ${isSidebarCollapsed ? 'justify-center px-2' : 'justify-between px-4'}`}>
           <div className={`flex min-w-0 items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3'}`}>
-            <span className={`sidebar-logo-frame ${isSidebarCollapsed ? 'compact' : ''}`}>
+            <button
+              type="button"
+              className={`sidebar-logo-frame ${isSidebarCollapsed ? 'compact' : ''}`}
+              onClick={onLogoClick}
+              aria-label="Luistudio"
+            >
               <img src={logoModoClaro} alt="Logo de Luistudio" className="sidebar-logo logo-light" />
               <img src={logoModoOscuro} alt="Logo de Luistudio" className="sidebar-logo logo-dark" />
-            </span>
+            </button>
             {!isSidebarCollapsed && <div className="min-w-0"><p className="m-0 truncate text-2xl font-extrabold tracking-tight">Luistudio</p><span className="role-chip mt-1">{roleLabel}</span></div>}
           </div>
         </div>
@@ -139,10 +146,10 @@ export function GlobalTopbar({
 
       <header className="fixed inset-x-0 top-0 z-40 border-b border-slate-200 bg-bg-card md:hidden">
         <div className="flex items-center justify-between gap-2 px-4 py-3">
-          <div className="mobile-brand-wrap">
+          <button type="button" className="mobile-brand-wrap" onClick={onLogoClick} aria-label="Luistudio">
             <img src={logoHorizontalClaro} alt="Luistudio" className="mobile-brand-logo logo-light" />
             <img src={logoHorizontalOscuro} alt="Luistudio" className="mobile-brand-logo logo-dark" />
-          </div>
+          </button>
           <div className="flex items-center gap-2">
             <button type="button" className="mobile-topbar-action" onClick={onOpenNotifications} aria-label={`Notificaciones${notifications.length ? ` (${notifications.length})` : ''}`} title="Notificaciones"><NavIcon type="bell" /></button>
             <button type="button" className={`mobile-topbar-action ${activeRoute === 'profile' ? 'active' : ''}`} onClick={() => onNavigate('profile')} aria-label="Mi perfil" title="Mi perfil" aria-current={activeRoute === 'profile' ? 'page' : undefined}><NavIcon type="profile" /></button>

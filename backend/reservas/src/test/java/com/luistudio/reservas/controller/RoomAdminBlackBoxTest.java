@@ -5,6 +5,8 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.verify;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -567,5 +569,14 @@ class RoomAdminBlackBoxTest {
             "CN-ROOM-06: Se esperaba HTTP 200 al editar una sala existente con datos válidos");
         assertNotNull(result.getResponse().getContentAsString(),
             "El cuerpo de la respuesta no debe ser nulo");
+    }
+
+    @Test
+    @DisplayName("Eliminar sala existente devuelve HTTP 204 sin cuerpo")
+    void shouldReturn204WhenRoomIsDeleted() throws Exception {
+        mockMvc.perform(delete("/api/rooms/{id}", EXISTING_ROOM_ID))
+            .andExpect(status().isNoContent());
+
+        verify(roomService).deleteRoom(EXISTING_ROOM_ID);
     }
 }

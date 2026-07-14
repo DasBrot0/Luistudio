@@ -182,6 +182,17 @@ export interface ApiPreferences {
   loginLandingView: 'STUDENT_MY_BOOKINGS' | 'STUDENT_RESERVE' | 'ADMIN_DASHBOARD' | 'ADMIN_ROOMS' | 'ADMIN_PROFILES' | 'ADMIN_BOOKINGS'
 }
 
+export interface ApiAvailabilitySubscription {
+  id: number
+  roomId: number
+  roomName: string
+  targetDate: string
+  startTime: string
+  endTime: string
+  status: string
+  createdAt: string
+}
+
 const fieldLabels: Record<string, string> = {
   campus: 'campus',
   capacity: 'capacidad',
@@ -280,7 +291,12 @@ async function http<T>(path: string, options: RequestInit = {}, _token?: string)
     return undefined as T
   }
 
-  return response.json() as Promise<T>
+  const body = await response.text()
+  if (!body.trim()) {
+    return undefined as T
+  }
+
+  return JSON.parse(body) as T
 }
 
 export const api = {
@@ -494,9 +510,11 @@ export const api = {
   },
 
   async downloadBookingIcs(token: string, bookingId: number) {
+    // La autenticación vive en la cookie HttpOnly. El valor UI "session" no es un JWT
+    // y no debe enviarse como Bearer porque el backend prioriza ese encabezado.
+    void token
     const response = await fetch(`${API_BASE}/bookings/${bookingId}/ics`, {
       credentials: 'include',
-      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
     })
 
     if (!response.ok) {
@@ -686,7 +704,7 @@ export const api = {
 
   // ST-08 Room availability subscriptions
   subscribeToRoom(token: string, roomId: number, targetDate: string, startTime: string, endTime: string) {
-    return http<{ message: string }>(`/rooms/${roomId}/availability-subscriptions`, {
+    return http<ApiAvailabilitySubscription>(`/rooms/${roomId}/availability-subscriptions`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ targetDate, startTime, endTime }),
@@ -698,7 +716,7 @@ export const api = {
   },
 
   getMyAvailabilitySubscriptions(token: string) {
-    return http<{ subscriptions: Array<{ id: number; roomId: number; roomName: string; targetDate: string; startTime: string; endTime: string; status: string; createdAt: string }> }>('/me/availability-subscriptions', {}, token)
+    return http<{ subscriptions: ApiAvailabilitySubscription[] }>('/me/availability-subscriptions', {}, token)
   },
 
   // ST-09 Announcements

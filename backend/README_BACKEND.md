@@ -309,6 +309,7 @@ Si falta alguna credencial, el sistema hace fallback a `log` y deja warning en l
 - El control automático de asistencia corre cada minuto y registra `INASISTIO` cuando han transcurrido 15 minutos desde el inicio. También recupera reservas activas de días anteriores que hubieran quedado pendientes y encola el correo al estudiante.
 - `attendance_records` conserva la auditoría (`status`, `recorded_at`, `recorded_by`) y `bookings.attendance_status` mantiene el estado actual consultado por las vistas, sin tablas paralelas para sanciones o fechas de impedimento que este release no implementa.
 - La administración lista asistencias con filtros y paginación de backend, incluido campus y pabellón, y puede corregir una reserva a `ASISTIO` o `INASISTIO`.
+- La eliminación administrativa de una sala responde `204 No Content`; los clientes no deben esperar un cuerpo JSON para esa operación.
 - El scheduler de mantenimiento sincroniza `PROGRAMADO`, `EN_CURSO` y `FINALIZADO`, bloquea la sala solo durante el intervalo vigente y la devuelve a `DISPONIBLE` al terminar.
 - El seed regenera reservas `DEMO_DASHBOARD_*`, `DEMO_FUTURE_*` y `DEMO_MAP_CURRENT_*` con variedad de campus, salas, fechas, horas, asistencia y estados; además oculta del mapa pabellones sin salas activas.
 

@@ -19,6 +19,7 @@ interface AdminAttendancePageProps {
   page: number
   totalPages: number
   totalElements: number
+  updatingBookingId: number | null
   onQueryChange: (value: string) => void
   onCampusChange: (value: string) => void
   onPavilionChange: (value: string) => void
@@ -60,6 +61,7 @@ export function AdminAttendancePage({
   page,
   totalPages,
   totalElements,
+  updatingBookingId,
   onQueryChange,
   onCampusChange,
   onPavilionChange,
@@ -82,6 +84,7 @@ export function AdminAttendancePage({
   ).sort((a, b) => a[1].localeCompare(b[1], 'es-PE'))
   const noFilters = query === '' && campus === 'Todos' && pavilion === 'Todos'
     && status === 'Todos' && from === '' && to === '' && sort === 'date:desc'
+  const updateInProgress = updatingBookingId !== null
 
   return (
     <main className="page dashboard-page">
@@ -161,6 +164,7 @@ export function AdminAttendancePage({
                   <thead><tr><th>Estudiante</th><th>Pabellón / sala</th><th>Fecha y horario</th><th>Estado</th><th>Acciones</th></tr></thead>
                   <tbody>{items.map((item) => {
                     const started = hasStarted(item)
+                    const updating = updatingBookingId === item.bookingId
                     return (
                     <tr key={item.bookingId}>
                       <td data-label="Estudiante"><strong>{item.studentName}</strong><br /><small>{item.studentCode} · {item.studentEmail}</small></td>
@@ -168,17 +172,18 @@ export function AdminAttendancePage({
                       <td data-label="Fecha y horario">{formatDate(item.date)}<br /><small>{item.startTime}-{item.endTime}</small></td>
                       <td data-label="Estado"><span className={`status-pill ${statusClass(item.attendanceStatus)}`}>{statusLabel(item.attendanceStatus)}</span></td>
                       <td data-label="Acciones" className="actions-cell">
-                        <button type="button" className="secondary-btn" title={started ? undefined : 'La reserva todavía no ha iniciado'} disabled={!started || item.attendanceStatus === 'ASISTIO'} onClick={() => onMark(item.bookingId, 'ASISTIO')}>Marcar asistencia</button>
-                        <button type="button" className="inline-flex min-h-8 items-center justify-center rounded-md bg-red-100 px-3 text-xs font-semibold text-red-700 disabled:opacity-50" title={started ? undefined : 'La reserva todavía no ha iniciado'} disabled={!started || item.attendanceStatus === 'INASISTIO'} onClick={() => onMark(item.bookingId, 'INASISTIO')}>Marcar inasistencia</button>
+                        <button type="button" className="attendance-action attendance-action--present" title={started ? undefined : 'La reserva todavía no ha iniciado'} disabled={!started || updateInProgress || item.attendanceStatus === 'ASISTIO'} onClick={() => onMark(item.bookingId, 'ASISTIO')}>{updating ? 'Guardando...' : 'Marcar asistencia'}</button>
+                        <button type="button" className="attendance-action attendance-action--absent" title={started ? undefined : 'La reserva todavía no ha iniciado'} disabled={!started || updateInProgress || item.attendanceStatus === 'INASISTIO'} onClick={() => onMark(item.bookingId, 'INASISTIO')}>{updating ? 'Guardando...' : 'Marcar inasistencia'}</button>
                       </td>
                     </tr>
                   )})}</tbody>
                 </table>
               </div>
 
-              <div className="mobile-card-list mobile-table-only">
+              <div className="mobile-card-list mobile-list-only">
                 {items.map((item) => {
                   const started = hasStarted(item)
+                  const updating = updatingBookingId === item.bookingId
                   return (
                   <article className="mobile-data-card" key={`mobile-attendance-${item.bookingId}`}>
                     <div className="mobile-data-card-head"><strong>{item.studentName}</strong><span className={`status-pill ${statusClass(item.attendanceStatus)}`}>{statusLabel(item.attendanceStatus)}</span></div>
@@ -187,8 +192,8 @@ export function AdminAttendancePage({
                     <p><strong>Sala:</strong> {item.roomName} · {item.location}</p>
                     <p><strong>Reserva:</strong> {formatDate(item.date)} · {item.startTime}-{item.endTime}</p>
                     <div className="mobile-card-actions">
-                      <button type="button" className="secondary-btn" title={started ? undefined : 'La reserva todavía no ha iniciado'} disabled={!started || item.attendanceStatus === 'ASISTIO'} onClick={() => onMark(item.bookingId, 'ASISTIO')}>Marcar asistencia</button>
-                      <button type="button" className="inline-flex min-h-8 items-center justify-center rounded-md bg-red-100 px-3 text-xs font-semibold text-red-700 disabled:opacity-50" title={started ? undefined : 'La reserva todavía no ha iniciado'} disabled={!started || item.attendanceStatus === 'INASISTIO'} onClick={() => onMark(item.bookingId, 'INASISTIO')}>Marcar inasistencia</button>
+                      <button type="button" className="attendance-action attendance-action--present" title={started ? undefined : 'La reserva todavía no ha iniciado'} disabled={!started || updateInProgress || item.attendanceStatus === 'ASISTIO'} onClick={() => onMark(item.bookingId, 'ASISTIO')}>{updating ? 'Guardando...' : 'Marcar asistencia'}</button>
+                      <button type="button" className="attendance-action attendance-action--absent" title={started ? undefined : 'La reserva todavía no ha iniciado'} disabled={!started || updateInProgress || item.attendanceStatus === 'INASISTIO'} onClick={() => onMark(item.bookingId, 'INASISTIO')}>{updating ? 'Guardando...' : 'Marcar inasistencia'}</button>
                     </div>
                   </article>
                 )})}

@@ -97,9 +97,10 @@ public class RoomController {
     }
 
     @DeleteMapping("/{roomId}")
-    public void deleteRoom(@PathVariable Long roomId) {
+    public ResponseEntity<Void> deleteRoom(@PathVariable Long roomId) {
         accessGuard.requireAdmin();
         roomService.deleteRoom(roomId);
+        return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/{roomId}/availability-subscriptions")

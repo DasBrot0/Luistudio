@@ -156,6 +156,8 @@ La ruta autenticada `/mapa` usa MapLibre y MapTiler, con fallback a una lista ac
 - Mis reservas incluye una tarjeta de historial de inasistencias. Si no existe una regla de impedimento registrada, lo indica sin inventar una fecha de sanción.
 - La navegación administrativa incluye `Asistencias`. La vista consulta una página de backend a la vez, permite filtrar por estudiante o código, campus, pabellón, estado y periodo, ordenar los resultados y marcar asistencia o inasistencia desde desktop y móvil.
 - La actualización manual conserva el mismo estado visible en Mis reservas y la auditoría de quién realizó el cambio; una inasistencia nueva encola la notificación al estudiante.
+- El cliente HTTP acepta respuestas exitosas sin cuerpo (por ejemplo, al eliminar una sala) y tipa la suscripción de disponibilidad con el registro que devuelve el backend.
+- La descarga ICS usa la cookie de sesión HttpOnly, igual que el resto de la API, y no envía un encabezado Bearer sintético.
 - Configuración expone preferencias de notificación para `Registro de inasistencia` y `Sala nuevamente disponible`, además de las opciones existentes de reservas.
 
 ## Inventario físico de salas

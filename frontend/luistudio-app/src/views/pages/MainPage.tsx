@@ -50,6 +50,7 @@ import { MessageModal } from '../components/modals/MessageModal'
 import { ConfirmCancelBookingModal } from '../components/modals/ConfirmCancelBookingModal'
 import { GlobalTopbar } from '../components/layout/GlobalTopbar'
 import { api, type ApiAdminAttendance, type ApiAdminDashboard, type ApiCampusSchedule, type ApiIntelligentRoomSearchResponse, type ApiPreferences } from '../../services/api'
+import { useLuistudioEasterEgg } from '../../hooks/useLuistudioEasterEgg'
 
 interface NotificationItem {
   id: number
@@ -481,6 +482,7 @@ function AuthRestoreScreen() {
 }
 
 export function MainPage() {
+  const { handleLogoClick } = useLuistudioEasterEgg()
   const location = useLocation()
   const navigate = useNavigate()
   const [route, setRoute] = useState<RouteKey>(() => getRouteFromPath(location.pathname))
@@ -621,6 +623,7 @@ export function MainPage() {
 
   const [attendanceItems, setAttendanceItems] = useState<ApiAdminAttendance[]>([])
   const [attendanceLoading, setAttendanceLoading] = useState(false)
+  const [updatingAttendanceId, setUpdatingAttendanceId] = useState<number | null>(null)
   const [attendanceQuery, setAttendanceQuery] = useState('')
   const [attendanceCampus, setAttendanceCampus] = useState('Todos')
   const [attendancePavilion, setAttendancePavilion] = useState('Todos')
@@ -2321,7 +2324,8 @@ export function MainPage() {
   }
 
   const handleMarkAttendance = async (bookingId: number, status: 'ASISTIO' | 'INASISTIO') => {
-    if (!token) return
+    if (!token || updatingAttendanceId !== null) return
+    setUpdatingAttendanceId(bookingId)
     try {
       const updated = await api.updateAttendance(token, bookingId, status)
       setAttendanceItems((current) => current.map((item) => item.bookingId === bookingId ? updated : item))
@@ -2329,6 +2333,8 @@ export function MainPage() {
     } catch (error) {
       const message = error instanceof Error ? error.message : 'No se pudo actualizar la asistencia.'
       setModalMessage({ title: 'Error al actualizar asistencia', message, variant: 'error' })
+    } finally {
+      setUpdatingAttendanceId(null)
     }
   }
 
@@ -2373,6 +2379,7 @@ export function MainPage() {
               onToggleSidebar={() => setIsSidebarCollapsed((current) => !current)}
               onOpenNotifications={() => setIsNotificationsModalOpen(true)}
               onOpenSettings={() => setIsSettingsModalOpen(true)}
+              onLogoClick={handleLogoClick}
             />
           )}
 
@@ -2755,6 +2762,7 @@ export function MainPage() {
                 page={attendancePage}
                 totalPages={attendanceTotalPages}
                 totalElements={attendanceTotalElements}
+                updatingBookingId={updatingAttendanceId}
                 onQueryChange={(value) => { setAttendanceQuery(value); setAttendancePage(1) }}
                 onCampusChange={(value) => { setAttendanceCampus(value); setAttendancePavilion('Todos'); setAttendancePage(1) }}
                 onPavilionChange={(value) => { setAttendancePavilion(value); setAttendancePage(1) }}

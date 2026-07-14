@@ -37,6 +37,7 @@ const defaultProps = {
   page: 1,
   totalPages: 1,
   totalElements: 1,
+  updatingBookingId: null,
   onQueryChange: () => undefined,
   onCampusChange: () => undefined,
   onPavilionChange: () => undefined,
@@ -81,5 +82,7 @@ describe('AdminAttendancePage', () => {
     expect(screen.getByLabelText('attendance-pavilion-filter')).toHaveTextContent('Biblioteca Antonio Pinilla')
     fireEvent.click(screen.getAllByRole('button', { name: 'Marcar asistencia' })[0])
     expect(onMark).toHaveBeenCalledWith(30, 'ASISTIO')
+    fireEvent.click(screen.getAllByRole('button', { name: 'Marcar inasistencia' })[0])
+    expect(onMark).toHaveBeenCalledWith(30, 'INASISTIO')
   })
 })

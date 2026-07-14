@@ -480,6 +480,14 @@
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  cursor: pointer;
+  padding: 0;
+}
+
+.sidebar-logo-frame:focus-visible,
+.mobile-brand-wrap:focus-visible {
+  outline: 2px solid var(--accent-400);
+  outline-offset: 3px;
 }
 
 .sidebar-logo {
@@ -597,6 +605,7 @@
   border: 1px solid var(--line-200);
   border-radius: 0.6rem;
   padding: 0.28rem 0.5rem;
+  cursor: pointer;
 }
 
 .mobile-brand-logo {
@@ -2046,6 +2055,48 @@ th {
 
 .actions-cell > button + button {
   margin-left: 6px;
+}
+
+.attendance-action {
+  display: inline-flex;
+  min-height: 2rem;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  padding: 0.38rem 0.75rem;
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  line-height: 1.15;
+  cursor: pointer;
+  transition: transform 0.16s, filter 0.16s, opacity 0.16s;
+}
+
+.attendance-action--present {
+  border-color: color-mix(in srgb, var(--ok-ink) 35%, transparent);
+  background: var(--ok-bg);
+  color: var(--ok-ink);
+}
+
+.attendance-action--absent {
+  border-color: color-mix(in srgb, var(--danger-ink) 35%, transparent);
+  background: var(--danger-bg);
+  color: var(--danger-ink);
+}
+
+.attendance-action:hover:not(:disabled) {
+  transform: translateY(-1px);
+  filter: brightness(0.96);
+}
+
+.attendance-action:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+  transform: none;
+}
+
+.mobile-card-actions .attendance-action {
+  flex: 1 1 10rem;
 }
 
 .actions-inline button {
