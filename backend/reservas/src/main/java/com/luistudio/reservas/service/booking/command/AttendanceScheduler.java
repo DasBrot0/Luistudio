@@ -13,7 +13,7 @@ public class AttendanceScheduler {
         this.attendanceService = attendanceService;
     }
 
-    @Scheduled(fixedDelay = 300_000)
+    @Scheduled(fixedDelay = 60_000)
     public void run() {
         attendanceService.processMissedBookings();
     }

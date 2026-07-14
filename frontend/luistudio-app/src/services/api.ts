@@ -43,6 +43,7 @@ export interface ApiRoom {
   supportsConcentration: boolean
   roomType: string
   equipment: string[]
+  inventoryCount?: number
 }
 
 export interface ApiRoomSearchIntent {
@@ -74,6 +75,26 @@ export interface ApiAdminDashboard {
   topStudents: Array<{ userId: number; code: string; fullName: string; email: string; reservationCount: number; reservedMinutes: number; absenceCount: number }>
 }
 
+export interface ApiAdminAttendance {
+  bookingId: number
+  userId: number
+  studentCode: string
+  studentName: string
+  studentEmail: string
+  roomId: number
+  roomCode: string
+  roomName: string
+  campus: string
+  pavilionCode: string
+  pavilionName: string
+  location: string
+  date: string
+  startTime: string
+  endTime: string
+  bookingStatus: string
+  attendanceStatus: 'PENDIENTE' | 'ASISTIO' | 'INASISTIO'
+}
+
 export interface ApiScheduleDay {
   dayOfWeek: number
   openTime: string | null
@@ -99,6 +120,8 @@ interface ApiBooking {
   observation?: string
   googleCalendarUrl: string
   icsUrl: string
+  roomUnitNumber?: number | null
+  roomUnitLabel?: string | null
 }
 
 interface ApiPage<T> {
@@ -340,13 +363,6 @@ export const api = {
     return http<ApiPage<ApiRoom>>(`/rooms${query}`, {}, token)
   },
 
-  getAvailableRooms(token: string, date: string, start: string, end: string) {
-    const query = `?fecha=${encodeURIComponent(date)}&horaInicio=${encodeURIComponent(
-      start,
-    )}&horaFin=${encodeURIComponent(end)}`
-    return http<ApiRoom[]>(`/rooms/available${query}`, {}, token)
-  },
-
   intelligentRoomSearch(token: string, payload: { query: string; date: string; start: string; end: string; limit?: number }) {
     return http<ApiIntelligentRoomSearchResponse>(
       '/rooms/intelligent-search',
@@ -368,6 +384,10 @@ export const api = {
       status?: 'DISPONIBLE' | 'EN_MANTENIMIENTO' | 'INACTIVA'
       schedule: ApiScheduleDay[]
       pabellonCode: string
+      noiseLevel: 'BAJO' | 'MEDIO' | 'ALTO'
+      supportsConcentration: boolean
+      roomType: 'ESTUDIO_INDIVIDUAL' | 'ESTUDIO_GRUPAL' | 'REUNION' | 'PRESENTACION' | 'GENERAL'
+      equipment: string[]
     },
   ) {
     return http<ApiRoom>(
@@ -391,6 +411,10 @@ export const api = {
       status?: 'DISPONIBLE' | 'EN_MANTENIMIENTO' | 'INACTIVA'
       schedule: ApiScheduleDay[]
       pabellonCode: string
+      noiseLevel: 'BAJO' | 'MEDIO' | 'ALTO'
+      supportsConcentration: boolean
+      roomType: 'ESTUDIO_INDIVIDUAL' | 'ESTUDIO_GRUPAL' | 'REUNION' | 'PRESENTACION' | 'GENERAL'
+      equipment: string[]
     },
   ) {
     return http<ApiRoom>(
@@ -477,6 +501,36 @@ export const api = {
     if (status && status !== 'Todos') params.set('status', status === 'Confirmado' ? 'ACTIVA' : 'CANCELADA')
     if (date) params.set('fecha', date)
     return http<ApiPage<ApiBooking>>(`/admin/bookings?${params.toString()}`, {}, token)
+  },
+
+  getAdminAttendance(
+    token: string,
+    filters: {
+      query?: string
+      campus?: string
+      pavilion?: string
+      status?: string
+      from?: string
+      to?: string
+      sortBy?: string
+      sortDir?: 'asc' | 'desc'
+    },
+    page = 0,
+    size = 10,
+  ) {
+    const params = new URLSearchParams({ page: String(Math.max(0, page)), size: String(Math.min(50, Math.max(1, size))) })
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value) params.set(key, value)
+    })
+    return http<ApiPage<ApiAdminAttendance>>(`/admin/attendance?${params.toString()}`, {}, token)
+  },
+
+  updateAttendance(token: string, bookingId: number, status: 'ASISTIO' | 'INASISTIO') {
+    return http<ApiAdminAttendance>(
+      `/admin/attendance/${bookingId}`,
+      { method: 'PATCH', body: JSON.stringify({ status }) },
+      token,
+    )
   },
 
   getAdminConfig(token: string) {
@@ -587,19 +641,14 @@ export const api = {
   },
 
   // ST-04 Activity
-  getMyActivity(token: string, page = 0, size = 20) {
-    return http<{ content: Array<{ id: number; action: string; detail: string | null; createdAt: string }>; page: number; totalPages: number }>(`/me/activity?page=${page}&size=${size}`, {}, token)
+  getMyActivity(token: string, page = 0, size = 10, filters: { from?: string; to?: string } = {}) {
+    const params = new URLSearchParams({ page: String(page), size: String(size) })
+    if (filters.from) params.set('from', filters.from)
+    if (filters.to) params.set('to', filters.to)
+    return http<{ content: Array<{ id: number; action: string; detail: string | null; createdAt: string }>; page: number; totalPages: number; totalElements: number }>(`/me/activity?${params.toString()}`, {}, token)
   },
 
   // ST-06 Sensitive change
-  requestSensitiveChange(token: string, actionType: string, payload?: string) {
-    return http<{ message: string }>('/auth/sensitive-change/request', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ actionType, payload }),
-    }, token)
-  },
-
   confirmSensitiveChange(token: string, confirmToken: string) {
     return http<{ message: string }>('/auth/sensitive-change/confirm', {
       method: 'POST',
@@ -609,7 +658,7 @@ export const api = {
   },
 
   // ST-07 Admin login attempts
-  getLoginAttempts(token: string, filters: { user?: string; email?: string; from?: string; to?: string; success?: boolean; blocked?: boolean }, page = 0, size = 10) {
+  getLoginAttempts(token: string, filters: { user?: string; email?: string; from?: string; to?: string; success?: boolean; blocked?: boolean; sortBy?: string; sortDir?: 'asc' | 'desc' }, page = 0, size = 10) {
     const params = new URLSearchParams({ page: String(page), size: String(size) })
     if (filters.user) params.set('user', filters.user)
     if (filters.email) params.set('email', filters.email)
@@ -617,6 +666,8 @@ export const api = {
     if (filters.to) params.set('to', filters.to)
     if (filters.success !== undefined) params.set('success', String(filters.success))
     if (filters.blocked !== undefined) params.set('blocked', String(filters.blocked))
+    if (filters.sortBy) params.set('sortBy', filters.sortBy)
+    if (filters.sortDir) params.set('sortDir', filters.sortDir)
     return http<{ content: Array<{ id: number; userId: number; userEmail: string; ip: string | null; userAgent: string | null; attemptedAt: string; success: boolean; lockedUntil: string | null }>; page: number; totalPages: number; totalElements: number }>(`/admin/security/login-attempts?${params.toString()}`, {}, token)
   },
 

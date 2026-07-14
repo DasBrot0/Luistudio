@@ -4,6 +4,7 @@ import com.luistudio.reservas.model.ReservationEntity;
 import com.luistudio.reservas.model.ReservationStatus;
 import com.luistudio.reservas.model.RoomEntity;
 import com.luistudio.reservas.model.UserEntity;
+import jakarta.persistence.LockModeType;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
@@ -12,10 +13,17 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
-public interface ReservationRepository extends JpaRepository<ReservationEntity, Long> {
+public interface ReservationRepository extends JpaRepository<ReservationEntity, Long>, JpaSpecificationExecutor<ReservationEntity> {
+
+    @Override
+    @EntityGraph(attributePaths = {"usuario", "sala", "sala.pabellon", "sala.pabellon.campus"})
+    Page<ReservationEntity> findAll(Specification<ReservationEntity> specification, Pageable pageable);
 
     @EntityGraph(attributePaths = {"usuario", "usuario.rol", "sala"})
     @Query("""
@@ -72,7 +80,7 @@ public interface ReservationRepository extends JpaRepository<ReservationEntity, 
     );
 
     @Query("""
-        SELECT COUNT(r) > 0 FROM ReservationEntity r
+        SELECT COUNT(r) FROM ReservationEntity r
         WHERE r.sala = :room
           AND r.fecha = :date
           AND r.estado = com.luistudio.reservas.model.ReservationStatus.ACTIVA
@@ -80,7 +88,25 @@ public interface ReservationRepository extends JpaRepository<ReservationEntity, 
           AND r.horaFin > :startTime
           AND (:excludeId IS NULL OR r.id <> :excludeId)
     """)
-    boolean existsOverlapping(
+    long countOverlapping(
+        @Param("room") RoomEntity room,
+        @Param("date") LocalDate date,
+        @Param("startTime") LocalTime startTime,
+        @Param("endTime") LocalTime endTime,
+        @Param("excludeId") Long excludeId
+    );
+
+    @Query("""
+        SELECT r.numeroUnidad FROM ReservationEntity r
+        WHERE r.sala = :room
+          AND r.fecha = :date
+          AND r.estado = com.luistudio.reservas.model.ReservationStatus.ACTIVA
+          AND r.horaInicio < :endTime
+          AND r.horaFin > :startTime
+          AND (:excludeId IS NULL OR r.id <> :excludeId)
+          AND r.numeroUnidad IS NOT NULL
+    """)
+    List<Integer> findOccupiedUnitNumbers(
         @Param("room") RoomEntity room,
         @Param("date") LocalDate date,
         @Param("startTime") LocalTime startTime,
@@ -163,15 +189,15 @@ public interface ReservationRepository extends JpaRepository<ReservationEntity, 
     );
 
     @EntityGraph(attributePaths = {"usuario", "sala"})
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("""
         SELECT r FROM ReservationEntity r
         WHERE r.estado = com.luistudio.reservas.model.ReservationStatus.ACTIVA
-          AND r.fecha = :today
-          AND r.horaInicio <= :cutoff
+          AND (r.fecha < :cutoffDate OR (r.fecha = :cutoffDate AND r.horaInicio <= :cutoffTime))
           AND r.attendanceStatus IS NULL
     """)
     List<ReservationEntity> findActiveBookingsMissedBefore(
-        @Param("today") LocalDate today,
-        @Param("cutoff") LocalTime cutoff
+        @Param("cutoffDate") LocalDate cutoffDate,
+        @Param("cutoffTime") LocalTime cutoffTime
     );
 }

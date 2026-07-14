@@ -2,7 +2,9 @@ import { useEffect, useMemo, useState } from 'react'
 import type { CSSProperties } from 'react'
 import { AppHeader } from '../components/layout/AppHeader'
 import { Pagination } from '../components/layout/Pagination'
+import { FilterBar } from '../components/filters/FilterBar'
 import type { ApiAdminDashboard } from '../../services/api'
+import { buildExcelCompatibleCsv } from '../../utils/csv'
 
 interface Props {
   data: ApiAdminDashboard | null
@@ -12,7 +14,6 @@ interface Props {
   to: string
   onFromChange: (value: string) => void
   onToChange: (value: string) => void
-  onApply: () => void
   onReset: () => void
 }
 
@@ -30,6 +31,14 @@ function MetricIcon({ type }: { type: 'occupancy' | 'bookings' | 'peak' | 'absen
     absence: <><path d="M12 3 3.5 19h17L12 3Z" /><path d="M12 9v4M12 16h.01" /></>,
   }
   return <span className={`dashboard-metric-icon ${type}`} aria-hidden="true"><svg viewBox="0 0 24 24">{paths[type]}</svg></span>
+}
+
+function ToolbarIcon({ type }: { type: 'reset' | 'export' }) {
+  return <svg viewBox="0 0 24 24" aria-hidden="true">
+    {type === 'reset'
+      ? <><path d="M4 4v6h6" /><path d="M5.5 15a8 8 0 1 0 .7-7.8L4 10" /></>
+      : <><path d="M12 3v12" /><path d="m7 10 5 5 5-5" /><path d="M5 20h14" /></>}
+  </svg>
 }
 
 function OccupancyTrend({ data }: { data: ApiAdminDashboard['dailyOccupancy'] }) {
@@ -109,9 +118,10 @@ function WeeklyHeatmap({ cells }: { cells: ApiAdminDashboard['weeklyHeatmap'] })
   )
 }
 
-export function AdminDashboardPage({ data, loading, error, from, to, onFromChange, onToChange, onApply, onReset }: Props) {
+export function AdminDashboardPage({ data, loading, error, from, to, onFromChange, onToChange, onReset }: Props) {
   const [occupancyMode, setOccupancyMode] = useState<'highest' | 'lowest'>('highest')
-  const [rankingQuery, setRankingQuery] = useState('')
+  const [rankingStudentFilter, setRankingStudentFilter] = useState('')
+  const [rankingCodeFilter, setRankingCodeFilter] = useState('')
   const [rankingPage, setRankingPage] = useState(1)
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
 
@@ -125,7 +135,14 @@ export function AdminDashboardPage({ data, loading, error, from, to, onFromChang
     const rooms = [...(data?.occupancyByRoom ?? [])]
     return rooms.sort((a, b) => occupancyMode === 'highest' ? b.occupancyRate - a.occupancyRate : a.occupancyRate - b.occupancyRate).slice(0, 7)
   }, [data, occupancyMode])
-  const filteredRanking = useMemo(() => (data?.topStudents ?? []).filter((student) => `${student.fullName} ${student.code} ${student.email}`.toLowerCase().includes(rankingQuery.toLowerCase())), [data, rankingQuery])
+  const filteredRanking = useMemo(() => {
+    const studentFilter = rankingStudentFilter.trim().toLocaleLowerCase('es-PE')
+    const codeFilter = rankingCodeFilter.trim().toLocaleLowerCase('es-PE')
+    return (data?.topStudents ?? []).filter((student) =>
+      student.fullName.toLocaleLowerCase('es-PE').includes(studentFilter)
+      && student.code.toLocaleLowerCase('es-PE').includes(codeFilter),
+    )
+  }, [data, rankingCodeFilter, rankingStudentFilter])
   const rankingTotalPages = Math.max(1, Math.ceil(filteredRanking.length / RANKING_PAGE_SIZE))
   const safeRankingPage = Math.min(rankingPage, rankingTotalPages)
   const visibleRanking = filteredRanking.slice((safeRankingPage - 1) * RANKING_PAGE_SIZE, safeRankingPage * RANKING_PAGE_SIZE)
@@ -133,7 +150,7 @@ export function AdminDashboardPage({ data, loading, error, from, to, onFromChang
   const exportCsv = () => {
     if (!data) return
     const rows = [['Puesto', 'Estudiante', 'Código', 'Reservas', 'Horas reservadas', 'Inasistencias'], ...data.topStudents.map((student, index) => [index + 1, student.fullName, student.code, student.reservationCount, (student.reservedMinutes / 60).toFixed(1), student.absenceCount])]
-    const csv = rows.map((row) => row.map((value) => `"${String(value).replaceAll('"', '""')}"`).join(',')).join('\n')
+    const csv = buildExcelCompatibleCsv(rows)
     const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }))
     const anchor = document.createElement('a'); anchor.href = url; anchor.download = `dashboard-${from}-${to}.csv`; anchor.click(); URL.revokeObjectURL(url)
   }
@@ -149,9 +166,8 @@ export function AdminDashboardPage({ data, loading, error, from, to, onFromChang
           </div>
           <div className="analytics-toolbar-actions">
             <span className="last-updated">Última actualización<br /><strong>{lastUpdated ? lastUpdated.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' }) : '—'}</strong></span>
-            <button type="button" className="secondary-btn analytics-action" onClick={onReset} disabled={loading}>Restablecer</button>
-            <button type="button" className="secondary-btn analytics-action" onClick={exportCsv} disabled={!data}>Exportar CSV</button>
-            <button type="button" className="primary-btn analytics-action" disabled={loading || !from || !to || from > to} onClick={onApply}>{loading ? 'Actualizando…' : 'Actualizar'}</button>
+            <button type="button" className="primary-btn analytics-action analytics-utility-btn" onClick={onReset} disabled={loading}><ToolbarIcon type="reset" />Restablecer</button>
+            <button type="button" className="primary-btn analytics-action analytics-utility-btn" onClick={exportCsv} disabled={!data}><ToolbarIcon type="export" />Exportar CSV</button>
           </div>
         </div>
 
@@ -161,7 +177,7 @@ export function AdminDashboardPage({ data, loading, error, from, to, onFromChang
           <div className="dashboard-summary-grid">
             <article><div><span>Tasa de ocupación</span><MetricIcon type="occupancy" /></div><strong>{percent(occupancyRate)}</strong><small>{hours(totalReserved)} de {hours(totalAvailable)} disponibles</small></article>
             <article><div><span>Reservas realizadas</span><MetricIcon type="bookings" /></div><strong>{data.totalReservations.toLocaleString('es-PE')}</strong><small>Activas y completadas en el periodo</small></article>
-            <article><div><span>Hora pico</span><MetricIcon type="peak" /></div><strong>{peak ? `${String(peak.hour).padStart(2, '0')}:00–${String((peak.hour + 1) % 24).padStart(2, '0')}:00` : '—'}</strong><small>{peak ? `${peak.reservationCount} cruces · ${hours(peak.reservedMinutes)}` : 'Sin uso registrado'}</small></article>
+            <article><div><span>Hora pico</span><MetricIcon type="peak" /></div><strong>{peak ? `${String(peak.hour).padStart(2, '0')}:00–${String((peak.hour + 1) % 24).padStart(2, '0')}:00` : '—'}</strong><small>{peak ? `${peak.reservationCount} reservas en esta franja · ${hours(peak.reservedMinutes)} acumuladas` : 'Sin uso registrado'}</small></article>
             <article><div><span>Tasa de inasistencia</span><MetricIcon type="absence" /></div><strong>{percent(data.absenceRate)}</strong><small>{data.absenceCount} de {data.attendanceEligibleCount} reservas evaluadas</small></article>
           </div>
 
@@ -176,7 +192,22 @@ export function AdminDashboardPage({ data, loading, error, from, to, onFromChang
           </div>
 
           <article className="dashboard-panel dashboard-ranking-panel">
-            <div className="dashboard-panel-head ranking-head"><div><h3>Estudiantes con más reservas</h3><p>Ordenados por cantidad y horas reservadas.</p></div><input type="search" value={rankingQuery} onChange={(event) => { setRankingQuery(event.target.value); setRankingPage(1) }} placeholder="Buscar estudiante o código" aria-label="Buscar en ranking" /></div>
+            <div className="dashboard-panel-head ranking-head"><div><h3>Estudiantes con más reservas</h3><p>Ordenados por cantidad y horas reservadas.</p></div></div>
+            <FilterBar
+              searchPlaceholder="Buscar estudiante"
+              searchValue={rankingStudentFilter}
+              onSearchChange={(value) => { setRankingStudentFilter(value); setRankingPage(1) }}
+              filters={[{
+                id: 'ranking-code-filter',
+                type: 'text',
+                value: rankingCodeFilter,
+                onChange: (value) => { setRankingCodeFilter(value); setRankingPage(1) },
+                placeholder: 'Código',
+                ariaLabel: 'Filtrar ranking por código',
+              }]}
+              quickChips={[]}
+              actions={<button type="button" className="secondary-btn" onClick={() => { setRankingStudentFilter(''); setRankingCodeFilter(''); setRankingPage(1) }}>Reiniciar filtros</button>}
+            />
             <div className="table-wrap"><table className="analytics-ranking-table"><thead><tr><th>Puesto</th><th>Estudiante</th><th>Código</th><th>Reservas</th><th>Horas reservadas</th><th>Inasistencias</th></tr></thead><tbody>{visibleRanking.map((student, index) => <tr key={student.userId}><td data-label="Puesto"><span className="ranking-position">{(safeRankingPage - 1) * RANKING_PAGE_SIZE + index + 1}</span></td><td data-label="Estudiante"><strong>{student.fullName}</strong><small>{student.email}</small></td><td data-label="Código">{student.code}</td><td data-label="Reservas">{student.reservationCount}</td><td data-label="Horas reservadas">{hours(student.reservedMinutes)}</td><td data-label="Inasistencias"><span className={`status-pill ${student.absenceCount ? 'cancelled' : 'ok'}`}>{student.absenceCount}</span></td></tr>)}</tbody></table>{visibleRanking.length === 0 && <p className="dashboard-empty">No hay estudiantes para este filtro.</p>}</div>
             <Pagination page={safeRankingPage} totalPages={rankingTotalPages} onPrev={() => setRankingPage(Math.max(1, safeRankingPage - 1))} onNext={() => setRankingPage(Math.min(rankingTotalPages, safeRankingPage + 1))} />
           </article>

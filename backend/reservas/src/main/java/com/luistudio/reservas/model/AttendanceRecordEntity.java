@@ -31,6 +31,13 @@ public class AttendanceRecordEntity {
     @JoinColumn(name = "user_id", nullable = false)
     private UserEntity usuario;
 
+    @Column(name = "status", nullable = false, length = 20)
+    private String status = "INASISTIO";
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "recorded_by")
+    private UserEntity recordedBy;
+
     @Column(name = "recorded_at", nullable = false)
     private OffsetDateTime recordedAt = OffsetDateTime.now();
 

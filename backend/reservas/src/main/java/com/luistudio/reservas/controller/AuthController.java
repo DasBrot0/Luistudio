@@ -6,14 +6,12 @@ import com.luistudio.reservas.dto.auth.LoginResponse;
 import com.luistudio.reservas.dto.auth.ResetConfirmInput;
 import com.luistudio.reservas.dto.auth.ResetRequestInput;
 import com.luistudio.reservas.dto.auth.SensitiveChangeConfirmInput;
-import com.luistudio.reservas.dto.auth.SensitiveChangeRequestInput;
 import com.luistudio.reservas.dto.auth.TwoFactorCodeInput;
 import com.luistudio.reservas.dto.auth.TwoFactorVerifyInput;
 import com.luistudio.reservas.dto.common.MessageResponse;
 import com.luistudio.reservas.security.AuthPrincipal;
 import com.luistudio.reservas.security.AuthCookieService;
 import com.luistudio.reservas.security.CurrentUserProvider;
-import com.luistudio.reservas.service.AccessGuard;
 import com.luistudio.reservas.service.AuthService;
 import com.luistudio.reservas.service.SensitiveChangeService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -33,20 +31,17 @@ public class AuthController {
     private final AuthService authService;
     private final CurrentUserProvider currentUserProvider;
     private final AuthCookieService authCookieService;
-    private final AccessGuard accessGuard;
     private final SensitiveChangeService sensitiveChangeService;
 
     public AuthController(
         AuthService authService,
         CurrentUserProvider currentUserProvider,
         AuthCookieService authCookieService,
-        AccessGuard accessGuard,
         SensitiveChangeService sensitiveChangeService
     ) {
         this.authService = authService;
         this.currentUserProvider = currentUserProvider;
         this.authCookieService = authCookieService;
-        this.accessGuard = accessGuard;
         this.sensitiveChangeService = sensitiveChangeService;
     }
 
@@ -125,13 +120,6 @@ public class AuthController {
         currentUserProvider.requireNotProvisionalToken();
         authService.confirmDisable2fa(principal.userId(), request);
         return ResponseEntity.ok(new MessageResponse("2FA desactivado"));
-    }
-
-    @PostMapping("/sensitive-change/request")
-    public ResponseEntity<MessageResponse> requestSensitiveChange(@RequestBody SensitiveChangeRequestInput request) {
-        AuthPrincipal principal = accessGuard.requireUser();
-        sensitiveChangeService.requestChange(principal.userId(), request.actionType(), request.payload());
-        return ResponseEntity.ok(new MessageResponse("Correo de confirmación enviado"));
     }
 
     @PostMapping("/sensitive-change/confirm")

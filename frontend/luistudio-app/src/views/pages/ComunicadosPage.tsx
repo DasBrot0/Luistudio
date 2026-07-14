@@ -1,7 +1,8 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
 import { AppHeader } from '../components/layout/AppHeader'
 import { Pagination } from '../components/layout/Pagination'
+import { FilterBar } from '../components/filters/FilterBar'
 
 const PAGE_SIZE = 10
 
@@ -60,9 +61,18 @@ export function ComunicadosPage({ published, sending, onPublish }: ComunicadosPa
   const [announcementType, setAnnouncementType] = useState('GENERAL')
   const [formError, setFormError] = useState('')
   const [page, setPage] = useState(1)
-  const totalPages = Math.max(1, Math.ceil(published.length / PAGE_SIZE))
+  const [historyQuery, setHistoryQuery] = useState('')
+  const [historyType, setHistoryType] = useState('Todos')
+  const filteredPublished = useMemo(() => {
+    const query = historyQuery.trim().toLocaleLowerCase('es-PE')
+    return published.filter((item) =>
+      item.title.toLocaleLowerCase('es-PE').includes(query)
+      && (historyType === 'Todos' || item.announcementType === historyType),
+    )
+  }, [historyQuery, historyType, published])
+  const totalPages = Math.max(1, Math.ceil(filteredPublished.length / PAGE_SIZE))
   const safePage = Math.min(page, totalPages)
-  const visiblePublished = published.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE)
+  const visiblePublished = filteredPublished.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE)
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -163,13 +173,27 @@ export function ComunicadosPage({ published, sending, onPublish }: ComunicadosPa
             <h2>Historial de comunicados</h2>
           </div>
 
+          <FilterBar
+            searchPlaceholder="Buscar por título"
+            searchValue={historyQuery}
+            onSearchChange={(value) => { setHistoryQuery(value); setPage(1) }}
+            filters={[{
+              id: 'announcement-type-filter',
+              value: historyType,
+              onChange: (value) => { setHistoryType(value); setPage(1) },
+              options: [{ value: 'Todos', label: 'Tipo: Todos' }, ...ANNOUNCEMENT_TYPES],
+            }]}
+            quickChips={[]}
+            actions={<button type="button" className="secondary-btn" onClick={() => { setHistoryQuery(''); setHistoryType('Todos'); setPage(1) }}>Reiniciar filtros</button>}
+          />
+
           {published.length === 0 && (
             <div className="empty-state">
               <p>No hay comunicados publicados aún.</p>
             </div>
           )}
 
-          {published.length > 0 && (
+          {filteredPublished.length > 0 && (
             <div className="table-wrap desktop-table-only">
               <table>
                 <thead>
@@ -194,7 +218,11 @@ export function ComunicadosPage({ published, sending, onPublish }: ComunicadosPa
             </div>
           )}
 
-          {published.length > 0 && (
+          {published.length > 0 && filteredPublished.length === 0 && (
+            <div className="empty-state"><p>No hay comunicados para estos filtros.</p></div>
+          )}
+
+          {filteredPublished.length > 0 && (
             <div className="mobile-list-only">
               {visiblePublished.map((item) => (
                 <article key={`com-mob-${item.id}`} className="mobile-record-card">
@@ -209,7 +237,7 @@ export function ComunicadosPage({ published, sending, onPublish }: ComunicadosPa
             </div>
           )}
 
-          {published.length > 0 && (
+          {filteredPublished.length > 0 && (
             <Pagination
               page={safePage}
               totalPages={totalPages}

@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import java.time.OffsetDateTime;
 
 @RestController
 @RequestMapping("/api/me")
@@ -40,6 +41,8 @@ public class AccountController {
 
     @GetMapping("/activity")
     public PageResponse<ActivityEventResponse> getMyActivity(
+        @RequestParam(required = false) String from,
+        @RequestParam(required = false) String to,
         @RequestParam(defaultValue = "0") int page,
         @RequestParam(defaultValue = "20") int size
     ) {
@@ -47,7 +50,14 @@ public class AccountController {
         UserEntity user = userService.getById(principal.userId());
         int safePage = Math.max(page, 0);
         int safeSize = Math.min(Math.max(size, 1), 50);
-        Page<AuditLogEntity> result = auditLogRepository.findActivityByActor(user, PageRequest.of(safePage, safeSize));
+        OffsetDateTime fromDt = from != null && !from.isBlank() ? OffsetDateTime.parse(from) : null;
+        OffsetDateTime toDt = to != null && !to.isBlank() ? OffsetDateTime.parse(to) : null;
+        Page<AuditLogEntity> result = auditLogRepository.findActivityByActor(
+            user,
+            fromDt,
+            toDt,
+            PageRequest.of(safePage, safeSize)
+        );
         return new PageResponse<>(
             result.getContent().stream().map(a -> new ActivityEventResponse(
                 a.getId(),

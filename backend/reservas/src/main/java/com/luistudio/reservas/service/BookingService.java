@@ -21,6 +21,8 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.HashSet;
+import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
@@ -69,6 +71,7 @@ public class BookingService {
     public BookingResponse createBooking(Long userId, BookingUpsertRequest request) {
         UserEntity user = userService.getById(userId);
         RoomEntity room = roomService.getRoomEntity(request.roomId());
+        roomService.lockRoomInventory(room.getId());
         log.info(
             "booking_create_started roomId={} date={} start={} durationMinutes={}",
             room.getId(),
@@ -90,13 +93,19 @@ public class BookingService {
                 existing.setEstado(ReservationStatus.ACTIVA);
                 existing.setCantidadPersonas(request.people());
                 existing.setObservacion(request.observation());
+                existing.setNumeroUnidad(resolveAvailableUnit(room, request, existing.getId(), existing.getNumeroUnidad()));
                 existing.setUpdatedBy(userId);
                 existing.setActualizadaEn(OffsetDateTime.now());
                 return reservationRepository.save(existing);
             })
             .orElseGet(() -> {
                 bookingValidationService.validate(user, room, request, null);
-                ReservationEntity booking = buildActiveReservation(user, room, request);
+                ReservationEntity booking = buildActiveReservation(
+                    user,
+                    room,
+                    request,
+                    resolveAvailableUnit(room, request, null, null)
+                );
                 return reservationRepository.save(booking);
             });
 
@@ -125,6 +134,7 @@ public class BookingService {
         LocalTime previousStart = current.getHoraInicio();
         LocalTime previousEnd = current.getHoraFin();
         RoomEntity room = roomService.getRoomEntity(request.roomId());
+        roomService.lockRoomInventory(room.getId());
         UserEntity actor = userService.getById(actorUserId);
         log.info(
             "booking_update_started bookingId={} roomId={} date={} start={} durationMinutes={}",
@@ -145,6 +155,7 @@ public class BookingService {
         current.setHoraFin(request.end());
         current.setCantidadPersonas(request.people());
         current.setObservacion(request.observation());
+        current.setNumeroUnidad(resolveAvailableUnit(room, request, bookingId, current.getNumeroUnidad()));
         current.setUpdatedBy(actorUserId);
         current.setActualizadaEn(OffsetDateTime.now());
 
@@ -332,7 +343,8 @@ public class BookingService {
     private ReservationEntity buildActiveReservation(
         UserEntity user,
         RoomEntity room,
-        BookingUpsertRequest request
+        BookingUpsertRequest request,
+        Integer roomUnitNumber
     ) {
         ReservationEntity booking = new ReservationEntity();
         booking.setUsuario(user);
@@ -342,8 +354,35 @@ public class BookingService {
         booking.setHoraFin(request.end());
         booking.setCantidadPersonas(request.people());
         booking.setObservacion(request.observation());
+        booking.setNumeroUnidad(roomUnitNumber);
         booking.setEstado(ReservationStatus.ACTIVA);
         return booking;
+    }
+
+    private int resolveAvailableUnit(
+        RoomEntity room,
+        BookingUpsertRequest request,
+        Long excludeBookingId,
+        Integer preferredUnit
+    ) {
+        int inventoryCount = room.getCantidadUnidades() == null ? 1 : room.getCantidadUnidades();
+        List<Integer> occupiedNumbers = reservationRepository.findOccupiedUnitNumbers(
+            room,
+            request.date(),
+            request.start(),
+            request.end(),
+            excludeBookingId
+        );
+        Set<Integer> occupied = occupiedNumbers == null ? new HashSet<>() : new HashSet<>(occupiedNumbers);
+        if (preferredUnit != null && preferredUnit <= inventoryCount && !occupied.contains(preferredUnit)) {
+            return preferredUnit;
+        }
+        for (int unit = 1; unit <= inventoryCount; unit++) {
+            if (!occupied.contains(unit)) {
+                return unit;
+            }
+        }
+        throw new BusinessException(HttpStatus.BAD_REQUEST, "Se agotaron todas las unidades de esta sala para el horario seleccionado");
     }
 
     private long durationMinutes(BookingUpsertRequest request) {

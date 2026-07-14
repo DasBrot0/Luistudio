@@ -62,6 +62,8 @@ El frontend usa exclusivamente pnpm. El campo `packageManager` y `pnpm-lock.yaml
 - Verificación 2FA mediante modal propio (sin depender de `window.prompt`).
 - Solicitud y confirmación de restablecimiento de contraseña.
 - Reserva, edición y cancelación de reservas.
+- La navegación estudiantil incluye `Disponibilidad` entre Reservar y Búsqueda inteligente. La sección lista, filtra y pagina los avisos activos, permite cancelarlos por sala y dirige a Reservar cuando todavía no existen avisos.
+- En Reservar, los horarios agotados muestran una campana para crear o cancelar el único aviso activo permitido por usuario y sala.
 - En listados de reservas, el horario se muestra sin segundos (`HH:mm-HH:mm`) y no se permite cancelar reservas ya finalizadas.
 - Reserva con cuadrícula semanal interactiva (semana anterior, actual y siguiente) y selección visual por bloque horario.
 - En reserva, los campos inician vacíos y `Inicio/Fin` se sincronizan con la grilla y reglas de sala/campus (sin seleccionar horas inválidas manualmente).
@@ -75,6 +77,7 @@ El frontend usa exclusivamente pnpm. El campo `packageManager` y `pnpm-lock.yaml
 - Vistas separadas por componente para desktop/móvil en listados principales (Mis reservas, Reservas registradas, Salas y Perfiles), evitando mezcla de estilos al redimensionar.
 - CRUD de salas (admin).
 - Edición completa de sala (campus, ubicación, recurso, capacidad, min/max personas y horario semanal por sala).
+- `Salas > Acciones > Editar` permite mantener los datos usados por la búsqueda inteligente: tipo, nivel de ruido, soporte de concentración y equipamiento. Las etiquetas de equipamiento se pueden agregar o quitar y se persisten en `room_equipment`.
 - Los guardados de salas y horarios normalizan días cerrados con horas `null` y validan datos básicos antes de llamar al backend.
 - Filtro por botón, búsqueda por código/correo/nombres/apellidos, ordenamiento y cambio de estado de perfiles (admin).
 - Configuración de límites de reservas (admin).
@@ -127,11 +130,11 @@ Notas recientes:
 ## Dashboard y búsqueda en lenguaje natural
 
 - `/admin/dashboard` es la primera opción de la navegación administrativa y la vista inicial predeterminada.
-- El dashboard permite filtrar y restablecer fechas; presenta cuatro KPI, tendencia diaria, dona de asistencia, mapa de calor semanal, barras horizontales por sala y ranking buscable/paginado. También exporta el ranking en CSV y muestra la hora de la última actualización.
+- El dashboard actualiza sus métricas automáticamente al cambiar cualquiera de las fechas y permite restablecer el rango; presenta cuatro KPI, tendencia diaria, dona de asistencia, mapa de calor semanal, barras horizontales por sala y ranking paginado con filtros separados por estudiante y código. También exporta el ranking como CSV UTF-8 con BOM para conservar tildes y eñes en Excel, y muestra la hora de la última actualización.
 - La opción **Búsqueda inteligente** acepta una descripción libre, fecha y horario. La respuesta muestra la intención interpretada y hasta 3 recomendaciones ordenadas por puntuación cuando existen salas compatibles.
 - Elegir una recomendación precarga campus, recinto, sala, fecha y horario en el formulario normal; la confirmación sigue usando todas las validaciones existentes.
 - Dashboard, mapa, navegación móvil, perfil y sesiones usan tokens compartidos de superficie, borde, texto, éxito y peligro para mantener contraste en temas claro y oscuro.
-- Todos los listados tabulares muestran un máximo de 10 elementos por página y reutilizan `Pagination`: acciones anterior/siguiente en los extremos y el indicador `Página X de Y` centrado en el ancho total. Salas, comunicados, reservas del estudiante, avisos y métricas usan paginación local; reservas administrativas, perfiles y seguridad conservan paginación de backend.
+- Todos los listados tabulares disponen de filtros consistentes mediante `FilterBar` y muestran un máximo de 10 elementos por página cuando son paginados. Reutilizan `Pagination`: acciones anterior/siguiente en los extremos y el indicador `Página X de Y` centrado en el ancho total. Salas, comunicados, reservas del estudiante, avisos y métricas usan paginación local; reservas administrativas, perfiles y seguridad conservan paginación de backend.
 
 # Mapa de campus E1-H10
 
@@ -139,8 +142,17 @@ La ruta autenticada `/mapa` usa MapLibre y MapTiler, con fallback a una lista ac
 
 ## Perfil, sesiones e inasistencias
 
-- Mi perfil muestra código, nombres, apellidos, correo, rol y estado en modo de solo lectura.
+- Mi perfil muestra código, nombres, apellidos, correo, rol y estado en modo de solo lectura, junto con las pestañas Actividad y Sesiones activas. Actividad incorpora filtros Desde/Hasta y paginación de 10 registros. La gestión de 2FA se mantiene únicamente en Configuración para evitar una opción duplicada.
 - Actividad separa visualmente IP, dispositivo o navegador cuando están presentes en el evento.
 - Configuración > Sesiones activas permite cerrar la sesión actual, revocar una sesión remota o cerrar todas. Seguridad queda reservada a la configuración de 2FA.
-- Seguridad administrativa permite combinar filtros por usuario, correo, resultado, bloqueo vigente y fechas.
+- Seguridad administrativa permite combinar filtros por usuario, correo, resultado, bloqueo vigente y fechas, además de ordenar por fecha, correo, resultado o bloqueo.
 - Mis reservas incluye una tarjeta de historial de inasistencias. Si no existe una regla de impedimento registrada, lo indica sin inventar una fecha de sanción.
+- La navegación administrativa incluye `Asistencias`. La vista consulta una página de backend a la vez, permite filtrar por estudiante o código, campus, pabellón, estado y periodo, ordenar los resultados y marcar asistencia o inasistencia desde desktop y móvil.
+- La actualización manual conserva el mismo estado visible en Mis reservas y la auditoría de quién realizó el cambio; una inasistencia nueva encola la notificación al estudiante.
+- Configuración expone preferencias de notificación para `Registro de inasistencia` y `Sala nuevamente disponible`, además de las opciones existentes de reservas.
+
+## Inventario físico de salas
+
+- El estudiante sigue viendo una sola opción por recurso, piso y edificio. La grilla de horarios solo marca el bloque como agotado cuando las reservas simultáneas alcanzan todas las unidades físicas de esa sala lógica.
+- En administración, Salas muestra la cantidad y las unidades generadas (`Unidad 1`, `Unidad 2`, etc.); Reservas registradas muestra la unidad física que el backend asignó a cada reserva.
+- La API cliente consume `inventoryCount`, `roomUnitNumber` y `roomUnitLabel`, manteniendo valor 1 como compatibilidad para respuestas antiguas.

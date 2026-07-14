@@ -5,6 +5,7 @@ export type RouteKey =
   | 'reset-password'
   | 'confirm-change'
   | 'reservas'
+  | 'disponibilidad'
   | 'busqueda-inteligente'
   | 'misreservas'
   | 'mapa'
@@ -12,6 +13,7 @@ export type RouteKey =
   | 'salas'
   | 'perfiles'
   | 'admin-reservas'
+  | 'asistencias'
   | 'seguridad'
   | 'comunicados'
   | 'profile'
@@ -53,6 +55,7 @@ export interface Room {
   supportsConcentration?: boolean
   roomType?: string
   equipment?: string[]
+  inventoryCount: number
 }
 
 export interface ScheduleDay {
@@ -95,6 +98,8 @@ export interface Booking {
   observation?: string
   googleCalendarUrl?: string
   icsUrl?: string
+  roomUnitNumber?: number | null
+  roomUnitLabel?: string | null
 }
 
 export interface Profile {
@@ -123,6 +128,10 @@ export interface RoomDraft {
   status: RoomStatus
   schedule: ScheduleDay[]
   pabellonCode: string
+  noiseLevel: 'BAJO' | 'MEDIO' | 'ALTO'
+  supportsConcentration: boolean
+  roomType: 'ESTUDIO_INDIVIDUAL' | 'ESTUDIO_GRUPAL' | 'REUNION' | 'PRESENTACION' | 'GENERAL'
+  equipment: string[]
 }
 
 export interface CampusSchedule {

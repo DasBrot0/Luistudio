@@ -3,6 +3,8 @@ package com.luistudio.reservas.controller;
 import com.luistudio.reservas.dto.admin.AdminConfigResponse;
 import com.luistudio.reservas.dto.admin.AdminConfigUpdateRequest;
 import com.luistudio.reservas.dto.admin.AdminDashboardResponse;
+import com.luistudio.reservas.dto.admin.AdminAttendanceResponse;
+import com.luistudio.reservas.dto.admin.AttendanceStatusUpdateRequest;
 import com.luistudio.reservas.dto.admin.AnnouncementRequest;
 import com.luistudio.reservas.dto.admin.AnnouncementResponse;
 import com.luistudio.reservas.dto.admin.CampusScheduleListResponse;
@@ -17,6 +19,7 @@ import com.luistudio.reservas.repository.LoginAttemptRepository;
 import com.luistudio.reservas.service.AccessGuard;
 import com.luistudio.reservas.service.AnnouncementService;
 import com.luistudio.reservas.service.AdminDashboardService;
+import com.luistudio.reservas.service.AttendanceService;
 import com.luistudio.reservas.service.RoomScheduleService;
 import com.luistudio.reservas.service.SystemConfigService;
 import com.luistudio.reservas.service.UserService;
@@ -28,6 +31,7 @@ import java.util.ArrayList;
 import java.util.List;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -50,6 +54,7 @@ public class AdminController {
     private final LoginAttemptRepository loginAttemptRepository;
     private final AnnouncementService announcementService;
     private final AdminDashboardService adminDashboardService;
+    private final AttendanceService attendanceService;
 
     public AdminController(
         AccessGuard accessGuard,
@@ -58,7 +63,8 @@ public class AdminController {
         RoomScheduleService roomScheduleService,
         LoginAttemptRepository loginAttemptRepository,
         AnnouncementService announcementService,
-        AdminDashboardService adminDashboardService
+        AdminDashboardService adminDashboardService,
+        AttendanceService attendanceService
     ) {
         this.accessGuard = accessGuard;
         this.userService = userService;
@@ -67,6 +73,7 @@ public class AdminController {
         this.loginAttemptRepository = loginAttemptRepository;
         this.announcementService = announcementService;
         this.adminDashboardService = adminDashboardService;
+        this.attendanceService = attendanceService;
     }
 
     @GetMapping("/admin/dashboard")
@@ -76,6 +83,34 @@ public class AdminController {
     ) {
         accessGuard.requireAdmin();
         return adminDashboardService.getDashboard(from, to);
+    }
+
+    @GetMapping("/admin/attendance")
+    public PageResponse<AdminAttendanceResponse> listAttendance(
+        @RequestParam(defaultValue = "0") int page,
+        @RequestParam(defaultValue = "10") int size,
+        @RequestParam(required = false) String query,
+        @RequestParam(required = false) String campus,
+        @RequestParam(required = false) String pavilion,
+        @RequestParam(required = false) String status,
+        @RequestParam(required = false) LocalDate from,
+        @RequestParam(required = false) LocalDate to,
+        @RequestParam(defaultValue = "date") String sortBy,
+        @RequestParam(defaultValue = "desc") String sortDir
+    ) {
+        accessGuard.requireAdmin();
+        return attendanceService.listAttendance(
+            page, size, query, campus, pavilion, status, from, to, sortBy, sortDir
+        );
+    }
+
+    @PatchMapping("/admin/attendance/{bookingId}")
+    public AdminAttendanceResponse updateAttendance(
+        @PathVariable Long bookingId,
+        @Valid @RequestBody AttendanceStatusUpdateRequest request
+    ) {
+        var principal = accessGuard.requireAdmin();
+        return attendanceService.updateAttendance(bookingId, principal.userId(), request);
     }
 
     @GetMapping("/admin/users")
@@ -133,6 +168,8 @@ public class AdminController {
         @RequestParam(required = false) String to,
         @RequestParam(required = false) Boolean success,
         @RequestParam(required = false) Boolean blocked,
+        @RequestParam(defaultValue = "date") String sortBy,
+        @RequestParam(defaultValue = "desc") String sortDir,
         @RequestParam(defaultValue = "0") int page,
         @RequestParam(defaultValue = "20") int size
     ) {
@@ -141,6 +178,13 @@ public class AdminController {
         int safeSize = Math.min(Math.max(size, 1), 50);
         OffsetDateTime fromDt = from != null && !from.isBlank() ? OffsetDateTime.parse(from) : null;
         OffsetDateTime toDt = to != null && !to.isBlank() ? OffsetDateTime.parse(to) : null;
+        Sort.Direction direction = "asc".equalsIgnoreCase(sortDir) ? Sort.Direction.ASC : Sort.Direction.DESC;
+        String sortProperty = switch (sortBy.toLowerCase()) {
+            case "email" -> "usuario.correo";
+            case "status" -> "exito";
+            case "block" -> "usuario.lockedUntil";
+            default -> "fechaIntento";
+        };
 
         Specification<LoginAttemptEntity> spec = (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
@@ -174,13 +218,13 @@ public class AdminController {
                     ? cb.greaterThan(usuario.get("lockedUntil"), now)
                     : cb.or(cb.isNull(usuario.get("lockedUntil")), cb.lessThanOrEqualTo(usuario.get("lockedUntil"), now)));
             }
-            if (query != null) {
-                query.orderBy(cb.desc(root.get("fechaIntento")));
-            }
             return cb.and(predicates.toArray(new Predicate[0]));
         };
 
-        Page<LoginAttemptEntity> result = loginAttemptRepository.findAll(spec, PageRequest.of(safePage, safeSize));
+        Page<LoginAttemptEntity> result = loginAttemptRepository.findAll(
+            spec,
+            PageRequest.of(safePage, safeSize, Sort.by(new Sort.Order(direction, sortProperty).nullsLast()))
+        );
         return new PageResponse<>(
             result.getContent().stream().map(a -> new LoginAttemptAdminResponse(
                 a.getId(),

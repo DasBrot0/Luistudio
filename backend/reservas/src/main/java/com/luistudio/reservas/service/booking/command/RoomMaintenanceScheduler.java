@@ -13,7 +13,7 @@ public class RoomMaintenanceScheduler {
         this.maintenanceService = maintenanceService;
     }
 
-    @Scheduled(fixedDelay = 60000)
+    @Scheduled(fixedDelay = 7000)
     public void run() {
         maintenanceService.reconcileStatuses();
     }

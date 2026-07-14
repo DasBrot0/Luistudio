@@ -195,6 +195,7 @@ export function SalasPage({
                   <th>Ubicación</th>
                   <th>Estado</th>
                   <th>Personas</th>
+                  <th>Unidades físicas</th>
                   <th>Acciones</th>
                 </tr>
               </thead>
@@ -211,6 +212,14 @@ export function SalasPage({
                     </td>
                     <td data-label="Personas">
                       {room.minPeople}-{room.maxPeople}
+                    </td>
+                    <td data-label="Unidades físicas">
+                      <details>
+                        <summary>{room.inventoryCount} {room.inventoryCount === 1 ? 'unidad' : 'unidades'}</summary>
+                        <div className="actions-inline mt-2">
+                          {Array.from({ length: room.inventoryCount }, (_, index) => <span className="status-pill ok" key={`${room.id}-unit-${index + 1}`}>Unidad {index + 1}</span>)}
+                        </div>
+                      </details>
                     </td>
                     <td data-label="Acciones" className="actions-cell">
                       <div className="actions-inline">
@@ -240,6 +249,7 @@ export function SalasPage({
                     <strong>Personas:</strong>{' '}
                     {room.minPeople}-{room.maxPeople}
                   </p>
+                  <p><strong>Unidades físicas:</strong> {Array.from({ length: room.inventoryCount }, (_, index) => `Unidad ${index + 1}`).join(', ')}</p>
                 </div>
                 <div className="actions-inline mobile-card-actions mt-2">
                   <button type="button" className="inline-flex min-h-8 items-center justify-center rounded-md bg-slate-200 px-3 text-xs font-semibold text-slate-700 transition hover:-translate-y-px hover:bg-slate-300 disabled:cursor-not-allowed disabled:opacity-60" onClick={() => onOpenEditRoom(room)}>Editar</button>

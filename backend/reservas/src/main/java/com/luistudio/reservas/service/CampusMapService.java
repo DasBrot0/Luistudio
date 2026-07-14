@@ -69,8 +69,8 @@ public class CampusMapService {
         Set<Long> buildingIds = enabled.stream().map(PabellonEntity::getId).collect(Collectors.toSet());
         List<RoomEntity> activeRooms = rooms.findByEstadoNot(RoomState.INACTIVA).stream()
             .filter(r -> r.getPabellon() != null && buildingIds.contains(r.getPabellon().getId())).toList();
-        Set<Long> occupied = reservations.findActiveAt(AppTime.today(), AppTime.nowTime()).stream()
-            .map(r -> r.getSala().getId()).collect(Collectors.toSet());
+        Map<Long, Long> occupied = reservations.findActiveAt(AppTime.today(), AppTime.nowTime()).stream()
+            .collect(Collectors.groupingBy(r -> r.getSala().getId(), Collectors.counting()));
         Set<Long> maintained = maintenances.findActiveAt(now).stream()
             .map(m -> m.getSala().getId()).collect(Collectors.toSet());
         Map<Long, List<RoomScheduleEntity>> scheduleByRoom = activeRooms.isEmpty() ? Map.of() :
@@ -90,11 +90,11 @@ public class CampusMapService {
         return new CampusMapResponse(now, refresh, campusItems);
     }
 
-    private CampusMapResponse.Pavilion mapBuilding(PabellonEntity b, List<RoomEntity> buildingRooms, Set<Long> occupied,
+    private CampusMapResponse.Pavilion mapBuilding(PabellonEntity b, List<RoomEntity> buildingRooms, Map<Long, Long> occupied,
         Set<Long> maintained, Map<Long, List<RoomScheduleEntity>> schedules) {
         List<RoomView> views = buildingRooms.stream().map(room -> {
             String status = (room.getEstado() == RoomState.EN_MANTENIMIENTO || maintained.contains(room.getId())) ? "MANTENIMIENTO"
-                : occupied.contains(room.getId()) ? "OCUPADA" : "LIBRE";
+                : occupied.getOrDefault(room.getId(), 0L) >= (room.getCantidadUnidades() == null ? 1 : room.getCantidadUnidades()) ? "OCUPADA" : "LIBRE";
             boolean within = withinSchedule(schedules.getOrDefault(room.getId(), List.of()));
             return new RoomView(room, status, within);
         }).sorted(Comparator.comparing(v -> v.room.getCodigo())).toList();

@@ -51,6 +51,7 @@ export function FilterBar({
   fieldsClassName,
 }: FilterBarProps) {
   const hasSearch = typeof onSearchChange === 'function'
+  const hasPanelContent = filters.length > 0 || sortControls.length > 0 || quickChips.length > 0 || Boolean(actions)
   const [filtersOpen, setFiltersOpen] = useState(true)
   const renderControl = (filter: FilterConfig) => {
     if (filter.type === 'date' || filter.type === 'text') {
@@ -104,7 +105,7 @@ export function FilterBar({
             placeholder={searchPlaceholder}
             aria-label={searchAriaLabel ?? searchPlaceholder ?? 'Buscar'}
           />
-          <div className="filter-bar-actions">
+          {hasPanelContent && <div className="filter-bar-actions">
             <button
               type="button"
               className="inline-flex min-h-8 items-center justify-center gap-2 rounded-md border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 transition hover:-translate-y-px hover:bg-slate-50"
@@ -118,11 +119,11 @@ export function FilterBar({
               </span>
               Filtros
             </button>
-          </div>
+          </div>}
         </div>
       )}
 
-      {filtersOpen && (
+      {filtersOpen && hasPanelContent && (
         <div className="filter-bar-panel">
           {filters.length > 0 || sortControls.length > 0 ? (
             <>

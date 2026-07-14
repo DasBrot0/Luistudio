@@ -12,7 +12,7 @@ public class EmailOutboxScheduler {
         this.emailDispatchService = emailDispatchService;
     }
 
-    @Scheduled(fixedDelay = 60000)
+    @Scheduled(fixedDelay = 7000)
     public void run() {
         emailDispatchService.processPendingEmails();
     }

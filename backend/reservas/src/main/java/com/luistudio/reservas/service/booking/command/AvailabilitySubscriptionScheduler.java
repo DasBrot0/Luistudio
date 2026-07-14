@@ -13,7 +13,7 @@ public class AvailabilitySubscriptionScheduler {
         this.subscriptionService = subscriptionService;
     }
 
-    @Scheduled(fixedDelay = 60000)
+    @Scheduled(fixedDelay = 7000)
     public void run() {
         subscriptionService.processNewlyAvailableRooms();
     }

@@ -2,7 +2,6 @@ package com.luistudio.reservas.controller;
 
 import com.luistudio.reservas.dto.booking.BookingResponse;
 import com.luistudio.reservas.dto.booking.BookingUpsertRequest;
-import com.luistudio.reservas.dto.common.MessageResponse;
 import com.luistudio.reservas.dto.common.PageResponse;
 import com.luistudio.reservas.security.AuthPrincipal;
 import com.luistudio.reservas.service.AccessGuard;
@@ -84,10 +83,4 @@ public class BookingController {
         return bookingService.listAdminBookings(page, size, status, fecha);
     }
 
-    @PostMapping("/notifications/booking-confirmation")
-    public MessageResponse sendConfirmation(@RequestParam Long bookingId) {
-        accessGuard.requireAdmin();
-        String ics = bookingService.getIcsContent(bookingId);
-        return new MessageResponse("Confirmación generada para reserva " + bookingId + " (ICS length=" + ics.length() + ")");
-    }
 }
