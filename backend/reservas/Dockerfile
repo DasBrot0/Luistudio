@@ -9,7 +9,10 @@ COPY mvnw.cmd mvnw.cmd
 RUN chmod +x mvnw && ./mvnw -q -DskipTests dependency:go-offline
 
 COPY src src
-RUN ./mvnw -q clean verify
+# El contexto de Render es backend/reservas; el contrato SchemaMappingTest
+# necesita ../../database/001_init.sql, que no puede copiarse desde ese contexto.
+# Las pruebas se ejecutan en CI/local desde el repositorio completo.
+RUN ./mvnw -q clean package -DskipTests
 
 FROM eclipse-temurin:21-jre-jammy
 WORKDIR /app

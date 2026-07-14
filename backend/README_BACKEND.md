@@ -68,6 +68,9 @@ En este proyecto puedes desplegar el backend usando:
 
 Sugerencias de configuración en Render:
 - `Root Directory`: `backend/reservas`
+- El Dockerfile compila el artefacto con las pruebas omitidas, porque ese contexto no
+  incluye `database/001_init.sql`, requerido por el contrato de esquema. Ejecuta
+  `./mvnw clean verify` desde `backend/reservas` en CI o local antes de desplegar.
 - Runtime: `Docker`
 - Variables de entorno minimas:
   - `DB_URL`
