@@ -58,7 +58,11 @@ public class DtoMapper {
             room.getPermiteConcentracion(),
             room.getTipo().name(),
             java.util.Set.copyOf(room.getEquipamiento()),
-            room.getCantidadUnidades()
+            room.getCantidadUnidades(),
+            room.getDescripcion(),
+            java.util.Set.copyOf(room.getActividadesPermitidas()),
+            java.util.Set.copyOf(room.getServiciosCercanos()),
+            java.util.Set.copyOf(room.getCaracteristicasAccesibilidad())
         );
     }
 

@@ -1,7 +1,9 @@
 package com.luistudio.reservas.service;
 
-import com.luistudio.reservas.dto.room.RoomSearchIntent;
+import com.luistudio.reservas.dto.room.RoomSearchAnalysis;
+import com.luistudio.reservas.dto.room.RoomSearchCandidate;
+import java.util.List;
 
 public interface RoomIntentInterpreter {
-    RoomSearchIntent interpret(String naturalLanguageQuery);
+    RoomSearchAnalysis interpret(String naturalLanguageQuery, List<RoomSearchCandidate> candidates);
 }

@@ -40,6 +40,7 @@ interface AdminReservasPageProps {
 }
 
 const dayLabels = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom']
+const exactHourOptions = Array.from({ length: 24 }, (_, hour) => `${String(hour).padStart(2, '0')}:00`)
 
 function ClearDateIcon() {
   return (
@@ -272,8 +273,11 @@ export function AdminReservasPage({
             <label htmlFor="max-bookings">Máximo de reservas simultáneas</label>
             <input id="max-bookings" type="number" min={1} value={configDraft.maxActiveBookings} onChange={(event) => onConfigDraftChange({ ...configDraft, maxActiveBookings: Number(event.target.value) })} />
 
-            <label htmlFor="max-duration">Duración máxima por reserva (minutos)</label>
-            <input id="max-duration" type="number" min={30} step={15} value={configDraft.maxDurationMinutes} onChange={(event) => onConfigDraftChange({ ...configDraft, maxDurationMinutes: Number(event.target.value) })} />
+            <label htmlFor="max-duration">Duración máxima por reserva</label>
+            <select id="max-duration" value={configDraft.maxDurationMinutes} onChange={(event) => onConfigDraftChange({ ...configDraft, maxDurationMinutes: Number(event.target.value) })}>
+              <option value={30}>30 minutos</option>
+              <option value={60}>1 hora</option>
+            </select>
 
             <button type="submit" className="inline-flex min-h-10 items-center justify-center rounded-full bg-primary px-4 text-sm font-semibold text-white transition hover:-translate-y-px hover:bg-primary-dark disabled:cursor-not-allowed disabled:opacity-60">Guardar configuración</button>
           </form>
@@ -307,9 +311,7 @@ export function AdminReservasPage({
                     }
                   >
                     <option value={30}>30 minutos</option>
-                    <option value={45}>45 minutos</option>
                     <option value={60}>1 hora</option>
-                    <option value={120}>2 horas</option>
                   </select>
                 </div>
               </div>
@@ -334,9 +336,7 @@ export function AdminReservasPage({
                       />
                       Cerrado
                     </label>
-                    <input
-                      type="time"
-                      step={campusSchedule.slotMinutes * 60}
+                    <select
                       value={day.openTime ?? ''}
                       disabled={day.closed}
                       onChange={(event) =>
@@ -345,10 +345,11 @@ export function AdminReservasPage({
                           days: patchDay(campusSchedule.days, day.dayOfWeek, { openTime: event.target.value }),
                         })
                       }
-                    />
-                    <input
-                      type="time"
-                      step={campusSchedule.slotMinutes * 60}
+                    >
+                      <option value="">Apertura</option>
+                      {exactHourOptions.map((time) => <option key={time} value={time}>{time}</option>)}
+                    </select>
+                    <select
                       value={day.closeTime ?? ''}
                       disabled={day.closed}
                       onChange={(event) =>
@@ -357,7 +358,10 @@ export function AdminReservasPage({
                           days: patchDay(campusSchedule.days, day.dayOfWeek, { closeTime: event.target.value }),
                         })
                       }
-                    />
+                    >
+                      <option value="">Cierre</option>
+                      {exactHourOptions.map((time) => <option key={time} value={time}>{time}</option>)}
+                    </select>
                   </div>
                 ))}
               </div>

@@ -25,6 +25,18 @@ public record RoomUpsertRequest(
     RoomNoiseLevel noiseLevel,
     Boolean supportsConcentration,
     RoomType roomType,
-    Set<@Size(max = 50) String> equipment
+    @Size(max = 20) Set<@Size(max = 50) String> equipment,
+    @Size(max = 500) String description,
+    @Size(max = 20) Set<@Size(max = 60) String> allowedActivities,
+    @Size(max = 20) Set<@Size(max = 60) String> nearbyServices,
+    @Size(max = 20) Set<@Size(max = 60) String> accessibilityFeatures
 ) {
+    public RoomUpsertRequest(
+        String name, String campus, String location, Integer capacity, Integer maxPeople, Integer minPeople,
+        Boolean minPeopleRequired, List<RoomScheduleInput> schedule, String pabellonCode, RoomState status,
+        RoomNoiseLevel noiseLevel, Boolean supportsConcentration, RoomType roomType, Set<String> equipment
+    ) {
+        this(name, campus, location, capacity, maxPeople, minPeople, minPeopleRequired, schedule, pabellonCode,
+            status, noiseLevel, supportsConcentration, roomType, equipment, null, null, null, null);
+    }
 }

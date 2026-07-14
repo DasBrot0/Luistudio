@@ -25,7 +25,11 @@ public record RoomResponse(
     Boolean supportsConcentration,
     String roomType,
     Set<String> equipment,
-    Integer inventoryCount
+    Integer inventoryCount,
+    String description,
+    Set<String> allowedActivities,
+    Set<String> nearbyServices,
+    Set<String> accessibilityFeatures
 ) {
     public RoomResponse(
         Long id, String code, String name, String resourceLabel, String campus, String campusLabel,
@@ -36,6 +40,18 @@ public record RoomResponse(
     ) {
         this(id, code, name, resourceLabel, campus, campusLabel, venue, venueLabel, capacity, location,
             minPeople, minPeopleRequired, maxPeople, slotMinutes, schedule, status, pabellonCode,
-            noiseLevel, supportsConcentration, roomType, equipment, 1);
+            noiseLevel, supportsConcentration, roomType, equipment, 1, null, Set.of(), Set.of(), Set.of());
+    }
+
+    public RoomResponse(
+        Long id, String code, String name, String resourceLabel, String campus, String campusLabel,
+        String venue, String venueLabel, Integer capacity, String location, Integer minPeople,
+        Boolean minPeopleRequired, Integer maxPeople, Integer slotMinutes, List<RoomScheduleResponse> schedule,
+        String status, String pabellonCode, String noiseLevel, Boolean supportsConcentration,
+        String roomType, Set<String> equipment, Integer inventoryCount
+    ) {
+        this(id, code, name, resourceLabel, campus, campusLabel, venue, venueLabel, capacity, location,
+            minPeople, minPeopleRequired, maxPeople, slotMinutes, schedule, status, pabellonCode,
+            noiseLevel, supportsConcentration, roomType, equipment, inventoryCount, null, Set.of(), Set.of(), Set.of());
     }
 }

@@ -109,6 +109,7 @@ CREATE TABLE IF NOT EXISTS rooms (
   noise_level VARCHAR(10) NOT NULL DEFAULT 'MEDIO',
   supports_concentration BOOLEAN NOT NULL DEFAULT FALSE,
   room_type VARCHAR(30) NOT NULL DEFAULT 'GENERAL',
+  description VARCHAR(500),
   status VARCHAR(30) NOT NULL DEFAULT 'DISPONIBLE',
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   CONSTRAINT fk_sala_pabellon FOREIGN KEY (building_id) REFERENCES buildings(id),
@@ -130,6 +131,27 @@ CREATE TABLE IF NOT EXISTS room_equipment (
   equipment VARCHAR(50) NOT NULL,
   CONSTRAINT fk_room_equipment_room FOREIGN KEY (room_id) REFERENCES rooms(id) ON DELETE CASCADE,
   CONSTRAINT uq_room_equipment UNIQUE (room_id, equipment)
+);
+
+CREATE TABLE IF NOT EXISTS room_allowed_activities (
+  room_id BIGINT NOT NULL,
+  activity VARCHAR(60) NOT NULL,
+  CONSTRAINT fk_room_activity_room FOREIGN KEY (room_id) REFERENCES rooms(id) ON DELETE CASCADE,
+  CONSTRAINT uq_room_activity UNIQUE (room_id, activity)
+);
+
+CREATE TABLE IF NOT EXISTS room_nearby_services (
+  room_id BIGINT NOT NULL,
+  service VARCHAR(60) NOT NULL,
+  CONSTRAINT fk_room_nearby_service_room FOREIGN KEY (room_id) REFERENCES rooms(id) ON DELETE CASCADE,
+  CONSTRAINT uq_room_nearby_service UNIQUE (room_id, service)
+);
+
+CREATE TABLE IF NOT EXISTS room_accessibility_features (
+  room_id BIGINT NOT NULL,
+  feature VARCHAR(60) NOT NULL,
+  CONSTRAINT fk_room_accessibility_room FOREIGN KEY (room_id) REFERENCES rooms(id) ON DELETE CASCADE,
+  CONSTRAINT uq_room_accessibility UNIQUE (room_id, feature)
 );
 
 CREATE TABLE IF NOT EXISTS campus_schedules (
@@ -206,6 +228,7 @@ CREATE TABLE IF NOT EXISTS bookings (
 
 -- Compatibilidad al aplicar el esquema sobre una base creada por una versión anterior.
 ALTER TABLE rooms ADD COLUMN IF NOT EXISTS inventory_count INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE rooms ADD COLUMN IF NOT EXISTS description VARCHAR(500);
 ALTER TABLE rooms DROP CONSTRAINT IF EXISTS chk_rooms_inventory;
 ALTER TABLE rooms ADD CONSTRAINT chk_rooms_inventory CHECK (inventory_count > 0);
 ALTER TABLE bookings ADD COLUMN IF NOT EXISTS room_unit_number INTEGER DEFAULT 1;
@@ -407,9 +430,9 @@ ON CONFLICT DO NOTHING;
 INSERT INTO system_config (config_key, config_value)
 VALUES
   ('max_reservas_simultaneas', '1'),
-  ('duracion_maxima_minutos', '120'),
+  ('duracion_maxima_minutos', '60'),
   ('campus_slot_minutos_monterrico', '60'),
-  ('campus_slot_minutos_mayorazgo', '45')
+  ('campus_slot_minutos_mayorazgo', '60')
 ON CONFLICT (config_key) DO NOTHING;
 
 INSERT INTO campuses (code, name) VALUES ('MON', 'Monterrico'), ('MAY', 'Mayorazgo') ON CONFLICT (code) DO NOTHING;
@@ -420,8 +443,8 @@ FROM campuses c
 JOIN (VALUES
   ('Monterrico', 1, TIME '06:00', TIME '22:00', FALSE), ('Monterrico', 2, TIME '06:00', TIME '22:00', FALSE), ('Monterrico', 3, TIME '06:00', TIME '22:00', FALSE),
   ('Monterrico', 4, TIME '06:00', TIME '22:00', FALSE), ('Monterrico', 5, TIME '06:00', TIME '22:00', FALSE), ('Monterrico', 6, TIME '06:00', TIME '12:00', FALSE), ('Monterrico', 7, NULL, NULL, TRUE),
-  ('Mayorazgo', 1, TIME '05:30', TIME '22:00', FALSE), ('Mayorazgo', 2, TIME '05:30', TIME '22:00', FALSE), ('Mayorazgo', 3, TIME '05:30', TIME '22:00', FALSE),
-  ('Mayorazgo', 4, TIME '05:30', TIME '22:00', FALSE), ('Mayorazgo', 5, TIME '05:30', TIME '22:00', FALSE), ('Mayorazgo', 6, TIME '05:30', TIME '22:00', FALSE), ('Mayorazgo', 7, NULL, NULL, TRUE)
+  ('Mayorazgo', 1, TIME '06:00', TIME '22:00', FALSE), ('Mayorazgo', 2, TIME '06:00', TIME '22:00', FALSE), ('Mayorazgo', 3, TIME '06:00', TIME '22:00', FALSE),
+  ('Mayorazgo', 4, TIME '06:00', TIME '22:00', FALSE), ('Mayorazgo', 5, TIME '06:00', TIME '22:00', FALSE), ('Mayorazgo', 6, TIME '06:00', TIME '22:00', FALSE), ('Mayorazgo', 7, NULL, NULL, TRUE)
 ) AS s(campus_name, day_of_week, open_time, close_time, is_closed) ON c.name = s.campus_name
 ON CONFLICT (campus_id, day_of_week) DO NOTHING;
 

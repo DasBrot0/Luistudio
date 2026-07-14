@@ -1,13 +1,19 @@
 -- Luistudio - datos semilla idempotentes. Requiere 001_init.sql.
 BEGIN;
 
+-- Normaliza instalaciones existentes: todas parten de horas exactas y usan bloques de una hora por defecto.
+UPDATE campus_schedules cs
+SET open_time = TIME '06:00', close_time = TIME '22:00', updated_at = NOW()
+FROM campuses c
+WHERE cs.campus_id = c.id AND c.name = 'Mayorazgo' AND cs.is_closed = FALSE;
+
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
 INSERT INTO system_config (config_key, config_value, updated_at) VALUES
   ('max_reservas_simultaneas', '2', NOW()),
-  ('duracion_maxima_minutos', '120', NOW()),
+  ('duracion_maxima_minutos', '60', NOW()),
   ('campus_slot_minutos_monterrico', '60', NOW()),
-  ('campus_slot_minutos_mayorazgo', '45', NOW())
+  ('campus_slot_minutos_mayorazgo', '60', NOW())
 ON CONFLICT (config_key) DO UPDATE SET config_value = EXCLUDED.config_value, updated_at = NOW();
 
 INSERT INTO users (role_id, code, first_name, last_name, email, password_hash, status, has_2fa)
@@ -122,6 +128,30 @@ UPDATE rooms
 SET noise_level = 'BAJO', supports_concentration = TRUE, room_type = 'PRESENTACION'
 WHERE code = 'M-6-VIS-04';
 
+UPDATE rooms SET
+  description = CASE
+    WHEN code = 'CDM-FUTBOL' THEN 'Cancha reglamentaria al aire libre para fútbol y entrenamiento de equipos.'
+    WHEN code = 'CS-CRUZ-FUT' THEN 'Losa deportiva para fulbito, partidos recreativos y entrenamiento grupal.'
+    WHEN code LIKE 'CDM-BAS-%' THEN 'Cancha deportiva para básquet y entrenamiento con balón.'
+    WHEN code = 'CDM-FRONTON' THEN 'Campo al aire libre con muro para frontón.'
+    WHEN code = 'CDM-PADEL' THEN 'Cancha cerrada para pádel recreativo.'
+    WHEN code = 'CDM-TENIS' THEN 'Cancha al aire libre para tenis.'
+    WHEN code = 'CDM-VOLEY' THEN 'Cancha equipada para vóley y actividades de equipo.'
+    WHEN code = 'CDM-PISCINA' THEN 'Piscina para natación y entrenamiento acuático.'
+    WHEN code = 'F1-CAM-MULTI' THEN 'Campo flexible para actividades deportivas y recreativas de grupo.'
+    WHEN code = 'F1-FUT-MESA' THEN 'Espacio interior con mesa para fulbito de mesa.'
+    WHEN code = 'F1-TEN-MESA' THEN 'Espacio interior equipado para tenis de mesa.'
+    WHEN code = 'F1-SAL-BAILE' THEN 'Sala amplia para baile, ensayo y actividad física dirigida.'
+    WHEN code LIKE '%VIS%' THEN 'Sala audiovisual para proyecciones, presentaciones y revisión de contenido.'
+    WHEN code = 'F1-CUBICULOS' THEN 'Cubículos individuales para estudio silencioso y trabajo concentrado.'
+    WHEN code LIKE 'M-%-GRU-%' THEN 'Sala cerrada para estudio grupal, reuniones académicas y trabajo colaborativo.'
+    ELSE description
+  END;
+
+UPDATE rooms
+SET noise_level = 'ALTO', supports_concentration = FALSE, room_type = 'GENERAL'
+WHERE code LIKE 'CDM-%' OR code IN ('CS-CRUZ-FUT', 'F1-CAM-MULTI', 'F1-FUT-MESA', 'F1-SAL-BAILE', 'F1-TEN-MESA');
+
 INSERT INTO room_equipment (room_id, equipment)
 SELECT r.id, e.equipment
 FROM rooms r
@@ -144,6 +174,51 @@ JOIN (VALUES
   ('M-7-GRU-10', 'pizarra')
 ) AS e(code, equipment) ON e.code = r.code
 ON CONFLICT (room_id, equipment) DO NOTHING;
+
+INSERT INTO room_equipment (room_id, equipment)
+SELECT r.id, e.equipment FROM rooms r JOIN (VALUES
+  ('CDM-BAS-COMP', 'aros de básquet'), ('CDM-BAS-COMP', 'iluminación nocturna'),
+  ('CDM-BAS-MED', 'aro de básquet'), ('CDM-FRONTON', 'muro de frontón'),
+  ('CDM-PADEL', 'red de pádel'), ('CDM-TENIS', 'red de tenis'),
+  ('CDM-FUTBOL', 'arcos de fútbol'), ('CDM-FUTBOL', 'iluminación nocturna'),
+  ('CDM-VOLEY', 'red de vóley'), ('CDM-PISCINA', 'carriles de natación'),
+  ('F1-CAM-MULTI', 'arcos multiuso'), ('F1-FUT-MESA', 'mesa de fulbito'),
+  ('F1-SAL-BAILE', 'espejos'), ('F1-SAL-BAILE', 'equipo de sonido'),
+  ('F1-TEN-MESA', 'mesa de ping pong'), ('CS-CRUZ-FUT', 'arcos de fulbito')
+) AS e(code, equipment) ON e.code = r.code
+ON CONFLICT (room_id, equipment) DO NOTHING;
+
+INSERT INTO room_allowed_activities (room_id, activity)
+SELECT r.id, a.activity FROM rooms r JOIN (VALUES
+  ('CDM-BAS-COMP','básquet'), ('CDM-BAS-MED','básquet'), ('CDM-FRONTON','frontón'),
+  ('CDM-PADEL','pádel'), ('CDM-TENIS','tenis'), ('CDM-FUTBOL','fútbol'),
+  ('CDM-VOLEY','vóley'), ('CDM-PISCINA','natación'), ('F1-CAM-MULTI','deporte recreativo'),
+  ('F1-FUT-MESA','fulbito de mesa'), ('F1-SAL-BAILE','baile'), ('F1-SAL-BAILE','ensayo'),
+  ('F1-SAL-VISION','proyección audiovisual'), ('F1-TEN-MESA','tenis de mesa'),
+  ('F1-CUBICULOS','estudio individual'), ('M-6-VIS-04','presentación'),
+  ('CS-CRUZ-FUT','fulbito')
+) AS a(code, activity) ON a.code = r.code
+ON CONFLICT (room_id, activity) DO NOTHING;
+
+INSERT INTO room_allowed_activities (room_id, activity)
+SELECT id, activity FROM rooms CROSS JOIN (VALUES ('estudio grupal'), ('trabajo colaborativo')) AS a(activity)
+WHERE code LIKE 'M-%-GRU-%'
+ON CONFLICT (room_id, activity) DO NOTHING;
+
+INSERT INTO room_nearby_services (room_id, service)
+SELECT id, service FROM rooms CROSS JOIN (VALUES ('comedor cercano'), ('baños'), ('bebederos')) AS s(service)
+WHERE code LIKE 'M-%' OR code LIKE 'F1-%'
+ON CONFLICT (room_id, service) DO NOTHING;
+
+INSERT INTO room_nearby_services (room_id, service)
+SELECT id, service FROM rooms CROSS JOIN (VALUES ('vestuarios'), ('baños'), ('bebederos')) AS s(service)
+WHERE code LIKE 'CDM-%' OR code = 'CS-CRUZ-FUT'
+ON CONFLICT (room_id, service) DO NOTHING;
+
+INSERT INTO room_accessibility_features (room_id, feature)
+SELECT id, feature FROM rooms CROSS JOIN (VALUES ('ruta accesible'), ('acceso para silla de ruedas')) AS a(feature)
+WHERE code LIKE 'M-%' OR code LIKE 'F1-%' OR code LIKE 'CDM-%'
+ON CONFLICT (room_id, feature) DO NOTHING;
 
 INSERT INTO notification_preferences (user_id, email_enabled, reminder_enabled, booking_changes_enabled, theme_mode, font_scale, login_landing_view)
 SELECT u.id, TRUE, TRUE, TRUE, 'LIGHT', 1.0, CASE WHEN r.name = 'ADMIN' THEN 'ADMIN_DASHBOARD' ELSE 'STUDENT_MY_BOOKINGS' END

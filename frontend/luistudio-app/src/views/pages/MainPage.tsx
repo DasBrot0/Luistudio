@@ -174,6 +174,10 @@ const toUiRoom = (room: {
   supportsConcentration?: boolean
   roomType?: string
   equipment?: string[]
+  description?: string | null
+  allowedActivities?: string[]
+  nearbyServices?: string[]
+  accessibilityFeatures?: string[]
   inventoryCount?: number
 }): Room => ({
   backendId: room.id,
@@ -202,6 +206,10 @@ const toUiRoom = (room: {
   supportsConcentration: room.supportsConcentration,
   roomType: room.roomType,
   equipment: room.equipment,
+  description: room.description ?? '',
+  allowedActivities: room.allowedActivities ?? [],
+  nearbyServices: room.nearbyServices ?? [],
+  accessibilityFeatures: room.accessibilityFeatures ?? [],
   inventoryCount: Math.max(1, room.inventoryCount ?? 1),
 })
 
@@ -505,11 +513,11 @@ export function MainPage() {
 
   const [config, setConfig] = useState<SystemConfig>({
     maxActiveBookings: 1,
-    maxDurationMinutes: 120,
+    maxDurationMinutes: 60,
   })
   const [configDraft, setConfigDraft] = useState<SystemConfig>({
     maxActiveBookings: 1,
-    maxDurationMinutes: 120,
+    maxDurationMinutes: 60,
   })
   const [configNotice, setConfigNotice] = useState('')
 
@@ -566,6 +574,10 @@ export function MainPage() {
     supportsConcentration: false,
     roomType: 'GENERAL',
     equipment: [],
+    description: '',
+    allowedActivities: [],
+    nearbyServices: [],
+    accessibilityFeatures: [],
   })
   const [roomNotice, setRoomNotice] = useState('')
   const [roomSuccessId, setRoomSuccessId] = useState('')
@@ -2001,6 +2013,10 @@ export function MainPage() {
       supportsConcentration: false,
       roomType: 'GENERAL',
       equipment: [],
+      description: '',
+      allowedActivities: [],
+      nearbyServices: [],
+      accessibilityFeatures: [],
     })
     setRoomModalTargetId(null)
     setRoomModalMode('add')
@@ -2022,6 +2038,10 @@ export function MainPage() {
       supportsConcentration: room.supportsConcentration ?? false,
       roomType: (room.roomType as RoomDraft['roomType'] | undefined) ?? 'GENERAL',
       equipment: room.equipment ?? [],
+      description: room.description ?? '',
+      allowedActivities: room.allowedActivities ?? [],
+      nearbyServices: room.nearbyServices ?? [],
+      accessibilityFeatures: room.accessibilityFeatures ?? [],
     })
     setRoomModalTargetId(room.id)
     setRoomModalMode('edit')
@@ -2168,7 +2188,7 @@ export function MainPage() {
       !Number.isInteger(configDraft.maxActiveBookings) ||
       !Number.isInteger(configDraft.maxDurationMinutes) ||
       configDraft.maxActiveBookings < 1 ||
-      configDraft.maxDurationMinutes < 30
+      ![30, 60].includes(configDraft.maxDurationMinutes)
     ) {
       setModalMessage({
         title: 'Configuración inválida',
@@ -2197,7 +2217,7 @@ export function MainPage() {
     if (!token) return
     const invalidScheduleDay = findInvalidScheduleDay(campus.days)
     const unalignedScheduleDay = findUnalignedScheduleDay(campus.days, campus.slotMinutes)
-    if (!campus.campus.trim() || !Number.isInteger(campus.slotMinutes) || campus.slotMinutes < 5) {
+    if (!campus.campus.trim() || ![30, 60].includes(campus.slotMinutes)) {
       setModalMessage({
         title: 'Horario inválido',
         message: 'Revisa el campus y la duración por reserva antes de guardar.',

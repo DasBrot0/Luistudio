@@ -16,6 +16,7 @@ interface RoomFormModalProps {
 }
 
 const dayLabels = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom']
+const exactHourOptions = Array.from({ length: 24 }, (_, hour) => `${String(hour).padStart(2, '0')}:00`)
 
 const defaultSchedule: ScheduleDay[] = [
   { dayOfWeek: 1, openTime: '06:00', closeTime: '22:00', closed: false },
@@ -26,6 +27,63 @@ const defaultSchedule: ScheduleDay[] = [
   { dayOfWeek: 6, openTime: '06:00', closeTime: '12:00', closed: false },
   { dayOfWeek: 7, openTime: null, closeTime: null, closed: true },
 ]
+
+function TagEditor({
+  id,
+  label,
+  placeholder,
+  values,
+  onChange,
+}: {
+  id: string
+  label: string
+  placeholder: string
+  values: string[]
+  onChange: (values: string[]) => void
+}) {
+  const [input, setInput] = useState('')
+  const addValue = () => {
+    const normalized = input.trim().toLowerCase()
+    if (!normalized || values.includes(normalized)) return
+    onChange([...values, normalized])
+    setInput('')
+  }
+
+  return (
+    <div className="mt-3">
+      <label htmlFor={id}>{label}</label>
+      <div className="flex flex-col gap-2 sm:flex-row">
+        <input
+          id={id}
+          type="text"
+          maxLength={60}
+          value={input}
+          placeholder={placeholder}
+          onChange={(event) => setInput(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter') {
+              event.preventDefault()
+              addValue()
+            }
+          }}
+        />
+        <button type="button" aria-label={`Agregar ${label.toLowerCase()}`} className="inline-flex min-h-10 shrink-0 items-center justify-center rounded-full border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60" disabled={!input.trim()} onClick={addValue}>
+          Agregar
+        </button>
+      </div>
+      {values.length > 0 ? (
+        <div className="mt-3 flex flex-wrap gap-2" aria-label={`${label} registrados`}>
+          {values.map((item) => (
+            <span key={item} className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
+              {item}
+              <button type="button" className="text-base leading-none text-slate-500 hover:text-red-600" aria-label={`Quitar ${item}`} onClick={() => onChange(values.filter((value) => value !== item))}>×</button>
+            </span>
+          ))}
+        </div>
+      ) : <p className="mb-0 mt-2 text-xs text-slate-500">Sin datos registrados.</p>}
+    </div>
+  )
+}
 
 export function RoomFormModal({
   mode,
@@ -194,6 +252,18 @@ export function RoomFormModal({
               Estos atributos se guardan por sala y se usan para filtrar y ordenar las recomendaciones.
             </p>
 
+            <div className="mb-3">
+              <label htmlFor="room-description">Descripción del espacio</label>
+              <textarea
+                id="room-description"
+                maxLength={500}
+                rows={3}
+                value={draft.description}
+                placeholder="Ej.: Sala cerrada para trabajo colaborativo, cerca del comedor principal."
+                onChange={(event) => onChange({ ...draft, description: event.target.value })}
+              />
+            </div>
+
             <div className="form-grid two-cols">
               <div>
                 <label htmlFor="room-type">Tipo de sala</label>
@@ -279,6 +349,10 @@ export function RoomFormModal({
                 <p className="mb-0 mt-2 text-xs text-slate-500">Sin equipamiento registrado.</p>
               )}
             </div>
+
+            <TagEditor id="room-activities" label="Actividades permitidas" placeholder="Ej.: fútbol, estudio grupal, ensayo" values={draft.allowedActivities} onChange={(allowedActivities) => onChange({ ...draft, allowedActivities })} />
+            <TagEditor id="room-nearby-services" label="Servicios cercanos" placeholder="Ej.: comedor cercano, baños, bebederos" values={draft.nearbyServices} onChange={(nearbyServices) => onChange({ ...draft, nearbyServices })} />
+            <TagEditor id="room-accessibility" label="Accesibilidad" placeholder="Ej.: ascensor, ruta accesible" values={draft.accessibilityFeatures} onChange={(accessibilityFeatures) => onChange({ ...draft, accessibilityFeatures })} />
           </fieldset>
 
           <div>
@@ -301,18 +375,22 @@ export function RoomFormModal({
                     />
                     Cerrado
                   </label>
-                  <input
-                    type="time"
+                  <select
                     value={day.openTime ?? ''}
                     disabled={day.closed}
                     onChange={(event) => updateScheduleDay(day.dayOfWeek, { openTime: event.target.value })}
-                  />
-                  <input
-                    type="time"
+                  >
+                    <option value="">Apertura</option>
+                    {exactHourOptions.map((time) => <option key={time} value={time}>{time}</option>)}
+                  </select>
+                  <select
                     value={day.closeTime ?? ''}
                     disabled={day.closed}
                     onChange={(event) => updateScheduleDay(day.dayOfWeek, { closeTime: event.target.value })}
-                  />
+                  >
+                    <option value="">Cierre</option>
+                    {exactHourOptions.map((time) => <option key={time} value={time}>{time}</option>)}
+                  </select>
                 </div>
               ))}
             </div>

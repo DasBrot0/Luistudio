@@ -124,7 +124,11 @@ public class RoomService {
             request.noiseLevel(),
             request.supportsConcentration(),
             request.roomType(),
-            request.equipment()
+            request.equipment(),
+            request.description(),
+            request.allowedActivities(),
+            request.nearbyServices(),
+            request.accessibilityFeatures()
         );
         RoomEntity saved = roomRepository.save(room);
         roomScheduleService.saveRoomSchedule(saved, request.schedule());
@@ -154,6 +158,18 @@ public class RoomService {
         }
         if (request.equipment() != null) {
             room.setEquipamiento(normalizeEquipment(request.equipment()));
+        }
+        if (request.description() != null) {
+            room.setDescripcion(normalizeDescription(request.description()));
+        }
+        if (request.allowedActivities() != null) {
+            room.setActividadesPermitidas(normalizeTags(request.allowedActivities()));
+        }
+        if (request.nearbyServices() != null) {
+            room.setServiciosCercanos(normalizeTags(request.nearbyServices()));
+        }
+        if (request.accessibilityFeatures() != null) {
+            room.setCaracteristicasAccesibilidad(normalizeTags(request.accessibilityFeatures()));
         }
         RoomState requestedStatus = request.status() == null ? room.getEstado() : request.status();
         if (requestedStatus == RoomState.INACTIVA) {
@@ -263,7 +279,11 @@ public class RoomService {
             base.supportsConcentration(),
             base.roomType(),
             base.equipment(),
-            base.inventoryCount()
+            base.inventoryCount(),
+            base.description(),
+            base.allowedActivities(),
+            base.nearbyServices(),
+            base.accessibilityFeatures()
         );
     }
 
@@ -283,7 +303,11 @@ public class RoomService {
         RoomNoiseLevel noiseLevel,
         Boolean supportsConcentration,
         RoomType roomType,
-        Set<String> equipment
+        Set<String> equipment,
+        String description,
+        Set<String> allowedActivities,
+        Set<String> nearbyServices,
+        Set<String> accessibilityFeatures
     ) {
         RoomEntity room = new RoomEntity();
         room.setNombre(name.trim());
@@ -299,6 +323,10 @@ public class RoomService {
         room.setPermiteConcentracion(Boolean.TRUE.equals(supportsConcentration));
         room.setTipo(roomType == null ? RoomType.GENERAL : roomType);
         room.setEquipamiento(normalizeEquipment(equipment));
+        room.setDescripcion(normalizeDescription(description));
+        room.setActividadesPermitidas(normalizeTags(allowedActivities));
+        room.setServiciosCercanos(normalizeTags(nearbyServices));
+        room.setCaracteristicasAccesibilidad(normalizeTags(accessibilityFeatures));
         return room;
     }
 
@@ -310,6 +338,21 @@ public class RoomService {
             .filter(item -> item != null && !item.isBlank())
             .map(String::trim)
             .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
+    }
+
+    private Set<String> normalizeTags(Set<String> values) {
+        if (values == null) {
+            return new LinkedHashSet<>();
+        }
+        return values.stream()
+            .filter(item -> item != null && !item.isBlank())
+            .map(String::trim)
+            .map(item -> item.toLowerCase(java.util.Locale.ROOT))
+            .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
+    }
+
+    private String normalizeDescription(String description) {
+        return description == null || description.isBlank() ? null : description.trim();
     }
 
     private void ensureRoomCanBeInactivated(RoomEntity room) {

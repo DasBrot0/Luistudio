@@ -43,6 +43,10 @@ export interface ApiRoom {
   supportsConcentration: boolean
   roomType: string
   equipment: string[]
+  description: string | null
+  allowedActivities: string[]
+  nearbyServices: string[]
+  accessibilityFeatures: string[]
   inventoryCount?: number
 }
 
@@ -57,6 +61,7 @@ export interface ApiRoomSearchIntent {
 export interface ApiIntelligentRoomSearchResponse {
   intent: ApiRoomSearchIntent
   recommendations: Array<{ room: ApiRoom; score: number; reasons: string[] }>
+  message?: string | null
 }
 
 export interface ApiAdminDashboard {
@@ -388,6 +393,10 @@ export const api = {
       supportsConcentration: boolean
       roomType: 'ESTUDIO_INDIVIDUAL' | 'ESTUDIO_GRUPAL' | 'REUNION' | 'PRESENTACION' | 'GENERAL'
       equipment: string[]
+      description: string
+      allowedActivities: string[]
+      nearbyServices: string[]
+      accessibilityFeatures: string[]
     },
   ) {
     return http<ApiRoom>(
@@ -415,6 +424,10 @@ export const api = {
       supportsConcentration: boolean
       roomType: 'ESTUDIO_INDIVIDUAL' | 'ESTUDIO_GRUPAL' | 'REUNION' | 'PRESENTACION' | 'GENERAL'
       equipment: string[]
+      description: string
+      allowedActivities: string[]
+      nearbyServices: string[]
+      accessibilityFeatures: string[]
     },
   ) {
     return http<ApiRoom>(

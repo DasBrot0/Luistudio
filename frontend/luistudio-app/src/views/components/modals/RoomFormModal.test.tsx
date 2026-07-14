@@ -19,6 +19,10 @@ const initialDraft: RoomDraft = {
   supportsConcentration: false,
   roomType: 'GENERAL',
   equipment: [],
+  description: '',
+  allowedActivities: [],
+  nearbyServices: [],
+  accessibilityFeatures: [],
 }
 
 function Harness() {

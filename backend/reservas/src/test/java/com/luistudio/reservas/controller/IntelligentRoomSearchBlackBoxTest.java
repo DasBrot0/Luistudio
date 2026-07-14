@@ -46,6 +46,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
  * - CN-SEARCH-04: date nula -> HTTP 400.
  * - CN-SEARCH-05: limit menor a 1 -> HTTP 400.
  * - CN-SEARCH-06: limit mayor a 3 -> HTTP 400.
+ * - CN-SEARCH-07: minutos arbitrarios o duración no reservable -> HTTP 400.
  *
  * La prueba usa únicamente el contrato HTTP y mantiene mockeado el servicio de
  * búsqueda, por lo que no depende de su implementación interna ni de servicios IA.
@@ -133,6 +134,14 @@ class IntelligentRoomSearchBlackBoxTest {
     void returns400ForLimitAboveMaximum() throws Exception {
         assertBadRequest("""
             {"query":"sala silenciosa","date":"2026-07-13","start":"09:00:00","end":"10:00:00","limit":4}
+            """);
+    }
+
+    @Test
+    @DisplayName("CN-SEARCH-07: horario con minutos arbitrarios — HTTP 400")
+    void returns400ForNonReservableTimeBlock() throws Exception {
+        assertBadRequest("""
+            {"query":"necesito estudiar","date":"2026-07-15","start":"08:22:00","end":"21:00:00","limit":3}
             """);
     }
 

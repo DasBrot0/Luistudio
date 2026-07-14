@@ -111,6 +111,10 @@ const sampleRoom: ApiRoom = {
   supportsConcentration: true,
   roomType: 'GENERAL',
   equipment: [],
+  description: null,
+  allowedActivities: [],
+  nearbyServices: [],
+  accessibilityFeatures: [],
 }
 
 const sampleBooking = {
@@ -181,7 +185,7 @@ beforeEach(() => {
   vi.mocked(api.getAdminBookings).mockReset().mockResolvedValue(emptyPage)
   vi.mocked(api.getAdminAttendance).mockReset().mockResolvedValue(emptyPage)
   vi.mocked(api.updateAttendance).mockReset()
-  vi.mocked(api.getAdminConfig).mockReset().mockResolvedValue({ maxActiveBookings: 1, maxDurationMinutes: 120 })
+  vi.mocked(api.getAdminConfig).mockReset().mockResolvedValue({ maxActiveBookings: 1, maxDurationMinutes: 60 })
   vi.mocked(api.updateAdminConfig).mockReset()
   vi.mocked(api.getCampusSchedules).mockReset().mockResolvedValue({ campuses: [] })
   vi.mocked(api.updateCampusSchedule).mockReset()

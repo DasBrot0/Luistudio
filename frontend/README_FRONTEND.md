@@ -82,7 +82,7 @@ El frontend usa exclusivamente pnpm. El campo `packageManager` y `pnpm-lock.yaml
 - Filtro por botón, búsqueda por código/correo/nombres/apellidos, ordenamiento y cambio de estado de perfiles (admin).
 - Configuración de límites de reservas (admin).
 - Configuración de horario general por campus (admin), con advertencias si entra en conflicto con overrides de salas.
-- Configuración de duración por reserva por campus (30/45/60/120 min); las horas de apertura/cierre del horario general se validan contra ese múltiplo.
+- Configuración de duración por reserva por campus limitada a 30 o 60 minutos, con 60 minutos por defecto. Apertura y cierre usan exclusivamente horas exactas (`:00`).
 - Navegación por rol y centro de notificaciones en UI.
 - Modo oscuro con persistencia (`localStorage`) y paleta tonal completa para cards, modales, tablas, botones, textos y selectores.
 - Favicon configurado con el icono de Luistudio desde `public/favicon.svg`.
@@ -135,6 +135,10 @@ Notas recientes:
 - `/admin/dashboard` es la primera opción de la navegación administrativa y la vista inicial predeterminada.
 - El dashboard actualiza sus métricas automáticamente al cambiar cualquiera de las fechas y permite restablecer el rango; presenta cuatro KPI, tendencia diaria, dona de asistencia, mapa de calor semanal, barras horizontales por sala y ranking paginado con filtros separados por estudiante y código. También exporta el ranking como CSV UTF-8 con BOM para conservar tildes y eñes en Excel, y muestra la hora de la última actualización.
 - La opción **Búsqueda inteligente** acepta una descripción libre, fecha y horario. La respuesta muestra la intención interpretada y hasta 3 recomendaciones ordenadas por puntuación cuando existen salas compatibles.
+- En Búsqueda inteligente, el inicio se elige de una lista: con bloques de una hora solo aparecen valores `:00`; con bloques de 30 minutos aparecen `:00` y `:30`. La hora final se calcula automáticamente.
+- La consulta puede incluir preferencias y exclusiones, por ejemplo: `cerca de F1`, `lejos de Mayorazgo`, `con comedor cerca` o `quiero estudiar, pero no en el edificio M`.
+- Cada recomendación muestra también la descripción y los servicios cercanos de la sala cuando están registrados.
+- El formulario administrativo de salas permite editar descripción, actividades permitidas, equipamiento, servicios cercanos (por ejemplo, comedor) y características de accesibilidad; estos datos alimentan la afinidad de la búsqueda inteligente.
 - Elegir una recomendación precarga campus, recinto, sala, fecha y horario en el formulario normal; la confirmación sigue usando todas las validaciones existentes.
 - Dashboard, mapa, navegación móvil, perfil y sesiones usan tokens compartidos de superficie, borde, texto, éxito y peligro para mantener contraste en temas claro y oscuro.
 - Todos los listados tabulares disponen de filtros consistentes mediante `FilterBar` y muestran un máximo de 10 elementos por página cuando son paginados. Reutilizan `Pagination`: acciones anterior/siguiente en los extremos y el indicador `Página X de Y` centrado en el ancho total. Salas, comunicados, reservas del estudiante, avisos y métricas usan paginación local; reservas administrativas, perfiles y seguridad conservan paginación de backend.

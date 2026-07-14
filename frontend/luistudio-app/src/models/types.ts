@@ -55,6 +55,10 @@ export interface Room {
   supportsConcentration?: boolean
   roomType?: string
   equipment?: string[]
+  description?: string
+  allowedActivities?: string[]
+  nearbyServices?: string[]
+  accessibilityFeatures?: string[]
   inventoryCount: number
 }
 
@@ -132,6 +136,10 @@ export interface RoomDraft {
   supportsConcentration: boolean
   roomType: 'ESTUDIO_INDIVIDUAL' | 'ESTUDIO_GRUPAL' | 'REUNION' | 'PRESENTACION' | 'GENERAL'
   equipment: string[]
+  description: string
+  allowedActivities: string[]
+  nearbyServices: string[]
+  accessibilityFeatures: string[]
 }
 
 export interface CampusSchedule {

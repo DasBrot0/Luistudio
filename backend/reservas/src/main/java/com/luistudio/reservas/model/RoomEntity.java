@@ -73,6 +73,24 @@ public class RoomEntity {
     @Column(name = "equipment", nullable = false, length = 50)
     private Set<String> equipamiento = new LinkedHashSet<>();
 
+    @Column(name = "description", length = 500)
+    private String descripcion;
+
+    @ElementCollection
+    @CollectionTable(name = "room_allowed_activities", joinColumns = @JoinColumn(name = "room_id"))
+    @Column(name = "activity", nullable = false, length = 60)
+    private Set<String> actividadesPermitidas = new LinkedHashSet<>();
+
+    @ElementCollection
+    @CollectionTable(name = "room_nearby_services", joinColumns = @JoinColumn(name = "room_id"))
+    @Column(name = "service", nullable = false, length = 60)
+    private Set<String> serviciosCercanos = new LinkedHashSet<>();
+
+    @ElementCollection
+    @CollectionTable(name = "room_accessibility_features", joinColumns = @JoinColumn(name = "room_id"))
+    @Column(name = "feature", nullable = false, length = 60)
+    private Set<String> caracteristicasAccesibilidad = new LinkedHashSet<>();
+
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 30)
     private RoomState estado = RoomState.DISPONIBLE;

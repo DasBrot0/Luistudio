@@ -26,10 +26,10 @@ public class SystemConfigService {
 
     @Transactional
     public void ensureDefaults() {
-        upsert(KEY_MAX_ACTIVE_BOOKINGS, "1");
-        upsert(KEY_MAX_DURATION_MINUTES, "120");
-        upsert(campusSlotKey("Monterrico"), "60");
-        upsert(campusSlotKey("Mayorazgo"), "45");
+        ensureDefault(KEY_MAX_ACTIVE_BOOKINGS, "1");
+        ensureDefault(KEY_MAX_DURATION_MINUTES, "60");
+        ensureDefault(campusSlotKey("Monterrico"), "60");
+        ensureDefault(campusSlotKey("Mayorazgo"), "60");
     }
 
     @Transactional(readOnly = true)
@@ -41,6 +41,7 @@ public class SystemConfigService {
 
     @Transactional
     public AdminConfigResponse updateConfig(AdminConfigUpdateRequest request) {
+        validateReservationDuration(request.maxDurationMinutes());
         upsert(KEY_MAX_ACTIVE_BOOKINGS, String.valueOf(request.maxActiveBookings()));
         upsert(KEY_MAX_DURATION_MINUTES, String.valueOf(request.maxDurationMinutes()));
         log.info(
@@ -73,10 +74,14 @@ public class SystemConfigService {
     }
 
     public void validateCampusSlotMinutes(int slotMinutes) {
-        if (slotMinutes != 30 && slotMinutes != 45 && slotMinutes != 60 && slotMinutes != 120) {
+        validateReservationDuration(slotMinutes);
+    }
+
+    public void validateReservationDuration(int durationMinutes) {
+        if (durationMinutes != 30 && durationMinutes != 60) {
             throw new com.luistudio.reservas.exception.BusinessException(
                 org.springframework.http.HttpStatus.BAD_REQUEST,
-                "La duración por reserva debe ser 30, 45, 60 o 120 minutos"
+                "La duración por reserva debe ser de 30 o 60 minutos"
             );
         }
     }
@@ -95,6 +100,17 @@ public class SystemConfigService {
         systemConfigRepository.save(entity);
     }
 
+    private void ensureDefault(String key, String value) {
+        if (systemConfigRepository.findByClave(key).isPresent()) {
+            return;
+        }
+        SystemConfigEntity entity = new SystemConfigEntity();
+        entity.setClave(key);
+        entity.setValor(value);
+        entity.setUpdatedAt(OffsetDateTime.now());
+        systemConfigRepository.save(entity);
+    }
+
     private String campusSlotKey(String campus) {
         String normalized = campus == null ? "default" : campus.trim().toLowerCase();
         normalized = normalized.replaceAll("[^a-z0-9]+", "_");
@@ -102,9 +118,6 @@ public class SystemConfigService {
     }
 
     private int getDefaultCampusSlotMinutes(String campus) {
-        if ("Mayorazgo".equalsIgnoreCase(campus)) {
-            return 45;
-        }
         return 60;
     }
 }

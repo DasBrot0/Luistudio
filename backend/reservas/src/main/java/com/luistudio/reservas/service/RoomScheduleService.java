@@ -284,6 +284,9 @@ public class RoomScheduleService {
             if (day.openTime() == null || day.closeTime() == null || !day.closeTime().isAfter(day.openTime())) {
                 throw new BusinessException(HttpStatus.BAD_REQUEST, "Horario general inválido para el día " + day.dayOfWeek());
             }
+            if (!isExactHour(day.openTime()) || !isExactHour(day.closeTime())) {
+                throw new BusinessException(HttpStatus.BAD_REQUEST, "La apertura y cierre deben usar horas exactas (:00)");
+            }
             if (!isAlignedToSlot(day.openTime(), slotMinutes) || !isAlignedToSlot(day.closeTime(), slotMinutes)) {
                 throw new BusinessException(
                     HttpStatus.BAD_REQUEST,
@@ -303,6 +306,9 @@ public class RoomScheduleService {
             if (day.openTime() == null || day.closeTime() == null || !day.closeTime().isAfter(day.openTime())) {
                 throw new BusinessException(HttpStatus.BAD_REQUEST, "Horario de sala inválido para el día " + day.dayOfWeek());
             }
+            if (!isExactHour(day.openTime()) || !isExactHour(day.closeTime())) {
+                throw new BusinessException(HttpStatus.BAD_REQUEST, "La apertura y cierre de la sala deben usar horas exactas (:00)");
+            }
         }
     }
 
@@ -314,5 +320,9 @@ public class RoomScheduleService {
 
     private boolean isAlignedToSlot(LocalTime time, int slotMinutes) {
         return (time.getHour() * 60 + time.getMinute()) % slotMinutes == 0;
+    }
+
+    private boolean isExactHour(LocalTime time) {
+        return time.getMinute() == 0 && time.getSecond() == 0 && time.getNano() == 0;
     }
 }

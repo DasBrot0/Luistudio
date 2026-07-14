@@ -115,7 +115,7 @@ Memoria (500 MB):
   - Devuelve `PageResponse<RoomResponse>`. Por defecto `includeSchedule=false` para listar salas sin cargar horarios completos.
 - `POST /api/rooms/intelligent-search`
   - Requiere sesión y recibe `{ "query", "date", "start", "end", "limit" }`.
-  - Groq interpreta `query` a una intención tipada. El backend valida esa intención, filtra por disponibilidad y metadata y calcula un ranking determinista; la IA no recibe el catálogo ni elige salas.
+  - Groq interpreta `query` a una intención tipada usando solo el catálogo público de salas activas. El backend valida esa intención, filtra por disponibilidad y metadata y calcula un ranking determinista; la IA no decide qué sala se reserva.
   - La respuesta devuelve `score` y `reasons` construidos por reglas locales para cada alternativa.
 - `GET /api/rooms/{id}/bookings?desde&hasta`
 - `POST /api/rooms`
@@ -150,7 +150,7 @@ Memoria (500 MB):
 - `GET /api/admin/campus-schedules`
 - `PUT /api/admin/campus-schedules`
   - En días cerrados (`closed=true`), `openTime` y `closeTime` pueden enviarse c?mo `null`.
-  - En días abiertos, `openTime` y `closeTime` deben alinearse con la duración por reserva del campus (30/45/60/120 min).
+  - En días abiertos, `openTime` y `closeTime` deben usar horas exactas (`:00`). La duración por reserva solo admite 30 o 60 minutos.
   - Los errores de validación incluyen el campo que falló.
 - `GET /api/campus/map`
 - `PUT /api/admin/buildings/{id}/location`
@@ -200,7 +200,7 @@ Memoria (500 MB):
 - El scheduler de `email_outbox` procesa c?mo máximo 50 correos listos por ciclo.
 - Se agregan horarios por campus (`campus_schedules`) y override por sala (`room_schedules`) para validar reservas por día/hora.
 - Se agregan reglas por sala de personas: `minPeople`, `minPeopleRequired`, `maxPeople`.
-- Se agrega configuración de duración por reserva por campus (Monterrico 60 min, Mayorazgo 45 min por defecto).
+- La duración por reserva se configura por campus con 60 minutos por defecto tanto en Monterrico como en Mayorazgo; el administrador puede elegir 30 o 60 minutos.
 - Las reservas solo aceptan fechas/horas dentro de la ventana permitida (semana actual; fin de semana habilita también la siguiente semana) y siempre en horas futuras del día actual.
 - Las reglas de negocio de reservas usan la zona `America/Lima` para comparar fecha/hora actual en producción.
 - No se permite cancelar reservas que ya finalizaron (validaci?n en backend).
@@ -279,9 +279,15 @@ Si falta alguna credencial, el sistema hace fallback a `log` y deja warning en l
 - La inasistencia usa reservas no canceladas cuyo inicio ya superó la tolerancia: `INASISTIO / reservas elegibles`.
 - La respuesta del dashboard incluye tendencia diaria de ocupación, celdas día/hora para el mapa de calor, conteos de asistencia/inasistencia/pendientes e inasistencias por estudiante.
 - `ADMIN_DASHBOARD` y su valor inicial para administradores forman parte de `database/001_init.sql` y `database/002_seed_release01.sql`.
-- `POST /api/rooms/intelligent-search` interpreta texto mediante `RoomIntentInterpreter`, filtra disponibilidad y aplica un ranking local determinista. `limit` admite valores de 1 a 3 (3 por defecto).
-- Los atributos administrables por sala (`room_type`, `noise_level`, `supports_concentration` y `room_equipment`) se reciben en el alta/edición de salas; enviar `equipment: []` elimina el equipamiento registrado para esa sala.
-- La IA solo estructura la intención; nunca decide el orden final ni recibe la decisión de sala.
+- `POST /api/rooms/intelligent-search` filtra primero las salas activas y disponibles, interpreta el texto mediante `RoomIntentInterpreter` y aplica el ranking final localmente. `limit` admite valores de 1 a 3 (3 por defecto).
+- Groq recibe `query` y el catálogo de salas activas con datos públicos: ID, código, nombre, descripción, ubicación, coordenadas del pabellón, capacidad, ruido, tipo, equipamiento, actividades, servicios cercanos y accesibilidad. Así puede entender exclusiones y referencias espaciales aunque la sala de referencia esté ocupada. No recibe fecha, horario, usuario, correo, cookie ni sesión; el backend filtra localmente las salas disponibles antes de recomendar.
+- Los atributos administrables por sala (`room_type`, `noise_level`, `supports_concentration`, `description`, `room_equipment`, `room_allowed_activities`, `room_nearby_services` y `room_accessibility_features`) se reciben en el alta/edición. Enviar una colección vacía elimina sus valores registrados.
+- La afinidad semántica de Groq suma como máximo 30 puntos. El backend descarta IDs no disponibles o duplicados, conserva los filtros obligatorios y decide el orden final.
+- La búsqueda solo recomienda rangos que coincidan con el bloque configurado del campus y estén alineados desde la apertura; si la duración u horario no son válidos, devuelve una explicación específica.
+- Cada coincidencia de Groq incluye `excluded`: una negación explícita como "no quiero en el edificio M", "evita Mayorazgo" o "excepto canchas" elimina esas salas antes de puntuar. Una ausencia de necesidad como "no necesito proyector" no excluye salas que lo tengan.
+- Las candidatas incluyen latitud y longitud públicas del pabellón. Si la consulta pide `NEAR` o `FAR` respecto de un edificio identificable, Groq devuelve una sala de referencia y el backend calcula la distancia Haversine localmente; la prioridad geográfica aporta hasta 20 puntos.
+- Consultas cubiertas por el contrato semántico: "no me importa el ruido", "no quiero ruido", "con comedor cerca", "sin escaleras", "para cuatro con pizarra", "fuera del edificio M", "cerca de F1" y "lo más lejos posible de Mayorazgo". "Cerca de mí" no se interpreta geográficamente porque no se envían coordenadas del usuario.
+- Para una base existente, vuelva a aplicar `database/001_init.sql` y `database/002_seed_release01.sql`; ambos scripts son idempotentes para estos metadatos.
 
 ## Seguridad, disponibilidad e inasistencias del Release 2
 
