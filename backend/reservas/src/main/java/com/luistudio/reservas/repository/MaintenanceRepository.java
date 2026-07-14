@@ -11,8 +11,6 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface MaintenanceRepository extends JpaRepository<MaintenanceEntity, Long> {
-    List<MaintenanceEntity> findBySalaOrderByInicioDesc(RoomEntity sala);
-
     @EntityGraph(attributePaths = "sala")
     List<MaintenanceEntity> findByEstadoIn(List<MaintenanceStatus> statuses);
 

@@ -2,11 +2,9 @@ package com.luistudio.reservas.service;
 
 import com.luistudio.reservas.dto.auth.AuthUserResponse;
 import com.luistudio.reservas.dto.booking.BookingResponse;
-import com.luistudio.reservas.dto.room.MaintenanceResponse;
 import com.luistudio.reservas.dto.room.RoomResponse;
 import com.luistudio.reservas.dto.room.RoomScheduleResponse;
 import com.luistudio.reservas.dto.user.UserResponse;
-import com.luistudio.reservas.model.MaintenanceEntity;
 import com.luistudio.reservas.model.ReservationEntity;
 import com.luistudio.reservas.model.RoomEntity;
 import com.luistudio.reservas.model.UserEntity;
@@ -59,7 +57,8 @@ public class DtoMapper {
             room.getNivelRuido().name(),
             room.getPermiteConcentracion(),
             room.getTipo().name(),
-            java.util.Set.copyOf(room.getEquipamiento())
+            java.util.Set.copyOf(room.getEquipamiento()),
+            room.getCantidadUnidades()
         );
     }
 
@@ -91,7 +90,9 @@ public class DtoMapper {
                 reservation.getHoraInicio(),
                 reservation.getHoraFin()
             ),
-            "/api/bookings/" + reservation.getId() + "/ics"
+            "/api/bookings/" + reservation.getId() + "/ics",
+            reservation.getNumeroUnidad(),
+            reservation.getNumeroUnidad() == null ? null : "Unidad " + reservation.getNumeroUnidad()
         );
     }
 
@@ -109,13 +110,4 @@ public class DtoMapper {
         );
     }
 
-    public MaintenanceResponse toMaintenance(MaintenanceEntity maintenance) {
-        return new MaintenanceResponse(
-            maintenance.getId(),
-            maintenance.getInicio(),
-            maintenance.getFin(),
-            maintenance.getMotivo(),
-            maintenance.getEstado().name()
-        );
-    }
 }

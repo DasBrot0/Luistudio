@@ -17,7 +17,6 @@ public class CampusMapCacheInvalidationAspect {
         + "execution(* com.luistudio.reservas.service.BookingService.cancelBooking(..)) || "
         + "execution(* com.luistudio.reservas.service.RoomService.createRoom(..)) || "
         + "execution(* com.luistudio.reservas.service.RoomService.updateRoom(..)) || "
-        + "execution(* com.luistudio.reservas.service.RoomService.deleteRoom(..)) || "
-        + "execution(* com.luistudio.reservas.service.RoomService.createMaintenance(..))")
+        + "execution(* com.luistudio.reservas.service.RoomService.deleteRoom(..))")
     public void evictAfterMapRelevantMutation() { campusMapService.evictAll(); }
 }

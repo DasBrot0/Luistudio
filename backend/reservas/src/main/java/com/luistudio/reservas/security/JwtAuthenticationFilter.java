@@ -128,7 +128,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private boolean isOptionalAuthenticationRequest(HttpServletRequest request) {
         String path = request.getRequestURI();
-        return path.startsWith("/api/auth/") || "/actuator/health".equals(path);
+        return "/api/auth/login".equals(path)
+            || "/api/auth/reset-request".equals(path)
+            || "/api/auth/reset-confirm".equals(path)
+            || "/api/auth/sensitive-change/confirm".equals(path)
+            || "/actuator/health".equals(path);
     }
 
     private String hashId(Long userId) {

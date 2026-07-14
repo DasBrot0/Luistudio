@@ -1,14 +1,10 @@
 package com.luistudio.reservas.service;
 
-import com.luistudio.reservas.dto.room.MaintenanceRequest;
-import com.luistudio.reservas.dto.room.MaintenanceResponse;
 import com.luistudio.reservas.dto.room.RoomResponse;
 import com.luistudio.reservas.dto.common.PageResponse;
 import com.luistudio.reservas.dto.room.RoomUpsertRequest;
 import com.luistudio.reservas.exception.BusinessException;
 import com.luistudio.reservas.exception.NotFoundException;
-import com.luistudio.reservas.model.MaintenanceEntity;
-import com.luistudio.reservas.model.MaintenanceStatus;
 import com.luistudio.reservas.model.CampusEntity;
 import com.luistudio.reservas.model.PabellonEntity;
 import com.luistudio.reservas.model.RoomEntity;
@@ -108,12 +104,6 @@ public class RoomService {
         );
     }
 
-    @Transactional(readOnly = true)
-    public List<RoomResponse> listAvailableRooms(LocalDate date, LocalTime start, LocalTime end) {
-        List<RoomEntity> rooms = roomRepository.findByEstadoNot(RoomState.INACTIVA);
-        return rooms.stream().filter(room -> isRoomAvailable(room, date, start, end, null)).map(room -> toRoomResponse(room, true)).toList();
-    }
-
     @Transactional
     public RoomResponse createRoom(RoomUpsertRequest request) {
         if (request.name().isBlank()) {
@@ -190,27 +180,8 @@ public class RoomService {
         return roomRepository.findById(roomId).orElseThrow(() -> new NotFoundException("Sala no encontrada"));
     }
 
-    @Transactional
-    public MaintenanceResponse createMaintenance(Long roomId, MaintenanceRequest request) {
-        RoomEntity room = getRoomEntity(roomId);
-        if (!request.end().isAfter(request.start())) {
-            throw new BusinessException(HttpStatus.BAD_REQUEST, "La fecha fin debe ser mayor que inicio");
-        }
-
-        MaintenanceEntity maintenance = buildScheduledMaintenance(room, request);
-        OffsetDateTime now = AppTime.nowOffset();
-        if (!request.start().isAfter(now) && request.end().isAfter(now)) {
-            room.setEstado(RoomState.EN_MANTENIMIENTO);
-            roomRepository.save(room);
-        }
-
-        return dtoMapper.toMaintenance(maintenanceRepository.save(maintenance));
-    }
-
-    @Transactional(readOnly = true)
-    public List<MaintenanceResponse> getRoomUnavailability(Long roomId) {
-        RoomEntity room = getRoomEntity(roomId);
-        return maintenanceRepository.findBySalaOrderByInicioDesc(room).stream().map(dtoMapper::toMaintenance).toList();
+    public void lockRoomInventory(Long roomId) {
+        roomRepository.findByIdForUpdate(roomId).orElseThrow(() -> new NotFoundException("Sala no encontrada"));
     }
 
     @Transactional(readOnly = true)
@@ -225,10 +196,11 @@ public class RoomService {
         OffsetDateTime from = date.atTime(start).atZone(AppTime.ZONE).toOffsetDateTime();
         OffsetDateTime to = date.atTime(end).atZone(AppTime.ZONE).toOffsetDateTime();
 
-        boolean overlapsBooking = reservationRepository.existsOverlapping(room, date, start, end, excludeBookingId);
+        long overlappingBookings = reservationRepository.countOverlapping(room, date, start, end, excludeBookingId);
+        int inventoryCount = room.getCantidadUnidades() == null ? 1 : room.getCantidadUnidades();
         boolean overlapsMaintenance = !maintenanceRepository.findOverlapping(room, from, to).isEmpty();
 
-        return !overlapsBooking && !overlapsMaintenance;
+        return overlappingBookings < inventoryCount && !overlapsMaintenance;
     }
 
     private PabellonEntity resolvePabellon(String requestedCode, String campusName) {
@@ -290,7 +262,8 @@ public class RoomService {
             base.noiseLevel(),
             base.supportsConcentration(),
             base.roomType(),
-            base.equipment()
+            base.equipment(),
+            base.inventoryCount()
         );
     }
 
@@ -337,16 +310,6 @@ public class RoomService {
             .filter(item -> item != null && !item.isBlank())
             .map(String::trim)
             .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
-    }
-
-    private MaintenanceEntity buildScheduledMaintenance(RoomEntity room, MaintenanceRequest request) {
-        MaintenanceEntity maintenance = new MaintenanceEntity();
-        maintenance.setSala(room);
-        maintenance.setInicio(request.start());
-        maintenance.setFin(request.end());
-        maintenance.setMotivo(request.reason());
-        maintenance.setEstado(MaintenanceStatus.PROGRAMADO);
-        return maintenance;
     }
 
     private void ensureRoomCanBeInactivated(RoomEntity room) {

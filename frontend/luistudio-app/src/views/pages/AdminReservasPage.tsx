@@ -203,6 +203,7 @@ export function AdminReservasPage({
                       <th>ID</th>
                       <th>Estudiante</th>
                       <th>Sala</th>
+                      <th>Unidad física</th>
                       <th>Fecha</th>
                       <th>Horario</th>
                       <th>Estado</th>
@@ -215,6 +216,7 @@ export function AdminReservasPage({
                         <td data-label="ID">{booking.id}</td>
                         <td data-label="Estudiante">{ownerEmail}</td>
                         <td data-label="Sala">{booking.roomId}</td>
+                        <td data-label="Unidad física">{booking.roomUnitLabel ?? 'Unidad 1'}</td>
                         <td data-label="Fecha">{formatDate(booking.date)}</td>
                         <td data-label="Horario">{booking.start}-{booking.end}</td>
                         <td data-label="Estado">
@@ -239,6 +241,7 @@ export function AdminReservasPage({
                       <p><strong>ID:</strong> {booking.id}</p>
                       <p><strong>Estudiante:</strong> {ownerEmail}</p>
                       <p><strong>Sala:</strong> {booking.roomId}</p>
+                      <p><strong>Unidad física:</strong> {booking.roomUnitLabel ?? 'Unidad 1'}</p>
                       <p><strong>Fecha:</strong> {formatDate(booking.date)}</p>
                       <p><strong>Horario:</strong> {booking.start}-{booking.end}</p>
                       <p className="mobile-record-state">

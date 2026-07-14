@@ -5,3 +5,4 @@ AGENTS.md
 .env.backend
 .env.frontend
 backend/reservas/.m2/
+frontend/luistudio-app/.pnpm-store

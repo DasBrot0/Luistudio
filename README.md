@@ -188,6 +188,8 @@ Luistudio/
 |---|---|
 | `AdminConfigResponse.java` | Respuesta con la configuración administrativa vigente. |
 | `AdminConfigUpdateRequest.java` | Entrada para actualizar parámetros administrativos del sistema. |
+| `AdminAttendanceResponse.java` | Fila paginada de control de asistencia para la administración. |
+| `AttendanceStatusUpdateRequest.java` | Entrada validada para marcar asistencia o inasistencia. |
 | `CampusMapResponse.java` | Respuesta usada para representar el mapa/estructura de campus y pabellones. |
 | `CampusScheduleDayInput.java` | Entrada de horario por día para configurar atención del campus. |
 | `CampusScheduleDayResponse.java` | Respuesta de horario diario del campus. |
@@ -206,8 +208,6 @@ Luistudio/
 | `ApiError.java` | Formato estándar para errores de API. |
 | `MessageResponse.java` | Respuesta simple con mensaje de confirmación. |
 | `PageResponse.java` | Envoltorio para respuestas paginadas. |
-| `MaintenanceRequest.java` | Entrada para registrar o actualizar mantenimiento de sala. |
-| `MaintenanceResponse.java` | Respuesta con información de mantenimiento. |
 | `RoomResponse.java` | Datos públicos/administrativos de una sala. |
 | `RoomScheduleInput.java` | Entrada para definir horario de una sala. |
 | `RoomScheduleResponse.java` | Respuesta de horario configurado para una sala. |

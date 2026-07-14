@@ -87,7 +87,7 @@ public class EmailDispatchService {
         var subscriptionId = email.getPayload().get("subscriptionId");
         if (type == null || !"ROOM_AVAILABLE".equals(type.asText()) || subscriptionId == null || !subscriptionId.canConvertToLong()) return;
         subscriptionRepository.findById(subscriptionId.asLong()).ifPresent(subscription -> {
-            if (!"ACTIVA".equals(subscription.getStatus())) return;
+            if (!"EN_COLA".equals(subscription.getStatus())) return;
             subscription.setStatus("NOTIFICADA");
             subscription.setNotifiedAt(OffsetDateTime.now());
             subscriptionRepository.save(subscription);

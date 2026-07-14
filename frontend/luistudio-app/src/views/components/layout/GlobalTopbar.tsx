@@ -13,7 +13,7 @@ interface NotificationItem {
 interface NavItem {
   route: RouteKey
   label: string
-  icon: 'dashboard' | 'calendar' | 'list' | 'rooms' | 'users' | 'bookings' | 'security' | 'megaphone' | 'map' | 'search'
+  icon: 'dashboard' | 'calendar' | 'availability' | 'attendance' | 'list' | 'rooms' | 'users' | 'bookings' | 'security' | 'megaphone' | 'map' | 'search'
 }
 
 interface GlobalTopbarProps {
@@ -31,6 +31,7 @@ interface GlobalTopbarProps {
 const studentItems: NavItem[] = [
   { route: 'misreservas', label: 'Mis reservas', icon: 'list' },
   { route: 'reservas', label: 'Reservar', icon: 'calendar' },
+  { route: 'disponibilidad', label: 'Disponibilidad', icon: 'availability' },
   { route: 'busqueda-inteligente', label: 'Búsqueda inteligente', icon: 'search' },
   { route: 'mapa', label: 'Mapa', icon: 'map' },
 ]
@@ -40,6 +41,7 @@ const adminItems: NavItem[] = [
   { route: 'salas', label: 'Salas', icon: 'rooms' },
   { route: 'perfiles', label: 'Perfiles', icon: 'users' },
   { route: 'admin-reservas', label: 'Reservas', icon: 'bookings' },
+  { route: 'asistencias', label: 'Asistencias', icon: 'attendance' },
   { route: 'mapa', label: 'Mapa', icon: 'map' },
   { route: 'seguridad', label: 'Seguridad', icon: 'security' },
   { route: 'comunicados', label: 'Comunicados', icon: 'megaphone' },
@@ -52,6 +54,8 @@ function NavIcon({ type }: { type: NavItem['icon'] | 'bell' | 'collapse' | 'sett
   if (type === 'security') return <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /></svg>
   if (type === 'profile') return <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="8" r="4" /><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" /></svg>
   if (type === 'calendar') return <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M16 3v4M8 3v4M3 10h18" /></svg>
+  if (type === 'availability') return <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4.5" width="18" height="16" rx="2" /><path d="M8 2.5v4M16 2.5v4M3 9.5h18" /><circle cx="15.5" cy="15" r="3.5" /><path d="M15.5 13v2.2l1.5 1" /></svg>
+  if (type === 'attendance') return <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="9" cy="7" r="3" /><path d="M3.5 19c.8-3.2 2.8-5 5.5-5 1.4 0 2.6.5 3.6 1.3" /><path d="m14 18 2.2 2.2L21 15.5" /></svg>
   if (type === 'search') return <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="6" /><path d="m16 16 4 4" /></svg>
   if (type === 'list') return <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" /></svg>
   if (type === 'rooms') return <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 21V8a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v13M3 21h18M8 11h2M8 15h2M16 3h3a2 2 0 0 1 2 2v16" /></svg>

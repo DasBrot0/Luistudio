@@ -57,6 +57,9 @@ public class ReservationEntity {
     @Column(name = "attendance_status", length = 20)
     private String attendanceStatus;
 
+    @Column(name = "room_unit_number")
+    private Integer numeroUnidad;
+
     @Column(name = "created_at", nullable = false)
     private OffsetDateTime creadaEn = OffsetDateTime.now();
 

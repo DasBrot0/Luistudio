@@ -218,13 +218,13 @@ export function ReservasPage({
   const maxWeekOffset = weekendToday ? 1 : 0
 
   const overlapsBooking = (date: string, start: string, end: string) =>
-    roomBookings.some(
+    roomBookings.filter(
       (booking) =>
         booking.date === date &&
         toMinutes(start) < toMinutes(booking.end) &&
         toMinutes(end) > toMinutes(booking.start) &&
         booking.status === 'Confirmado',
-    )
+    ).length >= (selectedRoom?.inventoryCount ?? 1)
 
   const isInsideSchedule = (weekday: number, start: string, end: string) => {
     const schedule = scheduleByDay.get(weekday)
@@ -545,6 +545,12 @@ export function ReservasPage({
               </button>
             </div>
 
+            {selectedRoom && (
+              <p className="mb-3 text-xs text-slate-500">
+                Los bloques agotados muestran una campana. Presiónala para recibir un correo cuando la sala vuelva a estar disponible; solo puede existir un aviso activo por sala.
+              </p>
+            )}
+
             <div className="calendar-grid-wrap">
               <table className="calendar-grid">
                 <thead>
@@ -578,19 +584,15 @@ export function ReservasPage({
                           const disabled = blockedBySchedule || occupied
 
                           if (occupied && selectedRoom) {
-                            const existingSub = mySubscriptions.find(
-                              (s) =>
-                                s.roomId === selectedRoom.backendId &&
-                                s.targetDate === day.isoDate &&
-                                s.startTime === slot &&
-                                s.endTime === slotEnd,
-                            )
+                            const existingSub = mySubscriptions.find((s) => s.roomId === selectedRoom.backendId)
                             return (
                               <td key={`${day.isoDate}-${slot}`}>
                                 <button
                                   type="button"
                                   className={`calendar-cell-btn blocked calendar-cell-btn-notify ${existingSub ? 'subscribed' : ''}`}
-                                  title={existingSub ? 'Cancelar aviso de disponibilidad' : 'Avisarme cuando esté disponible'}
+                                  title={existingSub
+                                    ? `Cancelar aviso activo para ${existingSub.targetDate}, ${existingSub.startTime}-${existingSub.endTime}`
+                                    : 'Avisarme cuando esté disponible'}
                                   aria-label={existingSub ? `Cancelar suscripción ${day.weekdayLabel} ${day.dateLabel} ${slot}` : `Suscribirse a disponibilidad ${day.weekdayLabel} ${day.dateLabel} ${slot}`}
                                   onClick={() => {
                                     if (existingSub) {

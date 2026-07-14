@@ -29,7 +29,6 @@ vi.mock('../../services/api', () => ({
     disable2fa: vi.fn(),
     confirmDisable2fa: vi.fn(),
     getRooms: vi.fn(),
-    getAvailableRooms: vi.fn(),
     createRoom: vi.fn(),
     updateRoom: vi.fn(),
     deleteRoom: vi.fn(),
@@ -40,6 +39,8 @@ vi.mock('../../services/api', () => ({
     cancelBooking: vi.fn(),
     downloadBookingIcs: vi.fn(),
     getAdminBookings: vi.fn(),
+    getAdminAttendance: vi.fn(),
+    updateAttendance: vi.fn(),
     getAdminConfig: vi.fn(),
     updateAdminConfig: vi.fn(),
     getCampusSchedules: vi.fn(),
@@ -55,7 +56,6 @@ vi.mock('../../services/api', () => ({
     revokeSession: vi.fn(),
     revokeAllSessions: vi.fn(),
     getMyActivity: vi.fn(),
-    requestSensitiveChange: vi.fn(),
     confirmSensitiveChange: vi.fn(),
     getLoginAttempts: vi.fn(),
     subscribeToRoom: vi.fn(),
@@ -169,7 +169,6 @@ beforeEach(() => {
   vi.mocked(api.disable2fa).mockReset().mockResolvedValue({ message: 'ok' })
   vi.mocked(api.confirmDisable2fa).mockReset().mockResolvedValue({ message: 'ok' })
   vi.mocked(api.getRooms).mockReset().mockResolvedValue({ ...emptyPage, size: 50 })
-  vi.mocked(api.getAvailableRooms).mockReset().mockResolvedValue([])
   vi.mocked(api.createRoom).mockReset()
   vi.mocked(api.updateRoom).mockReset()
   vi.mocked(api.deleteRoom).mockReset().mockResolvedValue(undefined)
@@ -180,6 +179,8 @@ beforeEach(() => {
   vi.mocked(api.cancelBooking).mockReset()
   vi.mocked(api.downloadBookingIcs).mockReset()
   vi.mocked(api.getAdminBookings).mockReset().mockResolvedValue(emptyPage)
+  vi.mocked(api.getAdminAttendance).mockReset().mockResolvedValue(emptyPage)
+  vi.mocked(api.updateAttendance).mockReset()
   vi.mocked(api.getAdminConfig).mockReset().mockResolvedValue({ maxActiveBookings: 1, maxDurationMinutes: 120 })
   vi.mocked(api.updateAdminConfig).mockReset()
   vi.mocked(api.getCampusSchedules).mockReset().mockResolvedValue({ campuses: [] })
@@ -200,8 +201,7 @@ beforeEach(() => {
   vi.mocked(api.getSessions).mockReset().mockResolvedValue({ sessions: [] })
   vi.mocked(api.revokeSession).mockReset()
   vi.mocked(api.revokeAllSessions).mockReset()
-  vi.mocked(api.getMyActivity).mockReset().mockResolvedValue({ content: [], page: 0, totalPages: 1 })
-  vi.mocked(api.requestSensitiveChange).mockReset()
+  vi.mocked(api.getMyActivity).mockReset().mockResolvedValue({ content: [], page: 0, totalPages: 1, totalElements: 0 })
   vi.mocked(api.confirmSensitiveChange).mockReset()
   vi.mocked(api.getLoginAttempts).mockReset().mockResolvedValue({ content: [], page: 0, totalPages: 1, totalElements: 0 })
   vi.mocked(api.subscribeToRoom).mockReset()
@@ -300,6 +300,21 @@ describe('Vista crítica: Salas / disponibilidad (admin)', () => {
   })
 })
 
+describe('Vista crítica: Asistencias (admin)', () => {
+  it('conecta la navegación con el listado paginado de asistencias', async () => {
+    localStorage.setItem('luistudio_login_landing_route', 'salas')
+    vi.mocked(api.login).mockResolvedValueOnce(loginResponse(adminUser))
+
+    renderApp()
+    await fillAndSubmitLogin(adminUser.email, 'Admin123!')
+    await screen.findByRole('heading', { name: 'Salas' })
+    fireEvent.click(screen.getAllByRole('button', { name: 'Asistencias' })[0])
+
+    expect(await screen.findByRole('heading', { name: 'Asistencias' })).toBeInTheDocument()
+    await waitFor(() => expect(api.getAdminAttendance).toHaveBeenCalled())
+  })
+})
+
 describe('Vista crítica: Perfil / configuración', () => {
   it('muestra el estado de carga y luego el historial de actividad obtenido vía HTTP mockeado', async () => {
     vi.mocked(api.login).mockResolvedValueOnce(loginResponse(studentUser))
@@ -327,6 +342,7 @@ describe('Vista crítica: Perfil / configuración', () => {
         content: [{ id: 1, action: 'LOGIN_SUCCESS', detail: null, createdAt: '2026-07-11T10:00:00Z' }],
         page: 0,
         totalPages: 1,
+        totalElements: 1,
       })
     })
 

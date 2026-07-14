@@ -54,6 +54,9 @@ public class RoomEntity {
     @Column(name = "max_people", nullable = false)
     private Integer maximoPersonas = 1;
 
+    @Column(name = "inventory_count", nullable = false)
+    private Integer cantidadUnidades = 1;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "noise_level", nullable = false, length = 10)
     private RoomNoiseLevel nivelRuido = RoomNoiseLevel.MEDIO;

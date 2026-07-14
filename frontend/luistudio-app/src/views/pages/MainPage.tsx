@@ -24,12 +24,14 @@ import { ResetPasswordPage } from './ResetPasswordPage'
 import { ConfirmSensitiveChangePage } from './ConfirmSensitiveChangePage'
 import { ReservasPage } from './ReservasPage'
 import type { AvailabilitySubscription } from './ReservasPage'
+import { AvailabilitySubscriptionsPage } from './AvailabilitySubscriptionsPage'
 import { SmartSearchPage } from './SmartSearchPage'
 import { MisReservasPage } from './MisReservasPage'
 import { CampusMapPage } from './CampusMapPage'
 import { SalasPage } from './SalasPage'
 import { PerfilesPage } from './PerfilesPage'
 import { AdminReservasPage } from './AdminReservasPage'
+import { AdminAttendancePage } from './AdminAttendancePage'
 import { ProfilePage } from './ProfilePage'
 import type { SessionItem, ActivityItem } from './ProfilePage'
 import { SecurityPage } from './SecurityPage'
@@ -47,7 +49,7 @@ import { TwoFactorModal } from '../components/modals/TwoFactorModal'
 import { MessageModal } from '../components/modals/MessageModal'
 import { ConfirmCancelBookingModal } from '../components/modals/ConfirmCancelBookingModal'
 import { GlobalTopbar } from '../components/layout/GlobalTopbar'
-import { api, type ApiAdminDashboard, type ApiCampusSchedule, type ApiIntelligentRoomSearchResponse, type ApiPreferences } from '../../services/api'
+import { api, type ApiAdminAttendance, type ApiAdminDashboard, type ApiCampusSchedule, type ApiIntelligentRoomSearchResponse, type ApiPreferences } from '../../services/api'
 
 interface NotificationItem {
   id: number
@@ -60,6 +62,7 @@ type NotificationPreferenceKey =
   | 'BOOKING_UPDATE'
   | 'BOOKING_CANCELLATION'
   | 'BOOKING_REMINDER'
+  | 'ABSENCE_NOTICE'
   | 'ROOM_MAINTENANCE'
   | 'ROOM_AVAILABLE'
   | 'PROFILE_STATUS'
@@ -171,6 +174,7 @@ const toUiRoom = (room: {
   supportsConcentration?: boolean
   roomType?: string
   equipment?: string[]
+  inventoryCount?: number
 }): Room => ({
   backendId: room.id,
   id: room.code,
@@ -198,6 +202,7 @@ const toUiRoom = (room: {
   supportsConcentration: room.supportsConcentration,
   roomType: room.roomType,
   equipment: room.equipment,
+  inventoryCount: Math.max(1, room.inventoryCount ?? 1),
 })
 
 const toApiRoomStatus = (status: RoomStatus): 'DISPONIBLE' | 'EN_MANTENIMIENTO' | 'INACTIVA' => {
@@ -270,6 +275,8 @@ const toUiBooking = (booking: {
   observation?: string
   googleCalendarUrl?: string
   icsUrl?: string
+  roomUnitNumber?: number | null
+  roomUnitLabel?: string | null
 }): Booking => ({
   id: `RES-${booking.id}`,
   backendId: booking.id,
@@ -287,6 +294,8 @@ const toUiBooking = (booking: {
   observation: booking.observation,
   googleCalendarUrl: booking.googleCalendarUrl,
   icsUrl: booking.icsUrl,
+  roomUnitNumber: booking.roomUnitNumber,
+  roomUnitLabel: booking.roomUnitLabel,
 })
 
 const formatDisplayDate = (isoDate: string) => {
@@ -392,6 +401,8 @@ const notificationPreferenceOptions = (role: Role): NotificationPreferenceOption
     { key: 'BOOKING_UPDATE', group: 'Reservas', label: 'Modificación de reserva', app: true, email: true },
     { key: 'BOOKING_CANCELLATION', group: 'Reservas', label: 'Cancelación de reserva', app: true, email: true },
     { key: 'BOOKING_REMINDER', group: 'Reservas', label: 'Recordatorio de reserva', app: true, email: true },
+    { key: 'ABSENCE_NOTICE', group: 'Reservas', label: 'Registro de inasistencia', app: true, email: true },
+    { key: 'ROOM_AVAILABLE', group: 'Disponibilidad', label: 'Sala nuevamente disponible', app: true, email: true },
   ]
   if (role === 'admin') {
     return [
@@ -551,6 +562,10 @@ export function MainPage() {
     status: 'Disponible',
     schedule: [],
     pabellonCode: '',
+    noiseLevel: 'MEDIO',
+    supportsConcentration: false,
+    roomType: 'GENERAL',
+    equipment: [],
   })
   const [roomNotice, setRoomNotice] = useState('')
   const [roomSuccessId, setRoomSuccessId] = useState('')
@@ -587,9 +602,23 @@ export function MainPage() {
   const [securityBlockFilter, setSecurityBlockFilter] = useState<'todos' | 'bloqueado' | 'sin-bloqueo'>('todos')
   const [securityFromFilter, setSecurityFromFilter] = useState('')
   const [securityToFilter, setSecurityToFilter] = useState('')
+  const [securitySort, setSecuritySort] = useState('date:desc')
   const [securityPage, setSecurityPage] = useState(1)
   const [securityTotalPages, setSecurityTotalPages] = useState(1)
   const [securityTotalElements, setSecurityTotalElements] = useState(0)
+
+  const [attendanceItems, setAttendanceItems] = useState<ApiAdminAttendance[]>([])
+  const [attendanceLoading, setAttendanceLoading] = useState(false)
+  const [attendanceQuery, setAttendanceQuery] = useState('')
+  const [attendanceCampus, setAttendanceCampus] = useState('Todos')
+  const [attendancePavilion, setAttendancePavilion] = useState('Todos')
+  const [attendanceStatus, setAttendanceStatus] = useState('Todos')
+  const [attendanceFrom, setAttendanceFrom] = useState('')
+  const [attendanceTo, setAttendanceTo] = useState('')
+  const [attendanceSort, setAttendanceSort] = useState('date:desc')
+  const [attendancePage, setAttendancePage] = useState(1)
+  const [attendanceTotalPages, setAttendanceTotalPages] = useState(1)
+  const [attendanceTotalElements, setAttendanceTotalElements] = useState(0)
 
   const [announcements, setAnnouncements] = useState<AnnouncementItem[]>([])
   const [announcementSending, setAnnouncementSending] = useState(false)
@@ -625,6 +654,10 @@ export function MainPage() {
   const [profileSessionsLoading, setProfileSessionsLoading] = useState(false)
   const [profileActivity, setProfileActivity] = useState<ActivityItem[]>([])
   const [profileActivityLoading, setProfileActivityLoading] = useState(false)
+  const [profileActivityFrom, setProfileActivityFrom] = useState('')
+  const [profileActivityTo, setProfileActivityTo] = useState('')
+  const [profileActivityPage, setProfileActivityPage] = useState(1)
+  const [profileActivityTotalPages, setProfileActivityTotalPages] = useState(1)
 
   const effectiveRoute = useMemo(
     () => resolveRouteByAuth(route, authenticatedUser, loginLandingRoute),
@@ -984,9 +1017,10 @@ export function MainPage() {
       const blockedParam = securityBlockFilter === 'todos' ? undefined : securityBlockFilter === 'bloqueado'
       const fromParam = securityFromFilter ? securityFromFilter + 'T00:00:00-05:00' : undefined
       const toParam = securityToFilter ? securityToFilter + 'T23:59:59-05:00' : undefined
+      const [sortBy, sortDir] = securitySort.split(':') as [string, 'asc' | 'desc']
       const result = await api.getLoginAttempts(
         authToken,
-        { user: securityUserFilter || undefined, email: securityEmailFilter || undefined, from: fromParam, to: toParam, success: successParam, blocked: blockedParam },
+        { user: securityUserFilter || undefined, email: securityEmailFilter || undefined, from: fromParam, to: toParam, success: successParam, blocked: blockedParam, sortBy, sortDir },
         securityPage - 1,
         10,
       )
@@ -1004,6 +1038,28 @@ export function MainPage() {
       setSecurityTotalElements(result.totalElements)
     } finally {
       setSecurityLoading(false)
+    }
+  }
+
+  const loadAttendance = async (authToken: string) => {
+    setAttendanceLoading(true)
+    try {
+      const [sortBy, sortDir] = attendanceSort.split(':') as [string, 'asc' | 'desc']
+      const result = await api.getAdminAttendance(authToken, {
+        query: attendanceQuery || undefined,
+        campus: attendanceCampus === 'Todos' ? undefined : attendanceCampus,
+        pavilion: attendancePavilion === 'Todos' ? undefined : attendancePavilion,
+        status: attendanceStatus === 'Todos' ? undefined : attendanceStatus,
+        from: attendanceFrom || undefined,
+        to: attendanceTo || undefined,
+        sortBy,
+        sortDir,
+      }, attendancePage - 1, 10)
+      setAttendanceItems(result.content)
+      setAttendanceTotalPages(Math.max(1, result.totalPages))
+      setAttendanceTotalElements(result.totalElements)
+    } finally {
+      setAttendanceLoading(false)
     }
   }
 
@@ -1078,6 +1134,10 @@ export function MainPage() {
       }
       if (targetRoute === 'seguridad') {
         await loadSecurityAttempts(authToken)
+        return
+      }
+      if (targetRoute === 'asistencias') {
+        await Promise.all([loadAttendance(authToken), loadRoomDirectory(authToken)])
       }
       return
     }
@@ -1092,6 +1152,10 @@ export function MainPage() {
     }
     if (targetRoute === 'reservas' || targetRoute === 'busqueda-inteligente') {
       await Promise.all([loadRooms(authToken), loadMySubscriptions(authToken)])
+      return
+    }
+    if (targetRoute === 'disponibilidad') {
+      await loadMySubscriptions(authToken)
     }
   }
 
@@ -1377,6 +1441,27 @@ export function MainPage() {
     securityBlockFilter,
     securityFromFilter,
     securityToFilter,
+    securitySort,
+    token,
+    authenticatedUser,
+    effectiveRoute,
+  ])
+
+  useEffect(() => {
+    if (!token || authenticatedUser?.role !== 'admin' || effectiveRoute !== 'asistencias') return
+    loadAttendance(token).catch((error) => {
+      const message = error instanceof Error ? error.message : 'No se pudo cargar el control de asistencias.'
+      setToastMessage(message)
+    })
+  }, [
+    attendancePage,
+    attendanceQuery,
+    attendanceCampus,
+    attendancePavilion,
+    attendanceStatus,
+    attendanceFrom,
+    attendanceTo,
+    attendanceSort,
     token,
     authenticatedUser,
     effectiveRoute,
@@ -1912,6 +1997,10 @@ export function MainPage() {
       status: 'Disponible',
       schedule: [],
       pabellonCode: buildPabellonCode(firstCampus, firstLocation),
+      noiseLevel: 'MEDIO',
+      supportsConcentration: false,
+      roomType: 'GENERAL',
+      equipment: [],
     })
     setRoomModalTargetId(null)
     setRoomModalMode('add')
@@ -1929,6 +2018,10 @@ export function MainPage() {
       status: room.status,
       schedule: room.schedule,
       pabellonCode: buildPabellonCode(room.campus, room.venue),
+      noiseLevel: room.noiseLevel ?? 'MEDIO',
+      supportsConcentration: room.supportsConcentration ?? false,
+      roomType: (room.roomType as RoomDraft['roomType'] | undefined) ?? 'GENERAL',
+      equipment: room.equipment ?? [],
     })
     setRoomModalTargetId(room.id)
     setRoomModalMode('edit')
@@ -2164,11 +2257,16 @@ export function MainPage() {
       .catch(() => {})
       .finally(() => setProfileSessionsLoading(false))
     setProfileActivityLoading(true)
-    api.getMyActivity(token)
-      .then((data) => setProfileActivity(data.content))
+    const activityFrom = profileActivityFrom ? `${profileActivityFrom}T00:00:00-05:00` : undefined
+    const activityTo = profileActivityTo ? `${profileActivityTo}T23:59:59-05:00` : undefined
+    api.getMyActivity(token, profileActivityPage - 1, 10, { from: activityFrom, to: activityTo })
+      .then((data) => {
+        setProfileActivity(data.content)
+        setProfileActivityTotalPages(Math.max(1, data.totalPages))
+      })
       .catch(() => {})
       .finally(() => setProfileActivityLoading(false))
-  }, [effectiveRoute, token])
+  }, [effectiveRoute, profileActivityFrom, profileActivityPage, profileActivityTo, token])
 
   const roomBookingsForSelectedRoom = useMemo(
     () => roomBookingsWindow.filter((booking) => booking.roomId === reservationForm.roomId),
@@ -2194,11 +2292,23 @@ export function MainPage() {
       const sub = mySubscriptions.find((s) => s.id === subscriptionId)
       if (!sub) return
       await api.unsubscribeFromRoom(token, sub.roomId)
-      setMySubscriptions((current) => current.filter((s) => s.id !== subscriptionId))
+      setMySubscriptions((current) => current.filter((s) => s.roomId !== sub.roomId))
       pushNotification('Suscripción de disponibilidad cancelada.', 'ROOM_AVAILABLE')
     } catch (error) {
       const message = error instanceof Error ? error.message : 'No se pudo cancelar la suscripción'
       setModalMessage({ title: 'Error al cancelar suscripción', message, variant: 'error' })
+    }
+  }
+
+  const handleMarkAttendance = async (bookingId: number, status: 'ASISTIO' | 'INASISTIO') => {
+    if (!token) return
+    try {
+      const updated = await api.updateAttendance(token, bookingId, status)
+      setAttendanceItems((current) => current.map((item) => item.bookingId === bookingId ? updated : item))
+      setToastMessage(status === 'ASISTIO' ? 'Asistencia registrada.' : 'Inasistencia registrada y notificada.')
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'No se pudo actualizar la asistencia.'
+      setModalMessage({ title: 'Error al actualizar asistencia', message, variant: 'error' })
     }
   }
 
@@ -2334,9 +2444,14 @@ export function MainPage() {
                 error={dashboardError}
                 from={dashboardFrom}
                 to={dashboardTo}
-                onFromChange={setDashboardFrom}
-                onToChange={setDashboardTo}
-                onApply={() => token && void loadDashboard(token)}
+                onFromChange={(value) => {
+                  setDashboardFrom(value)
+                  if (token && value && dashboardTo && value <= dashboardTo) void loadDashboard(token, value, dashboardTo)
+                }}
+                onToChange={(value) => {
+                  setDashboardTo(value)
+                  if (token && dashboardFrom && value && dashboardFrom <= value) void loadDashboard(token, dashboardFrom, value)
+                }}
                 onReset={() => {
                   const nextTo = getTodayIso()
                   const nextFromDate = new Date(); nextFromDate.setDate(nextFromDate.getDate() - 29)
@@ -2358,16 +2473,21 @@ export function MainPage() {
                 }}
               />
             )}
+            {effectiveRoute === 'disponibilidad' && (
+              <AvailabilitySubscriptionsPage
+                subscriptions={mySubscriptions}
+                onCancel={handleUnsubscribeFromSlot}
+                onGoToReserve={() => navigateToRoute('reservas')}
+              />
+            )}
             {effectiveRoute === 'misreservas' && (
               <MisReservasPage
                 myBookings={myBookings}
                 activeRooms={activeRooms}
-                mySubscriptions={mySubscriptions}
                 onEditBooking={openEditBooking}
                 onCancelBooking={(bookingId) => requestCancelBooking(bookingId, 'student')}
                 onCreateFirstReservation={() => navigateToRoute('reservas')}
                 onDownloadIcs={downloadBookingIcs}
-                onUnsubscribeFromSlot={handleUnsubscribeFromSlot}
               />
             )}
             {effectiveRoute === 'profile' && authenticatedUser && (
@@ -2377,6 +2497,14 @@ export function MainPage() {
                 sessionsLoading={profileSessionsLoading}
                 activity={profileActivity}
                 activityLoading={profileActivityLoading}
+                activityFrom={profileActivityFrom}
+                activityTo={profileActivityTo}
+                activityPage={profileActivityPage}
+                activityTotalPages={profileActivityTotalPages}
+                onActivityFromChange={(value) => { setProfileActivityFrom(value); setProfileActivityPage(1) }}
+                onActivityToChange={(value) => { setProfileActivityTo(value); setProfileActivityPage(1) }}
+                onActivityPageChange={setProfileActivityPage}
+                onClearActivityFilters={() => { setProfileActivityFrom(''); setProfileActivityTo(''); setProfileActivityPage(1) }}
                 onRevokeSession={async (sessionId) => {
                   if (!token) return
                   try {
@@ -2399,24 +2527,6 @@ export function MainPage() {
                     logout()
                   } catch {
                     setModalMessage({ title: 'Error', message: 'No se pudo revocar las sesiones', variant: 'error' })
-                  }
-                }}
-                onRequestDisable2fa={async () => {
-                  if (!token) return
-                  try {
-                    await api.requestSensitiveChange(token, 'DISABLE_2FA')
-                    setModalMessage({ title: 'Correo enviado', message: 'Revisa tu correo para confirmar la desactivación de 2FA.', variant: 'success' })
-                  } catch {
-                    setModalMessage({ title: 'Error', message: 'No se pudo enviar el correo de confirmación', variant: 'error' })
-                  }
-                }}
-                onRequestEnable2fa={async () => {
-                  if (!token) return
-                  try {
-                    await api.enroll2fa(token)
-                    setModalMessage({ title: 'Correo enviado', message: 'Revisa tu correo con el código para activar 2FA.', variant: 'success' })
-                  } catch {
-                    setModalMessage({ title: 'Error', message: 'No se pudo enviar el código', variant: 'error' })
                   }
                 }}
               />
@@ -2585,6 +2695,7 @@ export function MainPage() {
                 blockFilter={securityBlockFilter}
                 fromFilter={securityFromFilter}
                 toFilter={securityToFilter}
+                sortValue={securitySort}
                 page={securityPage}
                 totalPages={securityTotalPages}
                 totalElements={securityTotalElements}
@@ -2594,6 +2705,7 @@ export function MainPage() {
                 onBlockFilterChange={(value) => { setSecurityBlockFilter(value); setSecurityPage(1) }}
                 onFromFilterChange={(value) => { setSecurityFromFilter(value); setSecurityPage(1) }}
                 onToFilterChange={(value) => { setSecurityToFilter(value); setSecurityPage(1) }}
+                onSortChange={(value) => { setSecuritySort(value); setSecurityPage(1) }}
                 onPrevPage={() => setSecurityPage((current) => current - 1)}
                 onNextPage={() => setSecurityPage((current) => current + 1)}
                 onClearFilters={() => {
@@ -2603,8 +2715,46 @@ export function MainPage() {
                   setSecurityBlockFilter('todos')
                   setSecurityFromFilter('')
                   setSecurityToFilter('')
+                  setSecuritySort('date:desc')
                   setSecurityPage(1)
                 }}
+              />
+            )}
+            {effectiveRoute === 'asistencias' && (
+              <AdminAttendancePage
+                items={attendanceItems}
+                rooms={roomDirectory}
+                loading={attendanceLoading}
+                query={attendanceQuery}
+                campus={attendanceCampus}
+                pavilion={attendancePavilion}
+                status={attendanceStatus}
+                from={attendanceFrom}
+                to={attendanceTo}
+                sort={attendanceSort}
+                page={attendancePage}
+                totalPages={attendanceTotalPages}
+                totalElements={attendanceTotalElements}
+                onQueryChange={(value) => { setAttendanceQuery(value); setAttendancePage(1) }}
+                onCampusChange={(value) => { setAttendanceCampus(value); setAttendancePavilion('Todos'); setAttendancePage(1) }}
+                onPavilionChange={(value) => { setAttendancePavilion(value); setAttendancePage(1) }}
+                onStatusChange={(value) => { setAttendanceStatus(value); setAttendancePage(1) }}
+                onFromChange={(value) => { setAttendanceFrom(value); setAttendancePage(1) }}
+                onToChange={(value) => { setAttendanceTo(value); setAttendancePage(1) }}
+                onSortChange={(value) => { setAttendanceSort(value); setAttendancePage(1) }}
+                onClear={() => {
+                  setAttendanceQuery('')
+                  setAttendanceCampus('Todos')
+                  setAttendancePavilion('Todos')
+                  setAttendanceStatus('Todos')
+                  setAttendanceFrom('')
+                  setAttendanceTo('')
+                  setAttendanceSort('date:desc')
+                  setAttendancePage(1)
+                }}
+                onPrev={() => setAttendancePage(Math.max(1, attendancePage - 1))}
+                onNext={() => setAttendancePage(Math.min(attendanceTotalPages, attendancePage + 1))}
+                onMark={handleMarkAttendance}
               />
             )}
             {effectiveRoute === 'comunicados' && (

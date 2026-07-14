@@ -105,6 +105,7 @@ CREATE TABLE IF NOT EXISTS rooms (
   min_people INTEGER NOT NULL DEFAULT 1,
   min_people_required BOOLEAN NOT NULL DEFAULT FALSE,
   max_people INTEGER NOT NULL DEFAULT 1,
+  inventory_count INTEGER NOT NULL DEFAULT 1,
   noise_level VARCHAR(10) NOT NULL DEFAULT 'MEDIO',
   supports_concentration BOOLEAN NOT NULL DEFAULT FALSE,
   room_type VARCHAR(30) NOT NULL DEFAULT 'GENERAL',
@@ -117,6 +118,7 @@ CREATE TABLE IF NOT EXISTS rooms (
     AND max_people > 0
     AND max_people >= min_people
     AND max_people <= capacity
+    AND inventory_count > 0
   ),
   CONSTRAINT chk_sala_estado CHECK (status IN ('DISPONIBLE', 'EN_MANTENIMIENTO', 'INACTIVA')),
   CONSTRAINT chk_sala_ruido CHECK (noise_level IN ('BAJO', 'MEDIO', 'ALTO')),
@@ -193,6 +195,7 @@ CREATE TABLE IF NOT EXISTS bookings (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_by BIGINT,
   attendance_status VARCHAR(20),
+  room_unit_number INTEGER NOT NULL DEFAULT 1,
   CONSTRAINT fk_reserva_usuario FOREIGN KEY (user_id) REFERENCES users(id),
   CONSTRAINT fk_reserva_sala FOREIGN KEY (room_id) REFERENCES rooms(id),
   CONSTRAINT chk_reserva_horas CHECK (end_time > start_time),
@@ -200,6 +203,17 @@ CREATE TABLE IF NOT EXISTS bookings (
   CONSTRAINT chk_reserva_personas CHECK (people_count > 0),
   CONSTRAINT chk_booking_attendance CHECK (attendance_status IN ('ASISTIO', 'INASISTIO'))
 );
+
+-- Compatibilidad al aplicar el esquema sobre una base creada por una versión anterior.
+ALTER TABLE rooms ADD COLUMN IF NOT EXISTS inventory_count INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE rooms DROP CONSTRAINT IF EXISTS chk_rooms_inventory;
+ALTER TABLE rooms ADD CONSTRAINT chk_rooms_inventory CHECK (inventory_count > 0);
+ALTER TABLE bookings ADD COLUMN IF NOT EXISTS room_unit_number INTEGER DEFAULT 1;
+UPDATE bookings SET room_unit_number = 1 WHERE room_unit_number IS NULL;
+ALTER TABLE bookings ALTER COLUMN room_unit_number SET DEFAULT 1;
+ALTER TABLE bookings ALTER COLUMN room_unit_number SET NOT NULL;
+ALTER TABLE bookings DROP CONSTRAINT IF EXISTS chk_booking_room_unit;
+ALTER TABLE bookings ADD CONSTRAINT chk_booking_room_unit CHECK (room_unit_number > 0);
 
 CREATE TABLE IF NOT EXISTS notification_preferences (
   id BIGSERIAL PRIMARY KEY,
@@ -294,11 +308,24 @@ CREATE TABLE IF NOT EXISTS attendance_records (
   id BIGSERIAL PRIMARY KEY,
   booking_id BIGINT NOT NULL UNIQUE,
   user_id BIGINT NOT NULL,
+  status VARCHAR(20) NOT NULL DEFAULT 'INASISTIO',
+  recorded_by BIGINT,
   recorded_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   tolerance_minutes INTEGER NOT NULL DEFAULT 15,
   CONSTRAINT fk_attendance_booking FOREIGN KEY (booking_id) REFERENCES bookings(id),
-  CONSTRAINT fk_attendance_user FOREIGN KEY (user_id) REFERENCES users(id)
+  CONSTRAINT fk_attendance_user FOREIGN KEY (user_id) REFERENCES users(id),
+  CONSTRAINT fk_attendance_recorded_by FOREIGN KEY (recorded_by) REFERENCES users(id),
+  CONSTRAINT chk_attendance_record_status CHECK (status IN ('ASISTIO', 'INASISTIO'))
 );
+
+ALTER TABLE attendance_records ADD COLUMN IF NOT EXISTS status VARCHAR(20) NOT NULL DEFAULT 'INASISTIO';
+ALTER TABLE attendance_records ADD COLUMN IF NOT EXISTS recorded_by BIGINT;
+ALTER TABLE attendance_records DROP CONSTRAINT IF EXISTS chk_attendance_record_status;
+ALTER TABLE attendance_records ADD CONSTRAINT chk_attendance_record_status CHECK (status IN ('ASISTIO', 'INASISTIO'));
+DO $$ BEGIN
+  ALTER TABLE attendance_records ADD CONSTRAINT fk_attendance_recorded_by FOREIGN KEY (recorded_by) REFERENCES users(id);
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
 CREATE TABLE IF NOT EXISTS room_availability_subscriptions (
   id BIGSERIAL PRIMARY KEY,
@@ -337,6 +364,7 @@ CREATE INDEX IF NOT EXISTS idx_campus_schedule_campus_day ON campus_schedules (c
 CREATE INDEX IF NOT EXISTS idx_room_schedule_room_day ON room_schedules (room_id, day_of_week);
 CREATE INDEX IF NOT EXISTS idx_bookings_user_date ON bookings (user_id, booking_date);
 CREATE INDEX IF NOT EXISTS idx_bookings_room_date_hours ON bookings (room_id, booking_date, start_time, end_time);
+CREATE INDEX IF NOT EXISTS idx_bookings_room_unit_date_hours ON bookings (room_id, room_unit_number, booking_date, start_time, end_time);
 CREATE INDEX IF NOT EXISTS idx_intento_login_usuario_fecha ON login_attempts (user_id, attempted_at);
 CREATE INDEX IF NOT EXISTS idx_users_email_lower ON users (LOWER(email));
 CREATE INDEX IF NOT EXISTS idx_login_attempts_user_success_attempted ON login_attempts (user_id, success, attempted_at);
@@ -348,6 +376,7 @@ CREATE INDEX IF NOT EXISTS idx_login_sessions_jti ON login_sessions (jti);
 CREATE INDEX IF NOT EXISTS idx_sensitive_tokens_token_used ON sensitive_change_tokens (token, used);
 CREATE INDEX IF NOT EXISTS idx_attendance_records_booking ON attendance_records (booking_id);
 CREATE INDEX IF NOT EXISTS idx_attendance_records_user ON attendance_records (user_id);
+CREATE INDEX IF NOT EXISTS idx_attendance_records_status_date ON attendance_records (status, recorded_at DESC);
 CREATE UNIQUE INDEX IF NOT EXISTS uq_avail_sub_active ON room_availability_subscriptions (user_id, room_id) WHERE status IN ('ACTIVA', 'EN_COLA');
 CREATE INDEX IF NOT EXISTS idx_avail_sub_user ON room_availability_subscriptions (user_id);
 CREATE INDEX IF NOT EXISTS idx_avail_sub_room_date_status ON room_availability_subscriptions (room_id, target_date, status);

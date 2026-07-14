@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import type { FormEvent } from 'react'
 import type { RoomDraft, ScheduleDay } from '../../../models/types'
 import { buildPabellonCode } from '../../../utils/helpers'
@@ -37,8 +38,16 @@ export function RoomFormModal({
   onCancel,
   onSubmit,
 }: RoomFormModalProps) {
+  const [equipmentInput, setEquipmentInput] = useState('')
   const schedule = draft.schedule.length > 0 ? draft.schedule : defaultSchedule
   const venues = venueOptionsByCampus.get(draft.campus) ?? []
+
+  const addEquipment = () => {
+    const normalized = equipmentInput.trim().toLowerCase()
+    if (!normalized || draft.equipment.includes(normalized)) return
+    onChange({ ...draft, equipment: [...draft.equipment, normalized] })
+    setEquipmentInput('')
+  }
 
   const updateScheduleDay = (dayOfWeek: number, patch: Partial<ScheduleDay>) => {
     const nextSchedule = schedule.map((day) =>
@@ -178,6 +187,99 @@ export function RoomFormModal({
             />
             Mínimo obligatorio para reservar
           </label>
+
+          <fieldset className="rounded-xl border border-slate-200 p-4">
+            <legend className="px-2 text-sm font-semibold text-slate-800">Datos para búsqueda inteligente</legend>
+            <p className="mb-4 mt-0 text-xs text-slate-500">
+              Estos atributos se guardan por sala y se usan para filtrar y ordenar las recomendaciones.
+            </p>
+
+            <div className="form-grid two-cols">
+              <div>
+                <label htmlFor="room-type">Tipo de sala</label>
+                <select
+                  id="room-type"
+                  value={draft.roomType}
+                  onChange={(event) => onChange({ ...draft, roomType: event.target.value as RoomDraft['roomType'] })}
+                >
+                  <option value="GENERAL">General</option>
+                  <option value="ESTUDIO_INDIVIDUAL">Estudio individual</option>
+                  <option value="ESTUDIO_GRUPAL">Estudio grupal</option>
+                  <option value="REUNION">Reunión</option>
+                  <option value="PRESENTACION">Presentación</option>
+                </select>
+              </div>
+
+              <div>
+                <label htmlFor="room-noise-level">Nivel de ruido</label>
+                <select
+                  id="room-noise-level"
+                  value={draft.noiseLevel}
+                  onChange={(event) => onChange({ ...draft, noiseLevel: event.target.value as RoomDraft['noiseLevel'] })}
+                >
+                  <option value="BAJO">Bajo</option>
+                  <option value="MEDIO">Medio</option>
+                  <option value="ALTO">Alto</option>
+                </select>
+              </div>
+            </div>
+
+            <label className="remember-check mt-3">
+              <input
+                type="checkbox"
+                checked={draft.supportsConcentration}
+                onChange={(event) => onChange({ ...draft, supportsConcentration: event.target.checked })}
+              />
+              Apta para actividades que requieren concentración
+            </label>
+
+            <div className="mt-3">
+              <label htmlFor="room-equipment">Equipamiento</label>
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <input
+                  id="room-equipment"
+                  type="text"
+                  maxLength={50}
+                  value={equipmentInput}
+                  placeholder="Ej.: proyector, pizarra, computadora"
+                  onChange={(event) => setEquipmentInput(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') {
+                      event.preventDefault()
+                      addEquipment()
+                    }
+                  }}
+                />
+                <button
+                  type="button"
+                  className="inline-flex min-h-10 shrink-0 items-center justify-center rounded-full border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                  disabled={!equipmentInput.trim()}
+                  onClick={addEquipment}
+                >
+                  Agregar
+                </button>
+              </div>
+              {draft.equipment.length > 0 ? (
+                <div className="mt-3 flex flex-wrap gap-2" aria-label="Equipamiento registrado">
+                  {draft.equipment.map((item) => (
+                    <span key={item} className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
+                      {item}
+                      <button
+                        type="button"
+                        className="text-base leading-none text-slate-500 hover:text-red-600"
+                        aria-label={`Quitar ${item}`}
+                        onClick={() => onChange({ ...draft, equipment: draft.equipment.filter((value) => value !== item) })}
+                      >
+                        ×
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <p className="mb-0 mt-2 text-xs text-slate-500">Sin equipamiento registrado.</p>
+              )}
+            </div>
+          </fieldset>
 
           <div>
             <p className="m-0 mb-2 text-xs font-semibold text-slate-700">Horario de disponibilidad por sala</p>

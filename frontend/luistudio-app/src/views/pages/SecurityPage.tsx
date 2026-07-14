@@ -22,6 +22,7 @@ interface SecurityPageProps {
   blockFilter: 'todos' | 'bloqueado' | 'sin-bloqueo'
   fromFilter: string
   toFilter: string
+  sortValue: string
   page: number
   totalPages: number
   totalElements: number
@@ -31,6 +32,7 @@ interface SecurityPageProps {
   onBlockFilterChange: (value: 'todos' | 'bloqueado' | 'sin-bloqueo') => void
   onFromFilterChange: (value: string) => void
   onToFilterChange: (value: string) => void
+  onSortChange: (value: string) => void
   onPrevPage: () => void
   onNextPage: () => void
   onClearFilters: () => void
@@ -88,6 +90,7 @@ export function SecurityPage({
   blockFilter,
   fromFilter,
   toFilter,
+  sortValue,
   page,
   totalPages,
   totalElements,
@@ -97,6 +100,7 @@ export function SecurityPage({
   onBlockFilterChange,
   onFromFilterChange,
   onToFilterChange,
+  onSortChange,
   onPrevPage,
   onNextPage,
   onClearFilters,
@@ -107,7 +111,8 @@ export function SecurityPage({
     statusFilter === 'todos' &&
     blockFilter === 'todos' &&
     fromFilter === '' &&
-    toFilter === ''
+    toFilter === '' &&
+    sortValue === 'date:desc'
 
   return (
     <main className="page dashboard-page">
@@ -166,6 +171,20 @@ export function SecurityPage({
                 ariaLabel: 'Hasta fecha',
               },
             ]}
+            sortControls={[{
+              id: 'security-sort-control',
+              value: sortValue,
+              onChange: onSortChange,
+              options: [
+                { value: 'date:desc', label: 'Más recientes' },
+                { value: 'date:asc', label: 'Más antiguos' },
+                { value: 'email:asc', label: 'Correo A-Z' },
+                { value: 'email:desc', label: 'Correo Z-A' },
+                { value: 'status:asc', label: 'Fallidos primero' },
+                { value: 'status:desc', label: 'Exitosos primero' },
+                { value: 'block:desc', label: 'Bloqueados primero' },
+              ],
+            }]}
             quickChips={[]}
             actions={
               <button

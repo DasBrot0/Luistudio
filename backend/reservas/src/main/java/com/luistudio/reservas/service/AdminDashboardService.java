@@ -119,7 +119,7 @@ public class AdminDashboardService {
             .sum();
         long available = from.datesUntil(to.plusDays(1))
             .mapToLong(date -> scheduleMinutes(resolveSchedule(schedules, campusSchedules, toDatabaseDay(date.getDayOfWeek()))))
-            .sum();
+            .sum() * inventoryCount(room);
         return new AdminDashboardResponse.RoomOccupancy(
             room.getId(), room.getCodigo(), room.getNombre(), reserved, available, percentage(reserved, available)
         );
@@ -201,7 +201,7 @@ public class AdminDashboardService {
                     campusSchedules(room, schedulesByCampus),
                     toDatabaseDay(date.getDayOfWeek())
                 );
-                return scheduleMinutes(schedule);
+                return scheduleMinutes(schedule) * inventoryCount(room);
             }).sum();
             return new AdminDashboardResponse.DailyOccupancy(date, reserved, available, percentage(reserved, available));
         }).toList();
@@ -229,7 +229,7 @@ public class AdminDashboardService {
             );
             if (schedule != null && !schedule.closed() && schedule.open() != null && schedule.close() != null) {
                 accumulateHours(date.getDayOfWeek().getValue(), schedule.open(), schedule.close(),
-                    (key, minutes) -> available.merge(key, minutes, Long::sum));
+                    (key, minutes) -> available.merge(key, minutes * inventoryCount(room), Long::sum));
             }
         }));
         return available.entrySet().stream().map(entry -> {
@@ -257,6 +257,10 @@ public class AdminDashboardService {
 
     private long durationMinutes(ReservationEntity reservation) {
         return Duration.between(reservation.getHoraInicio(), reservation.getHoraFin()).toMinutes();
+    }
+
+    private int inventoryCount(RoomEntity room) {
+        return room.getCantidadUnidades() == null ? 1 : room.getCantidadUnidades();
     }
 
     private List<CampusScheduleEntity> campusSchedules(

@@ -103,7 +103,6 @@ Memoria (500 MB):
 - `POST /api/auth/2fa/verify`
 - `POST /api/auth/2fa/disable`
 - `POST /api/auth/2fa/disable/confirm`
-- `POST /api/auth/sensitive-change/request`
 - `POST /api/auth/sensitive-change/confirm`
 - `GET /api/me/sessions`
 - `DELETE /api/me/sessions/{sessionId}`
@@ -114,7 +113,6 @@ Memoria (500 MB):
 
 - `GET /api/rooms?page&size&includeSchedule&campus&recinto&ubicacion&q`
   - Devuelve `PageResponse<RoomResponse>`. Por defecto `includeSchedule=false` para listar salas sin cargar horarios completos.
-- `GET /api/rooms/available?fecha&horaInicio&horaFin`
 - `POST /api/rooms/intelligent-search`
   - Requiere sesión y recibe `{ "query", "date", "start", "end", "limit" }`.
   - Groq interpreta `query` a una intención tipada. El backend valida esa intención, filtra por disponibilidad y metadata y calcula un ranking determinista; la IA no recibe el catálogo ni elige salas.
@@ -122,10 +120,7 @@ Memoria (500 MB):
 - `GET /api/rooms/{id}/bookings?desde&hasta`
 - `POST /api/rooms`
 - `PUT /api/rooms/{id}`
-- `PATCH /api/rooms/{id}`
 - `DELETE /api/rooms/{id}`
-- `POST /api/rooms/{id}/unavailability`
-- `GET /api/rooms/{id}/unavailability`
 - `POST /api/rooms/{id}/availability-subscriptions`
 - `DELETE /api/rooms/{id}/availability-subscriptions/me`
 - `GET /api/me/availability-subscriptions`
@@ -139,6 +134,8 @@ Memoria (500 MB):
   - Devuelve `PageResponse<BookingResponse>`.
 - `GET /api/bookings/{id}/ics` descarga un archivo calendario para reservas confirmadas propias del estudiante autenticado. Convierte horarios locales con zona `America/Lima` a UTC.
 - `GET /api/admin/bookings`
+- `GET /api/admin/attendance?query&campus&pavilion&status&from&to&page&size&sortBy&sortDir`
+- `PATCH /api/admin/attendance/{bookingId}`
 
 ### Administración
 
@@ -181,7 +178,7 @@ Memoria (500 MB):
 - CORS cachea preflight por 3600 segundos; los `GET` simples del frontend no envian `Content-Type` para evitar `OPTIONS` innecesarios.
 - Los índices de autenticación forman parte de `database/001_init.sql`.
 - La estructura y los datos iniciales de búsqueda inteligente están consolidados en `database/001_init.sql` y `database/002_seed_release01.sql`.
-- `database/002_seed_release01.sql` incluye datos de demostración idempotentes para Dashboard, Mapa y Seguridad: usuarios genéricos `@gmail.com`, reservas históricas, una ocupación actual y un mantenimiento activo. Las filas se identifican con valores `DEMO_*` para evitar duplicados al reaplicar el seed.
+- `database/002_seed_release01.sql` incluye datos de demostración idempotentes para Dashboard, Mapa y Seguridad: 100 estudiantes con estados y 2FA variados, una cuenta temporalmente bloqueada (`DEMO005`), 720 reservas históricas repartidas uniformemente de lunes a sábado y entre las 08:00 y 18:00, 120 reservas futuras, ocupaciones actuales, horarios específicos por sala, un mantenimiento activo e intentos de acceso desde distintos dispositivos. Las filas controladas se identifican con valores `DEMO_*` para poder regenerarlas sin duplicados.
 - El listado administrativo de usuarios expone si una cuenta sigue bloqueada temporalmente y permite desbloquearla al volver a `HABILITADO`.
 - Se implementa 2FA por código temporal.
 - Los tokens de sesión y tokens provisionales viajan cifrados y se entregan en cookie `HttpOnly`.
@@ -196,6 +193,7 @@ Memoria (500 MB):
 - Los tests de backend incluyen un contrato que compara entidades JPA contra `database/001_init.sql` para detectar tablas/columnas desalineadas antes de desplegar.
 - Para una instalación limpia, ejecutar `001_init.sql` y después `002_seed_release01.sql`; el script `003_drop_all_tables.sql` permite reiniciarla.
 - El catálogo está normalizado como `campuses -> buildings -> rooms`: campus y recinto se derivan del pabellón, y la sala solo guarda su ubicación interna.
+- El campus Monterrico incluye el `Edificio M - Biblioteca Antonio Pinilla`, ubicado aproximadamente sobre la referencia del mapa institucional, con salas de estudio y visionado entre los pisos 2 y 7.
 - El listado de salas usa paginación y respuesta ligera por defecto; la creación/edición conserva horario completo en la respuesta.
 - Los listados de reservas que se mapean a DTO cargan usuario y sala con `EntityGraph` para evitar N+1.
 - El mapa de campus agrupa salas por pabellón desde una carga única y resuelve ocupación/mantenimiento con sets por id.
@@ -266,6 +264,7 @@ Si falta alguna credencial, el sistema hace fallback a `log` y deja warning en l
 - Los endpoints de escritura validan longitudes y formatos de entrada alineados con los tamaños de columna (ej. estado VARCHAR(20), observaciones/motivos VARCHAR(255), textos de sala VARCHAR(120/160)), para evitar errores SQL por datos demasiado largos.
 
 - 2FA opcional configurable por usuario desde Configuración: activar/desactivar requiere código de confirmación enviado por correo.
+- Las cuentas institucionales `@aloe.ulima.edu.pe` incluidas en el seed se crean con 2FA desactivado; cada usuario puede activarlo posteriormente desde Configuración.
 - Los correos salientes se renderizan con `EmailTemplateService`, una plantilla HTML unificada para alertas, recuperación de contraseña, 2FA, reservas y recordatorios; no hay layouts HTML duplicados en los servicios de negocio.
 - Correos de 2FA (activación, desactivación e inicio de sesión) ajustados con tildes correctas y render de código sin duplicados en plantilla HTML.
 - Para desarrollo, el backend incluye spring-boot-devtools (runtime) para reinicio automático al detectar cambios mientras se ejecuta ./mvnw spring-boot:run.
@@ -281,18 +280,33 @@ Si falta alguna credencial, el sistema hace fallback a `log` y deja warning en l
 - La respuesta del dashboard incluye tendencia diaria de ocupación, celdas día/hora para el mapa de calor, conteos de asistencia/inasistencia/pendientes e inasistencias por estudiante.
 - `ADMIN_DASHBOARD` y su valor inicial para administradores forman parte de `database/001_init.sql` y `database/002_seed_release01.sql`.
 - `POST /api/rooms/intelligent-search` interpreta texto mediante `RoomIntentInterpreter`, filtra disponibilidad y aplica un ranking local determinista. `limit` admite valores de 1 a 3 (3 por defecto).
+- Los atributos administrables por sala (`room_type`, `noise_level`, `supports_concentration` y `room_equipment`) se reciben en el alta/edición de salas; enviar `equipment: []` elimina el equipamiento registrado para esa sala.
 - La IA solo estructura la intención; nunca decide el orden final ni recibe la decisión de sala.
 
 ## Seguridad, disponibilidad e inasistencias del Release 2
 
+- `GET` y `HEAD /actuator/health` son públicos para el monitor de uptime. Los endpoints funcionales requieren sesión, salvo los puntos mínimos que inician o confirman login y recuperación de acceso.
+- Se retiraron contratos HTTP sin consumidor (`rooms/available`, endpoints de indisponibilidad/mantenimiento manual, `PATCH /rooms/{id}` y confirmación duplicada de reserva); el frontend usa los contratos restantes.
+- `GET /api/me/activity` acepta `from`, `to`, `page` y `size`; el historial personal se filtra y pagina en base de datos. El historial administrativo de accesos también admite `sortBy` (`date`, `email`, `status`, `block`) y `sortDir`.
 - Spring procesa encabezados reenviados del proxy para conservar la IP real del acceso. El primer acceso crea la referencia; los siguientes alertan por IP o tipo de dispositivo no reconocido.
 - El usuario puede revocar una sesión propia, la sesión actual o todas sus sesiones sin aprobación administrativa. La confirmación por correo se conserva para desactivar 2FA.
-- Las suscripciones evitan duplicados activos por usuario y sala. Un scheduler comprueba cada minuto si el horario quedó libre; usa `EN_COLA` para evitar correos duplicados y cambia a `NOTIFICADA` solo después del envío exitoso.
+- Las suscripciones evitan duplicados activos por usuario y sala. Un scheduler comprueba periódicamente si el horario quedó libre; usa `EN_COLA` para evitar correos duplicados y cambia a `NOTIFICADA` solo después del envío exitoso.
+- Si el correo de disponibilidad agota sus tres intentos, la suscripción vuelve de `EN_COLA` a `ACTIVA` para que pueda reintentarse en un ciclo posterior.
 - Editar una reserva también notifica a los suscriptores del horario anterior cuando este queda libre.
 - Los comunicados recorren en lotes de 200 a todos los estudiantes habilitados, sin un tope total de destinatarios.
 - `BookingResponse.attendanceStatus` expone `ASISTIO`, `INASISTIO` o `null` para el historial del estudiante.
+- El control automático de asistencia corre cada minuto y registra `INASISTIO` cuando han transcurrido 15 minutos desde el inicio. También recupera reservas activas de días anteriores que hubieran quedado pendientes y encola el correo al estudiante.
+- `attendance_records` conserva la auditoría (`status`, `recorded_at`, `recorded_by`) y `bookings.attendance_status` mantiene el estado actual consultado por las vistas, sin tablas paralelas para sanciones o fechas de impedimento que este release no implementa.
+- La administración lista asistencias con filtros y paginación de backend, incluido campus y pabellón, y puede corregir una reserva a `ASISTIO` o `INASISTIO`.
 - El scheduler de mantenimiento sincroniza `PROGRAMADO`, `EN_CURSO` y `FINALIZADO`, bloquea la sala solo durante el intervalo vigente y la devuelve a `DISPONIBLE` al terminar.
-- El seed regenera reservas `DEMO_DASHBOARD_*` dentro del horario y capacidad configurados, elimina `DEMO_MAP_CURRENT` y oculta del mapa pabellones sin salas activas.
+- El seed regenera reservas `DEMO_DASHBOARD_*`, `DEMO_FUTURE_*` y `DEMO_MAP_CURRENT_*` con variedad de campus, salas, fechas, horas, asistencia y estados; además oculta del mapa pabellones sin salas activas.
+
+## Inventario físico de salas
+
+- `rooms.inventory_count` conserva una sola sala lógica por tipo, piso y edificio, y registra cuántas unidades físicas existen. El seed configura 4 cubículos, 2 salas de visionado, 4 salas grupales de 6 personas y 2 salas grupales de 8 personas solo donde esos recursos ya existían.
+- `bookings.room_unit_number` identifica la unidad física asignada a cada reserva. El backend toma un bloqueo pesimista sobre la sala y elige la primera unidad libre para evitar sobreventa ante solicitudes simultáneas.
+- La disponibilidad se agota cuando la cantidad de reservas superpuestas alcanza `inventory_count`; estudiantes y suscripciones trabajan con la sala lógica, mientras la respuesta administrativa expone `roomUnitNumber` y `roomUnitLabel`.
+- El mapa y el dashboard consideran el inventario total: una sala lógica solo figura ocupada cuando todas sus unidades están reservadas y los denominadores de ocupación se multiplican por la cantidad de unidades.
 
 # Mapa de disponibilidad E1-H10
 
