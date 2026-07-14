@@ -52,6 +52,7 @@ export function FilterBar({
 }: FilterBarProps) {
   const hasSearch = typeof onSearchChange === 'function'
   const hasPanelContent = filters.length > 0 || sortControls.length > 0 || quickChips.length > 0 || Boolean(actions)
+  const hasOrderControls = sortControls.length > 0 || (quickChipsPlacement === 'sort-row' && quickChips.length > 0)
   const [filtersOpen, setFiltersOpen] = useState(true)
   const renderControl = (filter: FilterConfig) => {
     if (filter.type === 'date' || filter.type === 'text') {
@@ -136,7 +137,7 @@ export function FilterBar({
                 </div>
               ) : null}
 
-              {(sortControls.length > 0 || quickChipsPlacement === 'sort-row' || actions) ? (
+              {hasOrderControls ? (
                 <div className="filter-bar-section filter-bar-order-section">
                   <p className="filter-bar-label">Ordenar por</p>
                   <div className="filter-bar-order-row">
@@ -163,8 +164,9 @@ export function FilterBar({
                   </div>
                 </div>
               ) : null}
+              {!hasOrderControls && actions ? <div className="filter-bar-panel-actions filter-bar-standalone-actions">{actions}</div> : null}
             </>
-          ) : null}
+          ) : !hasOrderControls && actions ? <div className="filter-bar-panel-actions filter-bar-standalone-actions">{actions}</div> : null}
 
           {quickChipsPlacement === 'bottom' && quickChips.length > 0 ? (
             <div className="filter-bar-panel-bottom">

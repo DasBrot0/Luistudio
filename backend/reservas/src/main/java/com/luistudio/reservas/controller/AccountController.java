@@ -17,10 +17,20 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import java.time.OffsetDateTime;
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/me")
 public class AccountController {
+
+    private static final List<String> ACTIVITY_ACTIONS = List.of(
+        "LOGIN_SUCCESS",
+        "LOGOUT_CURRENT",
+        "LOGOUT_REMOTE",
+        "LOGOUT_ALL",
+        "SENSITIVE_CHANGE_CONFIRMED",
+        "LOGIN_UNUSUAL_ACCESS"
+    );
 
     private final AccessGuard accessGuard;
     private final UserService userService;
@@ -52,12 +62,8 @@ public class AccountController {
         int safeSize = Math.min(Math.max(size, 1), 50);
         OffsetDateTime fromDt = from != null && !from.isBlank() ? OffsetDateTime.parse(from) : null;
         OffsetDateTime toDt = to != null && !to.isBlank() ? OffsetDateTime.parse(to) : null;
-        Page<AuditLogEntity> result = auditLogRepository.findActivityByActor(
-            user,
-            fromDt,
-            toDt,
-            PageRequest.of(safePage, safeSize)
-        );
+        PageRequest pageable = PageRequest.of(safePage, safeSize);
+        Page<AuditLogEntity> result = findActivity(user, fromDt, toDt, pageable);
         return new PageResponse<>(
             result.getContent().stream().map(a -> new ActivityEventResponse(
                 a.getId(),
@@ -70,6 +76,24 @@ public class AccountController {
             result.getTotalElements(),
             result.getTotalPages()
         );
+    }
+
+    private Page<AuditLogEntity> findActivity(
+        UserEntity user,
+        OffsetDateTime from,
+        OffsetDateTime to,
+        PageRequest pageable
+    ) {
+        if (from == null && to == null) {
+            return auditLogRepository.findByActorAndAccionInOrderByCreadoEnDesc(user, ACTIVITY_ACTIONS, pageable);
+        }
+        if (from == null) {
+            return auditLogRepository.findByActorAndAccionInAndCreadoEnLessThanEqualOrderByCreadoEnDesc(user, ACTIVITY_ACTIONS, to, pageable);
+        }
+        if (to == null) {
+            return auditLogRepository.findByActorAndAccionInAndCreadoEnGreaterThanEqualOrderByCreadoEnDesc(user, ACTIVITY_ACTIONS, from, pageable);
+        }
+        return auditLogRepository.findByActorAndAccionInAndCreadoEnBetweenOrderByCreadoEnDesc(user, ACTIVITY_ACTIONS, from, to, pageable);
     }
 
     @GetMapping("/availability-subscriptions")

@@ -1928,6 +1928,11 @@ button:focus-visible {
   margin-left: auto;
 }
 
+.filter-bar-standalone-actions {
+  border-top: 1px solid color-mix(in srgb, var(--line-300) 55%, transparent);
+  padding-top: 0.55rem;
+}
+
 .filter-standalone-actions {
   display: flex;
   justify-content: flex-end;
