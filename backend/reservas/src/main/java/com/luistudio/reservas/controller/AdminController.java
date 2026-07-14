@@ -220,7 +220,9 @@ public class AdminController {
 
         Page<LoginAttemptEntity> result = loginAttemptRepository.findAll(
             spec,
-            PageRequest.of(safePage, safeSize, Sort.by(new Sort.Order(direction, sortProperty).nullsLast()))
+            // Spring Data JPA cannot translate Sort.NullHandling into a Criteria query.
+            // The default null ordering of the database is used instead.
+            PageRequest.of(safePage, safeSize, Sort.by(new Sort.Order(direction, sortProperty)))
         );
         return new PageResponse<>(
             result.getContent().stream().map(a -> new LoginAttemptAdminResponse(

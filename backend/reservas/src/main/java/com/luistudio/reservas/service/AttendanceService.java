@@ -149,7 +149,9 @@ public class AttendanceService {
             case "status" -> "attendanceStatus";
             default -> "fecha";
         };
-        Sort sort = Sort.by(new Sort.Order(direction, property).nullsLast())
+        // Spring Data JPA cannot translate Sort.NullHandling into a Criteria query.
+        // The default null ordering of the database is used instead.
+        Sort sort = Sort.by(new Sort.Order(direction, property))
             .and(Sort.by(direction, "horaInicio"))
             .and(Sort.by(Sort.Direction.ASC, "id"));
         Page<ReservationEntity> result = reservationRepository.findAll(
