@@ -182,7 +182,12 @@
 .smart-search-empty { color: var(--ink-500); padding: 1rem; text-align: center; }
 
 /* Búsqueda de salas en lenguaje natural */
-.smart-search-page-card { display: grid; gap: var(--space-2); }
+.smart-search-page-card {
+  display: grid;
+  width: min(100%, 80rem);
+  margin-inline: auto;
+  gap: var(--space-2);
+}
 .smart-search-description { margin: 0; color: var(--ink-700); }
 .smart-search-page-form { display: grid; }
 .smart-search-input-panel { display: grid; gap: 1.25rem; border: 1px solid var(--line-200); border-radius: 1rem; background: var(--surface-025); padding: clamp(1rem, .8rem + 1vw, 1.8rem); }
@@ -2576,6 +2581,11 @@ th {
 .settings-dialog {
   display: grid;
   gap: var(--space-2);
+  box-sizing: border-box;
+  max-height: calc(100dvh - 2.5rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
 }
 
 .settings-header {

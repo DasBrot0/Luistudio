@@ -156,7 +156,7 @@ export function GlobalTopbar({
           {navItems.map((item) => (
             <button key={item.route} type="button" onClick={() => onNavigate(item.route)} className={`mobile-nav-btn flex min-w-[4.8rem] flex-1 flex-col items-center gap-1 rounded-md px-2 py-2 text-[11px] font-semibold ${activeRoute === item.route ? 'active' : ''}`}>
               <NavIcon type={item.icon} />
-              <span className="truncate">{item.label}</span>
+              <span className="text-center leading-tight whitespace-normal">{item.label}</span>
             </button>
           ))}
         </div>

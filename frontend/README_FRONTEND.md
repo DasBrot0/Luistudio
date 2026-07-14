@@ -92,6 +92,9 @@ El frontend usa exclusivamente pnpm. El campo `packageManager` y `pnpm-lock.yaml
 - El autoguardado de preferencias usa debounce de 300 ms y una firma interna sin re-render para evitar cancelar el guardado pendiente.
 - Configuración de vista inicial de sesión por rol desde el modal de Configuración (estudiante: Mis reservas/Reservar; admin: Salas/Reservas).
 - Configuración incluye subsección Notificaciones con tipos por rol y switches independientes para canal App y Email, persistidos por usuario.
+- El modal de Configuración limita su altura al viewport y permite desplazarse cuando su contenido no cabe.
+- La vista de Búsqueda inteligente alinea su tarjeta principal con el encabezado y conserva ese ajuste en pantallas pequeñas.
+- La navegación inferior móvil permite que las etiquetas largas, como Búsqueda inteligente, pasen a una segunda línea.
 - Mensajes de error/confirmación en modales integrados con la UI (sin `alert`/mensajes legacy).
 
 Notas recientes:
