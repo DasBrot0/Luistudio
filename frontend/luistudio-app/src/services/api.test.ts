@@ -52,10 +52,15 @@ describe('API client contracts', () => {
 
   it('downloads ICS using the authenticated cookie without a fake Bearer token', async () => {
     const calendar = new Blob(['BEGIN:VCALENDAR\r\nEND:VCALENDAR'], { type: 'text/calendar' })
-    const fetchMock = vi.fn().mockResolvedValue(new Response(calendar, { status: 200 }))
+    const response = {
+      ok: true,
+      status: 200,
+      blob: vi.fn().mockResolvedValue(calendar),
+    }
+    const fetchMock = vi.fn().mockResolvedValue(response)
     vi.stubGlobal('fetch', fetchMock)
 
-    await expect(api.downloadBookingIcs('session', 77)).resolves.toBeInstanceOf(Blob)
+    await expect(api.downloadBookingIcs('session', 77)).resolves.toBe(calendar)
 
     const [url, options] = fetchMock.mock.calls[0] as [string, RequestInit]
     expect(url).toMatch(/\/api\/bookings\/77\/ics$/)
