@@ -268,12 +268,13 @@ export function ReservasPage({
     Boolean(reservationForm.campus) &&
     Boolean(reservationForm.location) &&
     Boolean(reservationForm.roomId)
+  const showInlineIntelligentSearch = false
 
   return (
     <main className="page dashboard-page">
       <AppHeader title="Reservar" roleLabel="Estudiante" />
 
-      {intelligentSearchResult ? Boolean(0) && <section className="smart-search-card">
+      {showInlineIntelligentSearch && intelligentSearchResult && <section className="smart-search-card">
         <div className="smart-search-heading">
           <div><span className="smart-search-badge">Búsqueda inteligente</span><h2>Cuéntanos qué espacio necesitas</h2><p>Escribe tu intención con tus propias palabras; ordenaremos salas disponibles por compatibilidad.</p></div>
         </div>
@@ -309,7 +310,7 @@ export function ReservasPage({
             )}
           </div>
         )}
-      </section> : null}
+      </section>}
 
       <section className="dashboard-grid single-grid">
         <article className="card booking-card">

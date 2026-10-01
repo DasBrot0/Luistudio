@@ -69,12 +69,13 @@ export function MisReservasPage({
   const [bookingQuery, setBookingQuery] = useState('')
   const [bookingStatus, setBookingStatus] = useState('Todos')
   const [absenceQuery, setAbsenceQuery] = useState('')
+  const [renderedAt] = useState(Date.now)
 
   const canCancelBooking = (booking: Booking) => {
     if (booking.status === 'Cancelado') return false
     const endDateTime = new Date(`${booking.date}T${booking.end}:00`)
     if (Number.isNaN(endDateTime.getTime())) return false
-    return endDateTime.getTime() > Date.now()
+    return endDateTime.getTime() > renderedAt
   }
 
   const canEditBooking = (booking: Booking) => booking.status !== 'Cancelado'

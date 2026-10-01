@@ -12,30 +12,28 @@ export function ConfirmSensitiveChangePage() {
   const [searchParams] = useSearchParams()
   const [status, setStatus] = useState<Status>('loading')
   const [message, setMessage] = useState('')
-  const [actionLabel, setActionLabel] = useState('')
+  const token = searchParams.get('token')
+  const action = searchParams.get('action') ?? ''
+  const actionLabel = ACTION_LABELS[action] ?? 'cambio de seguridad'
+  const visibleStatus: Status = token ? status : 'error'
+  const visibleMessage = token
+    ? message
+    : 'El enlace de confirmación no es válido o está incompleto.'
 
   useEffect(() => {
-    const token = searchParams.get('token')
-    const action = searchParams.get('action') ?? ''
-    setActionLabel(ACTION_LABELS[action] ?? 'cambio de seguridad')
-
-    if (!token) {
-      setStatus('error')
-      setMessage('El enlace de confirmación no es válido o está incompleto.')
-      return
-    }
+    if (!token) return
 
     api
       .confirmSensitiveChange('', token)
       .then(() => {
         setStatus('success')
-        setMessage('Tu ' + (ACTION_LABELS[action] ?? 'cambio de seguridad') + ' fue confirmado exitosamente.')
+        setMessage('Tu ' + actionLabel + ' fue confirmado exitosamente.')
       })
       .catch((err: unknown) => {
         setStatus('error')
         setMessage(err instanceof Error ? err.message : 'El enlace expiró o ya fue usado. Solicita uno nuevo desde tu perfil.')
       })
-  }, [searchParams])
+  }, [actionLabel, token])
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f1f5f9', padding: 24 }}>
@@ -43,29 +41,29 @@ export function ConfirmSensitiveChangePage() {
         <h1 style={{ margin: '0 0 6px', fontSize: 22, fontWeight: 800, color: '#1e3a8a' }}>Luistudio</h1>
         <p style={{ margin: '0 0 28px', fontSize: 13, color: '#64748b' }}>Confirmación de cambio de seguridad</p>
 
-        {status === 'loading' && (
+        {visibleStatus === 'loading' && (
           <>
             <div style={{ fontSize: 36, marginBottom: 16 }}>⏳</div>
             <p style={{ color: '#334155', fontSize: 15 }}>Confirmando tu {actionLabel}...</p>
           </>
         )}
 
-        {status === 'success' && (
+        {visibleStatus === 'success' && (
           <>
             <div style={{ fontSize: 36, marginBottom: 16 }}>✅</div>
             <h2 style={{ margin: '0 0 10px', fontSize: 18, fontWeight: 700, color: '#15803d' }}>¡Confirmado!</h2>
-            <p style={{ color: '#334155', fontSize: 14, marginBottom: 24 }}>{message}</p>
+            <p style={{ color: '#334155', fontSize: 14, marginBottom: 24 }}>{visibleMessage}</p>
             <a href="/" style={{ display: 'inline-block', background: '#2563eb', color: '#fff', textDecoration: 'none', fontWeight: 700, padding: '10px 24px', borderRadius: 10, fontSize: 14 }}>
               Ir al inicio
             </a>
           </>
         )}
 
-        {status === 'error' && (
+        {visibleStatus === 'error' && (
           <>
             <div style={{ fontSize: 36, marginBottom: 16 }}>❌</div>
             <h2 style={{ margin: '0 0 10px', fontSize: 18, fontWeight: 700, color: '#dc2626' }}>Enlace inválido</h2>
-            <p style={{ color: '#334155', fontSize: 14, marginBottom: 24 }}>{message}</p>
+            <p style={{ color: '#334155', fontSize: 14, marginBottom: 24 }}>{visibleMessage}</p>
             <a href="/" style={{ display: 'inline-block', background: '#2563eb', color: '#fff', textDecoration: 'none', fontWeight: 700, padding: '10px 24px', borderRadius: 10, fontSize: 14 }}>
               Volver al inicio
             </a>

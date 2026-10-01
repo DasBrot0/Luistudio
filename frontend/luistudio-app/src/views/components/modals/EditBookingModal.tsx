@@ -143,8 +143,10 @@ export function EditBookingModal({
   )
 
   const slotMinutes = selectedRoom?.slotMinutes ?? 60
-  const baseDate = form.date ? new Date(`${form.date}T00:00:00`) : new Date()
-  const weekDays = useMemo(() => getWeekDays(baseDate, weekOffset), [baseDate, weekOffset])
+  const weekDays = useMemo(() => {
+    const baseDate = form.date ? new Date(`${form.date}T00:00:00`) : new Date()
+    return getWeekDays(baseDate, weekOffset)
+  }, [form.date, weekOffset])
   const scheduleByDay = useMemo(() => {
     const values = new Map<number, { open: string | null; close: string | null; closed: boolean }>()
     for (const day of selectedRoom?.schedule ?? []) {
