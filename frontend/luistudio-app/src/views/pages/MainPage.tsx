@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useEffectEvent, useMemo, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { getRouteFromPath, resolveRouteByAuth, routePaths } from '../../viewmodels/routes'
@@ -485,7 +485,7 @@ export function MainPage() {
   const { handleLogoClick } = useLuistudioEasterEgg()
   const location = useLocation()
   const navigate = useNavigate()
-  const [route, setRoute] = useState<RouteKey>(() => getRouteFromPath(location.pathname))
+  const route = getRouteFromPath(location.pathname)
 
   const [token, setToken] = useState('')
   const [authenticatedUser, setAuthenticatedUser] = useState<AuthUser | null>(null)
@@ -853,7 +853,6 @@ export function MainPage() {
   const navigateToRoute = (nextRoute: RouteKey, options?: { replace?: boolean }) => {
     const nextPath = routePaths[nextRoute]
     if (location.pathname !== nextPath) navigate(nextPath, { replace: options?.replace ?? false })
-    setRoute(nextRoute)
   }
 
   const handleReservationChange = (next: ReservationForm) => {
@@ -1220,20 +1219,27 @@ export function MainPage() {
     }
   }
 
-  useEffect(() => {
-    setRoute(getRouteFromPath(location.pathname))
-  }, [location.pathname])
+  const navigateToRouteFromEffect = useEffectEvent(navigateToRoute)
+  const loadInitialDataForRouteFromEffect = useEffectEvent(loadInitialDataForRoute)
+  const loadAdminBookingsFromEffect = useEffectEvent(loadAdminBookings)
+  const loadRoomDirectoryFromEffect = useEffectEvent(loadRoomDirectory)
+  const loadProfilesFromEffect = useEffectEvent(loadProfiles)
+  const loadSecurityAttemptsFromEffect = useEffectEvent(loadSecurityAttempts)
+  const loadAttendanceFromEffect = useEffectEvent(loadAttendance)
+  const loadRoomBookingsWindowFromEffect = useEffectEvent(loadRoomBookingsWindow)
 
   useEffect(() => {
     if (route !== 'reset-password') return
     const params = new URLSearchParams(location.search)
     const tokenFromLink = params.get('token') ?? ''
     if (!tokenFromLink) {
-      setResetError('Debes abrir el enlace de recuperación enviado al correo')
-      navigateToRoute('login', { replace: true })
+      void Promise.resolve().then(() => {
+        setResetError('Debes abrir el enlace de recuperación enviado al correo')
+        navigateToRouteFromEffect('login', { replace: true })
+      })
       return
     }
-    setResetToken(tokenFromLink)
+    void Promise.resolve().then(() => setResetToken(tokenFromLink))
   }, [route, location.search])
 
   useEffect(() => {
@@ -1308,8 +1314,11 @@ export function MainPage() {
   }, [notifications])
 
   useEffect(() => {
-    setIsNotificationsModalOpen(false)
-    setIsSettingsModalOpen(false)
+    const timeout = window.setTimeout(() => {
+      setIsNotificationsModalOpen(false)
+      setIsSettingsModalOpen(false)
+    }, 0)
+    return () => window.clearTimeout(timeout)
   }, [effectiveRoute])
 
   useEffect(() => {
@@ -1378,12 +1387,11 @@ export function MainPage() {
 
   useEffect(() => {
     if (authenticatedUser) {
-      setAuthHydrated(true)
+      void Promise.resolve().then(() => setAuthHydrated(true))
       return
     }
     if (!hasStoredSession) {
-      setHasStoredSession(false)
-      setAuthHydrated(true)
+      void Promise.resolve().then(() => setAuthHydrated(true))
       return
     }
     api
@@ -1395,8 +1403,8 @@ export function MainPage() {
         setHasStoredSession(true)
         loadUserPreferences('session', user)
           .then((landingRoute) => {
-            navigateToRoute(landingRoute, { replace: true })
-            return loadInitialDataForRoute('session', user, landingRoute)
+            navigateToRouteFromEffect(landingRoute, { replace: true })
+            return loadInitialDataForRouteFromEffect('session', user, landingRoute)
           })
           .catch(() => undefined)
       })
@@ -1410,7 +1418,7 @@ export function MainPage() {
 
   useEffect(() => {
     if (!token || authenticatedUser?.role !== 'admin' || effectiveRoute !== 'admin-reservas') return
-    loadAdminBookings(token).catch((error) => {
+    void Promise.resolve().then(() => loadAdminBookingsFromEffect(token)).catch((error) => {
       const message = error instanceof Error ? error.message : 'No se pudieron cargar las reservas registradas.'
       setToastMessage(message)
     })
@@ -1418,7 +1426,7 @@ export function MainPage() {
 
   useEffect(() => {
     if (!token || authenticatedUser?.role !== 'admin' || !['salas', 'admin-reservas'].includes(effectiveRoute)) return
-    loadRoomDirectory(token).catch((error) => {
+    void Promise.resolve().then(() => loadRoomDirectoryFromEffect(token)).catch((error) => {
       const message = error instanceof Error ? error.message : 'No se pudo cargar el directorio de salas.'
       setToastMessage(message)
     })
@@ -1426,7 +1434,7 @@ export function MainPage() {
 
   useEffect(() => {
     if (!token || authenticatedUser?.role !== 'admin' || effectiveRoute !== 'perfiles') return
-    loadProfiles(token).catch((error) => {
+    void Promise.resolve().then(() => loadProfilesFromEffect(token)).catch((error) => {
       const message = error instanceof Error ? error.message : 'No se pudieron cargar los perfiles.'
       setToastMessage(message)
     })
@@ -1444,7 +1452,7 @@ export function MainPage() {
 
   useEffect(() => {
     if (!token || authenticatedUser?.role !== 'admin' || effectiveRoute !== 'seguridad') return
-    loadSecurityAttempts(token).catch((error) => {
+    void Promise.resolve().then(() => loadSecurityAttemptsFromEffect(token)).catch((error) => {
       const message = error instanceof Error ? error.message : 'No se pudo cargar el historial de seguridad.'
       setToastMessage(message)
     })
@@ -1464,7 +1472,7 @@ export function MainPage() {
 
   useEffect(() => {
     if (!token || authenticatedUser?.role !== 'admin' || effectiveRoute !== 'asistencias') return
-    loadAttendance(token).catch((error) => {
+    void Promise.resolve().then(() => loadAttendanceFromEffect(token)).catch((error) => {
       const message = error instanceof Error ? error.message : 'No se pudo cargar el control de asistencias.'
       setToastMessage(message)
     })
@@ -1486,10 +1494,12 @@ export function MainPage() {
     if (!token || authenticatedUser?.role !== 'student') return
     const room = activeRooms.find((item) => item.id === reservationForm.roomId)
     if (!room) {
-      setRoomBookingsWindow([])
+      void Promise.resolve().then(() => setRoomBookingsWindow([]))
       return
     }
-    loadRoomBookingsWindow(token, room.backendId, reservationWeekOffset).catch(() => setRoomBookingsWindow([]))
+    void Promise.resolve()
+      .then(() => loadRoomBookingsWindowFromEffect(token, room.backendId, reservationWeekOffset))
+      .catch(() => setRoomBookingsWindow([]))
   }, [token, authenticatedUser, activeRooms, reservationForm.roomId, reservationWeekOffset])
 
   useEffect(() => {
@@ -1500,7 +1510,7 @@ export function MainPage() {
       setResetPassword('')
       setResetPasswordConfirm('')
       setResetError('')
-      navigateToRoute('login', { replace: true })
+      navigateToRouteFromEffect('login', { replace: true })
     }, 1500)
     return () => window.clearTimeout(timeout)
   }, [showResetSuccess])
@@ -2274,21 +2284,23 @@ export function MainPage() {
 
   useEffect(() => {
     if (effectiveRoute !== 'profile' || !token) return
-    setProfileSessionsLoading(true)
-    api.getSessions(token)
-      .then((data) => setProfileSessions(data.sessions))
-      .catch(() => {})
-      .finally(() => setProfileSessionsLoading(false))
-    setProfileActivityLoading(true)
-    const activityFrom = profileActivityFrom ? `${profileActivityFrom}T00:00:00-05:00` : undefined
-    const activityTo = profileActivityTo ? `${profileActivityTo}T23:59:59-05:00` : undefined
-    api.getMyActivity(token, profileActivityPage - 1, 10, { from: activityFrom, to: activityTo })
-      .then((data) => {
-        setProfileActivity(data.content)
-        setProfileActivityTotalPages(Math.max(1, data.totalPages))
-      })
-      .catch(() => {})
-      .finally(() => setProfileActivityLoading(false))
+    void Promise.resolve().then(() => {
+      setProfileSessionsLoading(true)
+      api.getSessions(token)
+        .then((data) => setProfileSessions(data.sessions))
+        .catch(() => {})
+        .finally(() => setProfileSessionsLoading(false))
+      setProfileActivityLoading(true)
+      const activityFrom = profileActivityFrom ? `${profileActivityFrom}T00:00:00-05:00` : undefined
+      const activityTo = profileActivityTo ? `${profileActivityTo}T23:59:59-05:00` : undefined
+      api.getMyActivity(token, profileActivityPage - 1, 10, { from: activityFrom, to: activityTo })
+        .then((data) => {
+          setProfileActivity(data.content)
+          setProfileActivityTotalPages(Math.max(1, data.totalPages))
+        })
+        .catch(() => {})
+        .finally(() => setProfileActivityLoading(false))
+    })
   }, [effectiveRoute, profileActivityFrom, profileActivityPage, profileActivityTo, token])
 
   const roomBookingsForSelectedRoom = useMemo(
@@ -2496,7 +2508,6 @@ export function MainPage() {
                 isAdmin={authenticatedUser.role === 'admin'}
                 onReserve={(roomId) => {
                   navigate(`/reservas?roomId=${roomId}`)
-                  setRoute('reservas')
                 }}
               />
             )}

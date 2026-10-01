@@ -125,7 +125,11 @@ export function AdminDashboardPage({ data, loading, error, from, to, onFromChang
   const [rankingPage, setRankingPage] = useState(1)
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
 
-  useEffect(() => { if (data) setLastUpdated(new Date()) }, [data])
+  useEffect(() => {
+    if (!data) return
+    const timeout = window.setTimeout(() => setLastUpdated(new Date()), 0)
+    return () => window.clearTimeout(timeout)
+  }, [data])
 
   const totalReserved = data?.occupancyByRoom.reduce((sum, room) => sum + room.reservedMinutes, 0) ?? 0
   const totalAvailable = data?.occupancyByRoom.reduce((sum, room) => sum + room.availableMinutes, 0) ?? 0

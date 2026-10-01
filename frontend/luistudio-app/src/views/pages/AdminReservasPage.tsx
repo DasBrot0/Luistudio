@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import type { FormEvent } from 'react'
 import type { AuthUser, Booking, BookingStatus, CampusSchedule, ScheduleDay, SystemConfig } from '../../models/types'
 import { formatDate } from '../../utils/helpers'
@@ -89,11 +90,13 @@ export function AdminReservasPage({
   onCampusScheduleChange,
   onSaveCampusSchedule,
 }: AdminReservasPageProps) {
+  const [renderedAt] = useState(Date.now)
+
   const canCancelBooking = (booking: Booking) => {
     if (booking.status === 'Cancelado') return false
     const endDateTime = new Date(`${booking.date}T${booking.end}:00`)
     if (Number.isNaN(endDateTime.getTime())) return false
-    return endDateTime.getTime() > Date.now()
+    return endDateTime.getTime() > renderedAt
   }
 
   const bookingRows = bookings.map((booking) => {
