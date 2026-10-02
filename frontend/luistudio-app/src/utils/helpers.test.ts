@@ -3,7 +3,7 @@ import { buildPabellonCode, formatDate, minutesBetween, toMinutes } from './help
 
 describe('toMinutes', () => {
   it('converts an HH:mm string to total minutes', () => {
-    expect(toMinutes('09:30')).toBe(999)
+    expect(toMinutes('09:30')).toBe(570)
     expect(toMinutes('00:00')).toBe(0)
   })
 })
