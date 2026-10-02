@@ -44,7 +44,7 @@ export function LoginPage({
 
           <div className="login-context-copy">
             <p className="login-context-eyebrow">Espacios que se adaptan a ti</p>
-            <h2>Tu lugar para estudiar, reunirte y crear.</h2>
+            <h2>Tu espacio para estudiar, reunirte y crear.</h2>
             <p>Encuentra espacios disponibles y organiza tus reservas desde una experiencia simple y centralizada.</p>
           </div>
 
